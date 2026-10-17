@@ -1,0 +1,555 @@
+# Builds of upstream PR #2918, 2026-10-18.
+#
+# The pushed commit is 5c5aded209dffa74ad9b17b164d10ce16e76b41b.  The full builds ran at 435645f, an earlier local version
+# of it that was not pushed; 5c5aded changes only src/ngram/ple_reader_test.cpp from it (the engine sources are the same),
+# so at 5c5aded the CUDA and HIP builds rebuilt ple_reader_test and the SYCL build had nothing to do.
+# This machine has 4x Tesla P100 and no AMD or Intel GPU: the HIP and SYCL engines were built, not run.
+# ple_reader_test runs on the CPU, so its selftest ran in the CUDA and HIP builds; the SYCL build has no such target.
+# <rocm> is the site-packages folder of a venv with AMD's TheRock wheels rocm[libraries,devel]==7.10.0a20251120 from
+# https://rocm.nightlies.amd.com/v2/gfx110X-dgpu/ (the version and index setup.py uses for gfx1100).  <oneapi> is a conda
+# environment with dpcpp_linux-64 2026.1.1, mkl-devel-dpcpp 2026.1.0 and level-zero-devel 1.33.1 from
+# https://software.repos.intel.com/python/conda/.  cmake 4.4.3 and ninja from the deployed Strata's .venv; every build
+# ran under nice -n 19.  --gcc-install-dir: this machine has GCC 12's runtime but only GCC 11's C++ headers, and clang
+# picks 12 by default (the first HIP configure failed with "'cstdlib' file not found" for that reason).
+
+## 1. CUDA (build-cuda12: CUDA 12.9.1, sm_60, configured on 2026-10-17 with setup.py's CUDA 12 flags)
+
+# At 435645f:
+$ cmake --build build-cuda12 --target strata ple_reader_test -j 3
+[1/6] Building C object ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o
+[2/6] Linking CXX static library ggml/src/libggml-base.a
+[3/6] Linking CXX shared library libstrata_kq.so
+[4/6] Building CXX object CMakeFiles/ple_reader_test.dir/src/ngram/ple_reader_test.cpp.o
+[5/6] Linking CXX executable ple_reader_test
+[6/6] Linking CXX executable strata
+
+real	0m4.923s
+user	0m6.619s
+sys	0m1.714s
+
+# At 5c5aded:
+$ cmake --build build-cuda12 --target strata ple_reader_test -j 3
+[1/2] Building CXX object CMakeFiles/ple_reader_test.dir/src/ngram/ple_reader_test.cpp.o
+[2/2] Linking CXX executable ple_reader_test
+
+real	0m4.060s
+user	0m3.538s
+sys	0m0.496s
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # normal RLIMIT_MEMLOCK
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-cuda12/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 61
+    Start 61: ple_reader_selftest
+
+61: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12/ple_reader_test "--selftest"
+61: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+61: Test timeout computed to be: 10000000
+61: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+61: ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+61: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+61: ple_reader selftest (row_bytes=90): OK
+61: ple_reader selftest (row_bytes=110): OK
+1/1 Test #61: ple_reader_selftest ..............   Passed   13.32 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.33 sec
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # prlimit --memlock=65536
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-cuda12/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 61
+    Start 61: ple_reader_selftest
+
+61: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12/ple_reader_test "--selftest"
+61: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+61: Test timeout computed to be: 10000000
+61: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: IQ4_NL: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q5_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: F8_E4M3: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q5_1: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: BF16: mlock refused, the "ram" leg reads the table unlocked
+61: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+61: ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+61: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+61: ple_reader selftest (row_bytes=90): OK
+61: ple_reader selftest (row_bytes=110): OK
+1/1 Test #61: ple_reader_selftest ..............   Passed   13.49 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.49 sec
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # prlimit --memlock=0
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-cuda12/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 61
+    Start 61: ple_reader_selftest
+
+61: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12/ple_reader_test "--selftest"
+61: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-cuda12
+61: Test timeout computed to be: 10000000
+61: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: mlock refused (raise `ulimit -l`), a locked table is not tested
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: IQ4_NL: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q5_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: F8_E4M3: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q5_1: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+61: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+61: note: BF16: mlock refused, the "ram" leg reads the table unlocked
+61: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+61: ple row hints (Linux): kept on a refused lock: OK
+61: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+61: ple_reader selftest (row_bytes=90): OK
+61: ple_reader selftest (row_bytes=110): OK
+1/1 Test #61: ple_reader_selftest ..............   Passed   13.53 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.53 sec
+
+## 2. HIP (build-hip: gfx1100, ROCm 7.10.0a20251120, configured as setup.py's build_engine_hip does)
+
+#!/bin/bash
+# The HIP engine and ple_reader_test, configured the way Strata's setup.py does it (build_engine_hip), plus the test.
+# --gcc-install-dir: this machine has GCC 12's runtime but only GCC 11's C++ headers, and clang would pick 12.
+set -u
+S=<work>
+W=/home/thc1006/dev/strata-0.1.45-locked
+CB=/home/thc1006/dev/strata/.venv/lib/python3.10/site-packages/cmake/data/bin
+NINJA=/home/thc1006/dev/strata/.venv/bin/ninja
+ROOT=$($S/tc/rocm-venv/bin/rocm-sdk path --root)
+LIBS=$S/tc/rocm-venv/lib/python3.10/site-packages/_rocm_sdk_libraries_gfx110X_dgpu
+BITCODE=$ROOT/lib/llvm/amdgcn/bitcode
+export HIP_PLATFORM=amd HIP_COMPILER=clang HIP_RUNTIME=rocclr ROCM_PATH=$ROOT HIP_PATH=$ROOT
+export LD_LIBRARY_PATH=$ROOT/lib:$LIBS/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+export PATH=$ROOT/bin:$ROOT/llvm/bin:$PATH
+cd $W || exit 1
+echo "head: $(git rev-parse HEAD)"
+echo "rocm: $($S/tc/rocm-venv/bin/rocm-sdk version 2>&1 | head -1)"
+$ROOT/llvm/bin/clang++ --version | head -1
+nice -n 19 $CB/cmake -G Ninja -DCMAKE_MAKE_PROGRAM=$NINJA -S $W -B $W/build-hip -DCMAKE_BUILD_TYPE=Release \
+  -DSTRATA_ENABLE_HIP=ON -DSTRATA_ENABLE_CUDA=OFF -DSTRATA_BUILD_TESTS=OFF -DSTRATA_PREFILL_MMQ=ON \
+  -DSTRATA_Q6K_EXPERTS=ON -DSTRATA_MMQ_KQUANTS=ON -DCMAKE_HIP_ARCHITECTURES=gfx1100 \
+  -DCMAKE_HIP_COMPILER=$ROOT/llvm/bin/clang++ -DCMAKE_HIP_COMPILER_ROCM_ROOT=$ROOT \
+  "-DCMAKE_PREFIX_PATH=$ROOT;$LIBS" "-DCMAKE_HIP_FLAGS=--rocm-path=$ROOT --rocm-device-lib-path=$BITCODE --gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/11" \
+  -DSTRATA_GGML_DIR=$W/third_party/llama.cpp || { echo "CONFIGURE FAILED"; exit 1; }
+time nice -n 19 $CB/cmake --build $W/build-hip --target strata ple_reader_test -j 2
+rc=$?
+echo "BUILD rc=$rc"
+exit $rc
+
+# At 435645f, output abridged: the configure messages, the build steps for the PLE files, the links and the result.
+head: 435645f66fb8ac94fdb7b172348845ca0af73aa6
+rocm: 7.10.0a20251120
+AMD clang version 22.0.0git (https://github.com/ROCm/llvm-project.git 8e85e3138dd485c4221cc12aff9eb60ab48ed3b5+PATCHED:371bd8145f7e4d1d481987d05427c94e17708b91)
+-- The CXX compiler identification is GNU 11.4.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- The HIP compiler identification is Clang 22.0.0
+-- Detecting HIP compiler ABI info
+-- Detecting HIP compiler ABI info - done
+-- Check for working HIP compiler: <rocm>/_rocm_sdk_devel/llvm/bin/clang++ - skipped
+-- Detecting HIP compile features
+-- Detecting HIP compile features - done
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- Strata: HIP enabled, arch gfx1100
+-- strata: pack/full/experts.bin absent - the expert arena load test is NOT registered
+-- STRATA tests: no python3 with numpy was found (the configured interpreter and .venv were probed) - the iq_parity fixtures and its test are not registered; the fixtures need python3 with numpy and the repository's vendored gguf-py
+-- Performing Test STRATA_HAVE_AVXVNNI_INTRINSICS
+-- Performing Test STRATA_HAVE_AVXVNNI_INTRINSICS - Success
+-- The C compiler identification is GNU 11.4.0
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: /usr/bin/cc - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- The ASM compiler identification is GNU
+-- Found assembler: /usr/bin/cc
+-- Warning: ccache not found - consider installing it for faster compilation or disable this warning with GGML_CCACHE=OFF
+-- CMAKE_SYSTEM_PROCESSOR: x86_64
+-- GGML_SYSTEM_ARCH: x86
+-- Including CPU backend
+-- x86 detected
+-- Adding CPU backend variant ggml-cpu: -march=native 
+-- ggml version: 0.24.0
+-- ggml commit:  435645f6
+-- Configuring done (7.1s)
+-- Generating done (0.3s)
+-- Build files have been written to: /home/thc1006/dev/strata-0.1.45-locked/build-hip
+[15/151] Linking CXX static library ggml/src/libggml-base.a
+[31/151] Linking HIP static library libstrata_core.a
+[77/151] Building CXX object CMakeFiles/strata_kernels.dir/src/kernels/ngram.cpp.o
+[78/151] Building CXX object CMakeFiles/strata_kernels.dir/src/ngram/ple_reader.cpp.o
+[79/151] Building CXX object CMakeFiles/strata_kernels.dir/src/platform/direct_file.cpp.o
+[93/151] Linking CXX static library ggml/src/libggml-cpu.a
+[95/151] Linking HIP static library libstrata_kernels.a
+[112/151] Linking CXX static library libstrata_kernels_cpu.a
+[132/151] Linking HIP static library libstrata_engine.a
+[137/151] Linking HIP static library libstrata_mmq.a
+[139/151] Linking HIP static library libstrata_prefill.a
+[145/151] Linking HIP static library libstrata_qwen35.a
+[146/151] Building CXX object CMakeFiles/ple_reader_test.dir/src/ngram/ple_reader_test.cpp.o
+[147/151] Linking CXX static library libstrata_spec.a
+[148/151] Linking HIP executable ple_reader_test
+[150/151] Linking HIP executable strata
+real	10m57.612s
+user	19m6.696s
+sys	1m7.254s
+BUILD rc=0
+# 2103 compiler warnings in the whole build; 0 of them point into src/kernels/ngram.cpp or src/ngram/ple_reader_test.cpp.
+
+# At 5c5aded:
+$ cmake --build build-hip --target strata ple_reader_test -j 2
+[0/2] Re-checking globbed directories...
+[1/3] Building CXX object CMakeFiles/ple_reader_test.dir/src/ngram/ple_reader_test.cpp.o
+[2/3] Linking HIP executable ple_reader_test
+
+real	0m4.392s
+user	0m3.770s
+sys	0m0.618s
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # normal RLIMIT_MEMLOCK
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-hip/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-hip
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 67
+    Start 67: ple_reader_selftest
+
+67: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-hip/ple_reader_test "--selftest"
+67: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-hip
+67: Test timeout computed to be: 10000000
+67: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+67: ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+67: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+67: ple_reader selftest (row_bytes=90): OK
+67: ple_reader selftest (row_bytes=110): OK
+1/1 Test #67: ple_reader_selftest ..............   Passed   13.11 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.11 sec
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # prlimit --memlock=65536
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-hip/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-hip
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 67
+    Start 67: ple_reader_selftest
+
+67: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-hip/ple_reader_test "--selftest"
+67: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-hip
+67: Test timeout computed to be: 10000000
+67: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: IQ4_NL: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q5_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: F8_E4M3: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q5_1: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: BF16: mlock refused, the "ram" leg reads the table unlocked
+67: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+67: ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+67: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+67: ple_reader selftest (row_bytes=90): OK
+67: ple_reader selftest (row_bytes=110): OK
+1/1 Test #67: ple_reader_selftest ..............   Passed   13.44 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.44 sec
+
+$ ctest -R '^ple_reader_selftest$' --no-tests=error --output-on-failure -V   # prlimit --memlock=0
+UpdateCTestConfiguration  from :/home/thc1006/dev/strata-0.1.45-locked/build-hip/DartConfiguration.tcl
+Test project /home/thc1006/dev/strata-0.1.45-locked/build-hip
+Constructing a list of tests
+Done constructing a list of tests
+Updating test list for fixtures
+Added 0 tests to meet fixture requirements
+Checking test dependency graph...
+Checking test dependency graph end
+test 67
+    Start 67: ple_reader_selftest
+
+67: Test command: /home/thc1006/dev/strata-0.1.45-locked/build-hip/ple_reader_test "--selftest"
+67: Working Directory: /home/thc1006/dev/strata-0.1.45-locked/build-hip
+67: Test timeout computed to be: 10000000
+67: note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: mlock refused (raise `ulimit -l`), a locked table is not tested
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: IQ4_NL: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q5_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: F8_E4M3: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q5_1: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+67: strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+67: note: BF16: mlock refused, the "ram" leg reads the table unlocked
+67: ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+67: ple row hints (Linux): kept on a refused lock: OK
+67: ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+67: ple_reader selftest (row_bytes=90): OK
+67: ple_reader selftest (row_bytes=110): OK
+1/1 Test #67: ple_reader_selftest ..............   Passed   13.49 sec
+
+The following tests passed:
+	ple_reader_selftest
+
+100% tests passed out of 1
+
+Total Test time (real) =  13.49 sec
+
+# The same test object linked again with a copy of build-hip/libstrata_kernels.a whose ngram.cpp.o was compiled from
+# 0.1.45's ngram.cpp (no check) with build-hip's own compile command for ngram.cpp, and the same link command:
+
+$ ./ple_reader_test_noguard --selftest   # RLIMIT_MEMLOCK normal
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+FAIL /home/thc1006/dev/strata-0.1.45-locked/src/ngram/ple_reader_test.cpp:449: a locked table: gather_batch made 256 row hints, not 0
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+
+$ ./ple_reader_test_noguard --selftest   # RLIMIT_MEMLOCK 65536
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+FAIL /home/thc1006/dev/strata-0.1.45-locked/src/ngram/ple_reader_test.cpp:449: a locked table: gather_batch made 256 row hints, not 0
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+
+$ ./ple_reader_test_noguard --selftest   # RLIMIT_MEMLOCK 0
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: mlock refused (raise `ulimit -l`), a locked table is not tested
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: IQ4_NL: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q5_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: F8_E4M3: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q5_1: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: BF16: mlock refused, the "ram" leg reads the table unlocked
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple row hints (Linux): kept on a refused lock: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+
+## 3. SYCL (build-sycl: oneAPI DPC++ 2026.1.1, oneMKL 2026.1.0, SPIR-V JIT, configured as sycl/tools/build.sh does)
+
+#!/bin/bash
+# The SYCL engine, configured as sycl/tools/build.sh does (icx/icpx, Ninja, SPIR-V JIT), with oneAPI DPC++ 2026.1.1
+# and oneMKL 2026.1.0 from Intel's conda channel, and ggml from the checkout's third_party/llama.cpp.
+# --gcc-install-dir: this machine has GCC 12's runtime but only GCC 11's C++ headers, and clang would pick 12.
+set -u
+S=<work>
+W=/home/thc1006/dev/strata-0.1.45-locked
+P=$S/tc/oneapi
+CB=/home/thc1006/dev/strata/.venv/lib/python3.10/site-packages/cmake/data/bin
+NINJA=/home/thc1006/dev/strata/.venv/bin/ninja
+export PATH=$P/bin:$PATH MKLROOT=$P LD_LIBRARY_PATH=$P/lib CMAKE_PREFIX_PATH=$P
+GCC='--gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/11'
+cd $W || exit 1
+echo "head: $(git rev-parse HEAD)"
+icpx --version 2>/dev/null | head -1
+nice -n 19 $CB/cmake -S $W/sycl -B $W/build-sycl -G Ninja -DCMAKE_MAKE_PROGRAM=$NINJA -DCMAKE_C_COMPILER=icx \
+  -DCMAKE_CXX_COMPILER=icpx -DSTRATA_SYCL_AOT= -DSTRATA_SYCL_SPIN_MAX= "-DCMAKE_C_FLAGS=$GCC" "-DCMAKE_CXX_FLAGS=$GCC" \
+  -DSTRATA_GGML_DIR=$W/third_party/llama.cpp || { echo "CONFIGURE FAILED"; exit 1; }
+time nice -n 19 $CB/cmake --build $W/build-sycl --target strata -j 2
+rc=$?
+echo "BUILD rc=$rc"
+exit $rc
+
+# At 435645f, output abridged as above.
+head: 435645f66fb8ac94fdb7b172348845ca0af73aa6
+Intel(R) oneAPI DPC++/C++ Compiler 2026.1.1 (2026.1.1.20260724)
+-- The C compiler identification is IntelLLVM 2026.1.1
+-- The CXX compiler identification is IntelLLVM 2026.1.1
+-- Detecting C compiler ABI info
+-- Detecting C compiler ABI info - done
+-- Check for working C compiler: <oneapi>/bin/icx - skipped
+-- Detecting C compile features
+-- Detecting C compile features - done
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: <oneapi>/bin/icpx - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Performing Test STRATA_HAVE_AVXVNNI_INTRINSICS
+-- Performing Test STRATA_HAVE_AVXVNNI_INTRINSICS - Success
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD
+-- Performing Test CMAKE_HAVE_LIBC_PTHREAD - Success
+-- Found Threads: TRUE
+-- The ASM compiler identification is GNU
+-- Found assembler: <oneapi>/bin/icx
+-- Warning: ccache not found - consider installing it for faster compilation or disable this warning with GGML_CCACHE=OFF
+-- CMAKE_SYSTEM_PROCESSOR: x86_64
+-- GGML_SYSTEM_ARCH: x86
+-- Including CPU backend
+-- x86 detected
+-- Adding CPU backend variant ggml-cpu: -march=native 
+-- ggml version: 0.24.0
+-- ggml commit:  435645f6
+-- STRATA SYCL tests: no python3 with numpy found - iq_parity and its fixtures are not registered
+-- Configuring done (3.6s)
+-- Generating done (0.2s)
+-- Build files have been written to: /home/thc1006/dev/strata-0.1.45-locked/build-sycl
+[15/129] Linking CXX static library ggml/src/libggml-base.a
+[44/129] Linking CXX static library libstrata_core.a
+[89/129] Building CXX object CMakeFiles/strata_kernels.dir/home/thc1006/dev/strata-0.1.45-locked/src/kernels/ngram.cpp.o
+[90/129] Building CXX object CMakeFiles/strata_kernels.dir/src/ngram/ple_reader.cpp.o
+[91/129] Building CXX object CMakeFiles/strata_kernels.dir/src/platform/direct_file.cpp.o
+[93/129] Linking CXX static library ggml/src/libggml-cpu.a
+[94/129] Linking CXX static library libstrata_kernels_cpu.a
+[96/129] Linking CXX static library libstrata_kernels.a
+[119/129] Linking CXX static library libstrata_engine.a
+[125/129] Linking CXX static library libstrata_spec.a
+[127/129] Linking CXX static library libstrata_prefill.a
+[129/129] Linking CXX executable strata
+real	12m31.786s
+user	21m2.905s
+sys	2m43.357s
+BUILD rc=0
+# 7765 compiler warnings in the whole build; 0 of them point into src/kernels/ngram.cpp or src/ngram/ple_reader_test.cpp.
+
+# At 5c5aded:
+$ cmake --build build-sycl --target strata -j 2
+ninja: no work to do.
+
+## 4. Compile checks for other platforms with zig 0.16.0 (clang 21.1.0), compile only
+
+# zig 0.16.0 from https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz (sha256 70e49664...).
+# $ zig c++ -target <target> -std=c++20 -O2 -Wall -Wextra -DSTRATA_VERSION='"0.1.45"' -Iinclude -c <file>.cpp
+# Files: src/kernels/ngram.cpp at 5c5aded ("ngram") and at 477ac13 ("ngram_noguard"), src/ngram/ple_reader_test.cpp at
+# 5c5aded (working name ple_reader_test_v5.cpp), src/ngram/ple_reader.cpp and src/platform/direct_file.cpp.
+x86_64-linux-gnu.2.35    ngram            compiled  warnings=0 errors=0
+x86_64-linux-gnu.2.35    ngram_noguard    compiled  warnings=0 errors=0
+x86_64-linux-gnu.2.35    ple_reader_test  compiled  warnings=0 errors=0
+x86_64-linux-gnu.2.35    ple_reader       compiled  warnings=0 errors=0
+x86_64-linux-gnu.2.35    direct_file      compiled  warnings=0 errors=0
+x86_64-linux-musl        ngram            compiled  warnings=0 errors=0
+x86_64-linux-musl        ngram_noguard    compiled  warnings=0 errors=0
+x86_64-linux-musl        ple_reader_test  compiled  warnings=0 errors=0
+x86_64-linux-musl        ple_reader       compiled  warnings=0 errors=0
+x86_64-linux-musl        direct_file      compiled  warnings=0 errors=0
+aarch64-macos            ngram            compiled  warnings=0 errors=0
+aarch64-macos            ngram_noguard    compiled  warnings=0 errors=0
+aarch64-macos            ple_reader_test  compiled  warnings=0 errors=0
+aarch64-macos            ple_reader       compiled  warnings=0 errors=0
+aarch64-macos            direct_file      compiled  warnings=0 errors=0
+x86_64-macos             ngram            compiled  warnings=0 errors=0
+x86_64-macos             ngram_noguard    compiled  warnings=0 errors=0
+x86_64-macos             ple_reader_test  compiled  warnings=0 errors=0
+x86_64-macos             ple_reader       compiled  warnings=0 errors=0
+x86_64-macos             direct_file      compiled  warnings=0 errors=0
+x86_64-windows-gnu       ngram            compiled  warnings=0 errors=0
+x86_64-windows-gnu       ngram_noguard    compiled  warnings=0 errors=0
+x86_64-windows-gnu       ple_reader_test  compiled  warnings=0 errors=0
+x86_64-windows-gnu       ple_reader       compiled  warnings=0 errors=0
+x86_64-windows-gnu       direct_file      compiled  warnings=0 errors=0
+
+# Where the test's madvise counter and its mlock probe are compiled in (nm on the test object; both need __linux__ and __GLIBC__):
+x86_64-linux-gnu.2.35    defines madvise: yes   calls mlock: yes
+x86_64-linux-musl        defines madvise: no    calls mlock: no
+aarch64-macos            defines madvise: no    calls mlock: no
+x86_64-macos             defines madvise: no    calls mlock: no
+x86_64-windows-gnu       defines madvise: no    calls mlock: no
+
+# Windows: the two ngram.cpp objects disassemble to the same code once the file-name-derived symbol
+# _GLOBAL__sub_I_ngram_noguard.cpp is renamed to _GLOBAL__sub_I_ngram.cpp (objdump -d --no-show-raw-insn):
+x86_64-windows-gnu: identical (7058 lines)
+x86_64-macos (llvm-objdump from <rocm>): different
+x86_64-linux-gnu: different

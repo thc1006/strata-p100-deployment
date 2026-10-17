@@ -1,0 +1,817 @@
+# Hint-count contract for PleTable::gather_batch (upstream PR #2918), run on 2026-10-18.
+#
+# Harness: pr2918-contract.cpp.txt, linked with -Wl,--wrap=madvise (every madvise is counted and passed on).
+# Engine sources, from the PR branch: src/kernels/ngram.cpp at c1c9e57 (sha256 22a867fd..., the same file at 5c5aded)
+# for "head", and at 477ac13 (0.1.45, sha256 6e658955...) for "no guard"; src/ngram/ple_reader.cpp (f0cb0694...) and
+# src/platform/direct_file.cpp (f4bc441c...) at c1c9e57.
+# Build: g++ 11.4.0, -std=c++17 -O2 -pthread, host only, no GPU.  Runs: taskset -c 1-7, --dir in a temporary directory.
+# Contract "new": a table that open() locked gets no row hint in gather_batch; a table that is not locked, or whose
+# lock was refused, gets one hint per row in range.  "old": the behaviour before the PR (a locked table too).
+# The reviewer's matrix is 7 formats x 6 modes x 7 token counts (0, 1, 16, 255, 256, 257, 700); --extra adds the modes
+# "mmap" and "reopen-locked" and the token counts 2, 512, 513 and 1024.
+
+## head (with the check), --contract new --extra
+contract=new RLIMIT_MEMLOCK soft=8428400640 hard=8428400640 CAP_IPC_LOCK=0 formats=7
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 294 pass, 0 fail, 0 uncovered
+extra cases: 266 cases, 266 pass, 0 fail, 0 uncovered
+invalid-row zeros: +0 328800 values, -0 0 (mapped) and 17280 (direct)
+PASSED
+### stderr: 77 lines, 1 distinct
+77 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## no guard (0.1.45), --contract new --extra
+contract=new RLIMIT_MEMLOCK soft=8428400640 hard=8428400640 CAP_IPC_LOCK=0 formats=7
+FAIL IQ4_NL locked nt=1: hints=15 expected=0
+FAIL IQ4_NL locked nt=16: hints=253 expected=0
+FAIL IQ4_NL locked nt=255: hints=4077 expected=0
+FAIL IQ4_NL locked nt=256: hints=4093 expected=0
+FAIL IQ4_NL locked nt=257: hints=4108 expected=0
+FAIL IQ4_NL locked nt=700: hints=11195 expected=0
+FAIL IQ4_NL reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL IQ4_NL reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL IQ4_NL reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL IQ4_NL reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL IQ4_NL reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL IQ4_NL reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL IQ4_NL reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL IQ4_NL reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL IQ4_NL reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL IQ4_NL reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL IQ4_NL reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL IQ4_NL reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL IQ4_NL locked nt=2: hints=29 expected=0
+FAIL IQ4_NL locked nt=512: hints=8188 expected=0
+FAIL IQ4_NL locked nt=513: hints=8203 expected=0
+FAIL IQ4_NL locked nt=1024: hints=16379 expected=0
+FAIL IQ4_NL reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL IQ4_NL reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL IQ4_NL reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL IQ4_NL reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL Q5_0 locked nt=1: hints=15 expected=0
+FAIL Q5_0 locked nt=16: hints=253 expected=0
+FAIL Q5_0 locked nt=255: hints=4077 expected=0
+FAIL Q5_0 locked nt=256: hints=4093 expected=0
+FAIL Q5_0 locked nt=257: hints=4108 expected=0
+FAIL Q5_0 locked nt=700: hints=11195 expected=0
+FAIL Q5_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q5_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q5_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q5_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q5_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q5_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q5_0 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL Q5_0 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL Q5_0 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL Q5_0 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL Q5_0 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL Q5_0 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL Q5_0 locked nt=2: hints=29 expected=0
+FAIL Q5_0 locked nt=512: hints=8188 expected=0
+FAIL Q5_0 locked nt=513: hints=8203 expected=0
+FAIL Q5_0 locked nt=1024: hints=16379 expected=0
+FAIL Q5_0 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL Q5_0 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL Q5_0 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL Q5_0 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL F8_E4M3 locked nt=1: hints=15 expected=0
+FAIL F8_E4M3 locked nt=16: hints=253 expected=0
+FAIL F8_E4M3 locked nt=255: hints=4077 expected=0
+FAIL F8_E4M3 locked nt=256: hints=4093 expected=0
+FAIL F8_E4M3 locked nt=257: hints=4108 expected=0
+FAIL F8_E4M3 locked nt=700: hints=11195 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL F8_E4M3 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL F8_E4M3 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL F8_E4M3 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL F8_E4M3 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL F8_E4M3 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL F8_E4M3 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL F8_E4M3 locked nt=2: hints=29 expected=0
+FAIL F8_E4M3 locked nt=512: hints=8188 expected=0
+FAIL F8_E4M3 locked nt=513: hints=8203 expected=0
+FAIL F8_E4M3 locked nt=1024: hints=16379 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL Q5_1 locked nt=1: hints=15 expected=0
+FAIL Q5_1 locked nt=16: hints=253 expected=0
+FAIL Q5_1 locked nt=255: hints=4077 expected=0
+FAIL Q5_1 locked nt=256: hints=4093 expected=0
+FAIL Q5_1 locked nt=257: hints=4108 expected=0
+FAIL Q5_1 locked nt=700: hints=11195 expected=0
+FAIL Q5_1 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q5_1 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q5_1 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q5_1 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q5_1 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q5_1 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q5_1 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL Q5_1 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL Q5_1 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL Q5_1 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL Q5_1 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL Q5_1 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL Q5_1 locked nt=2: hints=29 expected=0
+FAIL Q5_1 locked nt=512: hints=8188 expected=0
+FAIL Q5_1 locked nt=513: hints=8203 expected=0
+FAIL Q5_1 locked nt=1024: hints=16379 expected=0
+FAIL Q5_1 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL Q5_1 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL Q5_1 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL Q5_1 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL Q8_0 locked nt=1: hints=15 expected=0
+FAIL Q8_0 locked nt=16: hints=253 expected=0
+FAIL Q8_0 locked nt=255: hints=4077 expected=0
+FAIL Q8_0 locked nt=256: hints=4093 expected=0
+FAIL Q8_0 locked nt=257: hints=4108 expected=0
+FAIL Q8_0 locked nt=700: hints=11195 expected=0
+FAIL Q8_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q8_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q8_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q8_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q8_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q8_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q8_0 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL Q8_0 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL Q8_0 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL Q8_0 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL Q8_0 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL Q8_0 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL Q8_0 locked nt=2: hints=29 expected=0
+FAIL Q8_0 locked nt=512: hints=8188 expected=0
+FAIL Q8_0 locked nt=513: hints=8203 expected=0
+FAIL Q8_0 locked nt=1024: hints=16379 expected=0
+FAIL Q8_0 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL Q8_0 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL Q8_0 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL Q8_0 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL Q4_0 locked nt=1: hints=15 expected=0
+FAIL Q4_0 locked nt=16: hints=253 expected=0
+FAIL Q4_0 locked nt=255: hints=4077 expected=0
+FAIL Q4_0 locked nt=256: hints=4093 expected=0
+FAIL Q4_0 locked nt=257: hints=4108 expected=0
+FAIL Q4_0 locked nt=700: hints=11195 expected=0
+FAIL Q4_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q4_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q4_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q4_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q4_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q4_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q4_0 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL Q4_0 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL Q4_0 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL Q4_0 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL Q4_0 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL Q4_0 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL Q4_0 locked nt=2: hints=29 expected=0
+FAIL Q4_0 locked nt=512: hints=8188 expected=0
+FAIL Q4_0 locked nt=513: hints=8203 expected=0
+FAIL Q4_0 locked nt=1024: hints=16379 expected=0
+FAIL Q4_0 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL Q4_0 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL Q4_0 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL Q4_0 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+FAIL BF16 locked nt=1: hints=15 expected=0
+FAIL BF16 locked nt=16: hints=253 expected=0
+FAIL BF16 locked nt=255: hints=4077 expected=0
+FAIL BF16 locked nt=256: hints=4093 expected=0
+FAIL BF16 locked nt=257: hints=4108 expected=0
+FAIL BF16 locked nt=700: hints=11195 expected=0
+FAIL BF16 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL BF16 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL BF16 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL BF16 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL BF16 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL BF16 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL BF16 reopen-locked nt=1: reopened locked: hints=15 expected=0
+FAIL BF16 reopen-locked nt=16: reopened locked: hints=253 expected=0
+FAIL BF16 reopen-locked nt=255: reopened locked: hints=4077 expected=0
+FAIL BF16 reopen-locked nt=256: reopened locked: hints=4093 expected=0
+FAIL BF16 reopen-locked nt=257: reopened locked: hints=4108 expected=0
+FAIL BF16 reopen-locked nt=700: reopened locked: hints=11195 expected=0
+FAIL BF16 locked nt=2: hints=29 expected=0
+FAIL BF16 locked nt=512: hints=8188 expected=0
+FAIL BF16 locked nt=513: hints=8203 expected=0
+FAIL BF16 locked nt=1024: hints=16379 expected=0
+FAIL BF16 reopen-unlocked nt=2: before close: hints=29 expected=0
+FAIL BF16 reopen-unlocked nt=512: before close: hints=8188 expected=0
+FAIL BF16 reopen-unlocked nt=513: before close: hints=8203 expected=0
+FAIL BF16 reopen-unlocked nt=1024: before close: hints=16379 expected=0
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 210 pass, 84 fail, 0 uncovered
+extra cases: 266 cases, 168 pass, 98 fail, 0 uncovered
+invalid-row zeros: +0 186560 values, -0 0 (mapped) and 17280 (direct)
+FAILED
+### stderr: 77 lines, 1 distinct
+77 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## head (with the check), --contract old --extra
+contract=old RLIMIT_MEMLOCK soft=8428400640 hard=8428400640 CAP_IPC_LOCK=0 formats=7
+FAIL IQ4_NL locked nt=1: hints=0 expected=15
+FAIL IQ4_NL locked nt=16: hints=0 expected=253
+FAIL IQ4_NL locked nt=255: hints=0 expected=4077
+FAIL IQ4_NL locked nt=256: hints=0 expected=4093
+FAIL IQ4_NL locked nt=257: hints=0 expected=4108
+FAIL IQ4_NL locked nt=700: hints=0 expected=11195
+FAIL IQ4_NL reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL IQ4_NL reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL IQ4_NL reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL IQ4_NL reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL IQ4_NL reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL IQ4_NL reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL IQ4_NL reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL IQ4_NL reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL IQ4_NL reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL IQ4_NL reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL IQ4_NL reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL IQ4_NL reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL IQ4_NL locked nt=2: hints=0 expected=29
+FAIL IQ4_NL locked nt=512: hints=0 expected=8188
+FAIL IQ4_NL locked nt=513: hints=0 expected=8203
+FAIL IQ4_NL locked nt=1024: hints=0 expected=16379
+FAIL IQ4_NL reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL IQ4_NL reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL IQ4_NL reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL IQ4_NL reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL Q5_0 locked nt=1: hints=0 expected=15
+FAIL Q5_0 locked nt=16: hints=0 expected=253
+FAIL Q5_0 locked nt=255: hints=0 expected=4077
+FAIL Q5_0 locked nt=256: hints=0 expected=4093
+FAIL Q5_0 locked nt=257: hints=0 expected=4108
+FAIL Q5_0 locked nt=700: hints=0 expected=11195
+FAIL Q5_0 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL Q5_0 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL Q5_0 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL Q5_0 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL Q5_0 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL Q5_0 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL Q5_0 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL Q5_0 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL Q5_0 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL Q5_0 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL Q5_0 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL Q5_0 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL Q5_0 locked nt=2: hints=0 expected=29
+FAIL Q5_0 locked nt=512: hints=0 expected=8188
+FAIL Q5_0 locked nt=513: hints=0 expected=8203
+FAIL Q5_0 locked nt=1024: hints=0 expected=16379
+FAIL Q5_0 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL Q5_0 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL Q5_0 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL Q5_0 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL F8_E4M3 locked nt=1: hints=0 expected=15
+FAIL F8_E4M3 locked nt=16: hints=0 expected=253
+FAIL F8_E4M3 locked nt=255: hints=0 expected=4077
+FAIL F8_E4M3 locked nt=256: hints=0 expected=4093
+FAIL F8_E4M3 locked nt=257: hints=0 expected=4108
+FAIL F8_E4M3 locked nt=700: hints=0 expected=11195
+FAIL F8_E4M3 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL F8_E4M3 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL F8_E4M3 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL F8_E4M3 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL F8_E4M3 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL F8_E4M3 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL F8_E4M3 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL F8_E4M3 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL F8_E4M3 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL F8_E4M3 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL F8_E4M3 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL F8_E4M3 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL F8_E4M3 locked nt=2: hints=0 expected=29
+FAIL F8_E4M3 locked nt=512: hints=0 expected=8188
+FAIL F8_E4M3 locked nt=513: hints=0 expected=8203
+FAIL F8_E4M3 locked nt=1024: hints=0 expected=16379
+FAIL F8_E4M3 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL F8_E4M3 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL F8_E4M3 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL F8_E4M3 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL Q5_1 locked nt=1: hints=0 expected=15
+FAIL Q5_1 locked nt=16: hints=0 expected=253
+FAIL Q5_1 locked nt=255: hints=0 expected=4077
+FAIL Q5_1 locked nt=256: hints=0 expected=4093
+FAIL Q5_1 locked nt=257: hints=0 expected=4108
+FAIL Q5_1 locked nt=700: hints=0 expected=11195
+FAIL Q5_1 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL Q5_1 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL Q5_1 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL Q5_1 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL Q5_1 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL Q5_1 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL Q5_1 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL Q5_1 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL Q5_1 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL Q5_1 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL Q5_1 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL Q5_1 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL Q5_1 locked nt=2: hints=0 expected=29
+FAIL Q5_1 locked nt=512: hints=0 expected=8188
+FAIL Q5_1 locked nt=513: hints=0 expected=8203
+FAIL Q5_1 locked nt=1024: hints=0 expected=16379
+FAIL Q5_1 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL Q5_1 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL Q5_1 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL Q5_1 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL Q8_0 locked nt=1: hints=0 expected=15
+FAIL Q8_0 locked nt=16: hints=0 expected=253
+FAIL Q8_0 locked nt=255: hints=0 expected=4077
+FAIL Q8_0 locked nt=256: hints=0 expected=4093
+FAIL Q8_0 locked nt=257: hints=0 expected=4108
+FAIL Q8_0 locked nt=700: hints=0 expected=11195
+FAIL Q8_0 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL Q8_0 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL Q8_0 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL Q8_0 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL Q8_0 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL Q8_0 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL Q8_0 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL Q8_0 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL Q8_0 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL Q8_0 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL Q8_0 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL Q8_0 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL Q8_0 locked nt=2: hints=0 expected=29
+FAIL Q8_0 locked nt=512: hints=0 expected=8188
+FAIL Q8_0 locked nt=513: hints=0 expected=8203
+FAIL Q8_0 locked nt=1024: hints=0 expected=16379
+FAIL Q8_0 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL Q8_0 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL Q8_0 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL Q8_0 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL Q4_0 locked nt=1: hints=0 expected=15
+FAIL Q4_0 locked nt=16: hints=0 expected=253
+FAIL Q4_0 locked nt=255: hints=0 expected=4077
+FAIL Q4_0 locked nt=256: hints=0 expected=4093
+FAIL Q4_0 locked nt=257: hints=0 expected=4108
+FAIL Q4_0 locked nt=700: hints=0 expected=11195
+FAIL Q4_0 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL Q4_0 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL Q4_0 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL Q4_0 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL Q4_0 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL Q4_0 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL Q4_0 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL Q4_0 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL Q4_0 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL Q4_0 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL Q4_0 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL Q4_0 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL Q4_0 locked nt=2: hints=0 expected=29
+FAIL Q4_0 locked nt=512: hints=0 expected=8188
+FAIL Q4_0 locked nt=513: hints=0 expected=8203
+FAIL Q4_0 locked nt=1024: hints=0 expected=16379
+FAIL Q4_0 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL Q4_0 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL Q4_0 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL Q4_0 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+FAIL BF16 locked nt=1: hints=0 expected=15
+FAIL BF16 locked nt=16: hints=0 expected=253
+FAIL BF16 locked nt=255: hints=0 expected=4077
+FAIL BF16 locked nt=256: hints=0 expected=4093
+FAIL BF16 locked nt=257: hints=0 expected=4108
+FAIL BF16 locked nt=700: hints=0 expected=11195
+FAIL BF16 reopen-unlocked nt=1: before close: hints=0 expected=15
+FAIL BF16 reopen-unlocked nt=16: before close: hints=0 expected=253
+FAIL BF16 reopen-unlocked nt=255: before close: hints=0 expected=4077
+FAIL BF16 reopen-unlocked nt=256: before close: hints=0 expected=4093
+FAIL BF16 reopen-unlocked nt=257: before close: hints=0 expected=4108
+FAIL BF16 reopen-unlocked nt=700: before close: hints=0 expected=11195
+FAIL BF16 reopen-locked nt=1: reopened locked: hints=0 expected=15
+FAIL BF16 reopen-locked nt=16: reopened locked: hints=0 expected=253
+FAIL BF16 reopen-locked nt=255: reopened locked: hints=0 expected=4077
+FAIL BF16 reopen-locked nt=256: reopened locked: hints=0 expected=4093
+FAIL BF16 reopen-locked nt=257: reopened locked: hints=0 expected=4108
+FAIL BF16 reopen-locked nt=700: reopened locked: hints=0 expected=11195
+FAIL BF16 locked nt=2: hints=0 expected=29
+FAIL BF16 locked nt=512: hints=0 expected=8188
+FAIL BF16 locked nt=513: hints=0 expected=8203
+FAIL BF16 locked nt=1024: hints=0 expected=16379
+FAIL BF16 reopen-unlocked nt=2: before close: hints=0 expected=29
+FAIL BF16 reopen-unlocked nt=512: before close: hints=0 expected=8188
+FAIL BF16 reopen-unlocked nt=513: before close: hints=0 expected=8203
+FAIL BF16 reopen-unlocked nt=1024: before close: hints=0 expected=16379
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 210 pass, 84 fail, 0 uncovered
+extra cases: 266 cases, 168 pass, 98 fail, 0 uncovered
+invalid-row zeros: +0 186560 values, -0 0 (mapped) and 17280 (direct)
+FAILED
+### stderr: 77 lines, 1 distinct
+77 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## no guard (0.1.45), --contract old --extra
+contract=old RLIMIT_MEMLOCK soft=8428400640 hard=8428400640 CAP_IPC_LOCK=0 formats=7
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 294 pass, 0 fail, 0 uncovered
+extra cases: 266 cases, 266 pass, 0 fail, 0 uncovered
+invalid-row zeros: +0 328800 values, -0 0 (mapped) and 17280 (direct)
+PASSED
+### stderr: 77 lines, 1 distinct
+77 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## head, --contract new, under prlimit --memlock=0
+contract=new RLIMIT_MEMLOCK soft=0 hard=0 CAP_IPC_LOCK=0 formats=7
+UNCOVERED IQ4_NL locked nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=700: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=700: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=0: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=1: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=16: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=255: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=256: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=257: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=700: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED BF16 locked nt=0: mlock did not succeed here
+UNCOVERED BF16 locked nt=1: mlock did not succeed here
+UNCOVERED BF16 locked nt=16: mlock did not succeed here
+UNCOVERED BF16 locked nt=255: mlock did not succeed here
+UNCOVERED BF16 locked nt=256: mlock did not succeed here
+UNCOVERED BF16 locked nt=257: mlock did not succeed here
+UNCOVERED BF16 locked nt=700: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=700: mlock did not succeed here
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 147 pass, 0 fail, 147 uncovered
+invalid-row zeros: +0 54720 values, -0 0 (mapped) and 9120 (direct)
+PASSED WITH UNCOVERED CASES
+### stderr: 196 lines, 1 distinct
+196 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## no guard, --contract new, under prlimit --memlock=0
+contract=new RLIMIT_MEMLOCK soft=0 hard=0 CAP_IPC_LOCK=0 formats=7
+UNCOVERED IQ4_NL locked nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL locked nt=700: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL locked-nohint nt=700: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED IQ4_NL reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q5_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q5_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q5_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 locked nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED F8_E4M3 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=0: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=1: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=16: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=255: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=256: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=257: mlock did not succeed here
+UNCOVERED Q5_1 locked nt=700: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q5_1 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q5_1 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q8_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q8_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q8_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=0: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=1: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=16: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=255: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=256: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=257: mlock did not succeed here
+UNCOVERED Q4_0 locked nt=700: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED Q4_0 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED Q4_0 reopen-unlocked nt=700: mlock did not succeed here
+UNCOVERED BF16 locked nt=0: mlock did not succeed here
+UNCOVERED BF16 locked nt=1: mlock did not succeed here
+UNCOVERED BF16 locked nt=16: mlock did not succeed here
+UNCOVERED BF16 locked nt=255: mlock did not succeed here
+UNCOVERED BF16 locked nt=256: mlock did not succeed here
+UNCOVERED BF16 locked nt=257: mlock did not succeed here
+UNCOVERED BF16 locked nt=700: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=0: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=1: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=16: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=255: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=256: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=257: mlock did not succeed here
+UNCOVERED BF16 locked-nohint nt=700: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=0: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=1: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=16: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=255: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=256: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=257: mlock did not succeed here
+UNCOVERED BF16 reopen-unlocked nt=700: mlock did not succeed here
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 147 pass, 0 fail, 147 uncovered
+invalid-row zeros: +0 54720 values, -0 0 (mapped) and 9120 (direct)
+PASSED WITH UNCOVERED CASES
+### stderr: 196 lines, 1 distinct
+196 x strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+
+## head, --contract new, under prlimit --memlock=8388608 (stderr not kept)
+contract=new RLIMIT_MEMLOCK soft=8388608 hard=8388608 CAP_IPC_LOCK=0 formats=7
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 294 pass, 0 fail, 0 uncovered
+invalid-row zeros: +0 139840 values, -0 0 (mapped) and 9120 (direct)
+PASSED
+
+## no guard, --contract new, under prlimit --memlock=8388608 (stderr not kept)
+contract=new RLIMIT_MEMLOCK soft=8388608 hard=8388608 CAP_IPC_LOCK=0 formats=7
+FAIL IQ4_NL locked nt=1: hints=15 expected=0
+FAIL IQ4_NL locked nt=16: hints=253 expected=0
+FAIL IQ4_NL locked nt=255: hints=4077 expected=0
+FAIL IQ4_NL locked nt=256: hints=4093 expected=0
+FAIL IQ4_NL locked nt=257: hints=4108 expected=0
+FAIL IQ4_NL locked nt=700: hints=11195 expected=0
+FAIL IQ4_NL reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL IQ4_NL reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL IQ4_NL reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL IQ4_NL reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL IQ4_NL reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL IQ4_NL reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q5_0 locked nt=1: hints=15 expected=0
+FAIL Q5_0 locked nt=16: hints=253 expected=0
+FAIL Q5_0 locked nt=255: hints=4077 expected=0
+FAIL Q5_0 locked nt=256: hints=4093 expected=0
+FAIL Q5_0 locked nt=257: hints=4108 expected=0
+FAIL Q5_0 locked nt=700: hints=11195 expected=0
+FAIL Q5_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q5_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q5_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q5_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q5_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q5_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL F8_E4M3 locked nt=1: hints=15 expected=0
+FAIL F8_E4M3 locked nt=16: hints=253 expected=0
+FAIL F8_E4M3 locked nt=255: hints=4077 expected=0
+FAIL F8_E4M3 locked nt=256: hints=4093 expected=0
+FAIL F8_E4M3 locked nt=257: hints=4108 expected=0
+FAIL F8_E4M3 locked nt=700: hints=11195 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL F8_E4M3 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q5_1 locked nt=1: hints=15 expected=0
+FAIL Q5_1 locked nt=16: hints=253 expected=0
+FAIL Q5_1 locked nt=255: hints=4077 expected=0
+FAIL Q5_1 locked nt=256: hints=4093 expected=0
+FAIL Q5_1 locked nt=257: hints=4108 expected=0
+FAIL Q5_1 locked nt=700: hints=11195 expected=0
+FAIL Q5_1 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q5_1 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q5_1 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q5_1 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q5_1 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q5_1 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q8_0 locked nt=1: hints=15 expected=0
+FAIL Q8_0 locked nt=16: hints=253 expected=0
+FAIL Q8_0 locked nt=255: hints=4077 expected=0
+FAIL Q8_0 locked nt=256: hints=4093 expected=0
+FAIL Q8_0 locked nt=257: hints=4108 expected=0
+FAIL Q8_0 locked nt=700: hints=11195 expected=0
+FAIL Q8_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q8_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q8_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q8_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q8_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q8_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL Q4_0 locked nt=1: hints=15 expected=0
+FAIL Q4_0 locked nt=16: hints=253 expected=0
+FAIL Q4_0 locked nt=255: hints=4077 expected=0
+FAIL Q4_0 locked nt=256: hints=4093 expected=0
+FAIL Q4_0 locked nt=257: hints=4108 expected=0
+FAIL Q4_0 locked nt=700: hints=11195 expected=0
+FAIL Q4_0 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL Q4_0 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL Q4_0 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL Q4_0 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL Q4_0 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL Q4_0 reopen-unlocked nt=700: before close: hints=11195 expected=0
+FAIL BF16 locked nt=1: hints=15 expected=0
+FAIL BF16 locked nt=16: hints=253 expected=0
+FAIL BF16 locked nt=255: hints=4077 expected=0
+FAIL BF16 locked nt=256: hints=4093 expected=0
+FAIL BF16 locked nt=257: hints=4108 expected=0
+FAIL BF16 locked nt=700: hints=11195 expected=0
+FAIL BF16 reopen-unlocked nt=1: before close: hints=15 expected=0
+FAIL BF16 reopen-unlocked nt=16: before close: hints=253 expected=0
+FAIL BF16 reopen-unlocked nt=255: before close: hints=4077 expected=0
+FAIL BF16 reopen-unlocked nt=256: before close: hints=4093 expected=0
+FAIL BF16 reopen-unlocked nt=257: before close: hints=4108 expected=0
+FAIL BF16 reopen-unlocked nt=700: before close: hints=11195 expected=0
+reviewer matrix (formats x 6 modes x 7 token counts): 294 cases, 210 pass, 84 fail, 0 uncovered
+invalid-row zeros: +0 76000 values, -0 0 (mapped) and 9120 (direct)
+FAILED

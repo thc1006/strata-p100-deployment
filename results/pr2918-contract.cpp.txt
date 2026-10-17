@@ -1,0 +1,457 @@
+// Adapted from Strata's src/ngram/ple_reader_test.cpp (MIT License, Copyright (c) 2026 Niko1221 and the Strata
+// contributors; full text in results/LICENSE-strata.txt).
+// Hint-count contract for PleTable::gather_batch on Linux (Strata PR #2918), host-only.
+//
+// Link with -Wl,--wrap=madvise: every madvise the library makes goes through __wrap_madvise, which passes it on to
+// the real madvise and records it.  Only the calls made inside gather_batch are compared with the contract; the
+// whole-table hint that open() makes for --ple-io ram is counted separately.
+//
+//   contract [--dir D] [--contract new|old] [--extra]
+//
+// new: a table that open() locked gets no row hint; an unlocked or refused-lock table gets one per in-range row.
+// old: the behaviour before the PR (a locked table gets the row hints too).
+// Exit 0: every case passed.  1: a case failed.  3: no failure, but a case could not be run as intended (uncovered).
+#include "strata/kernels/ngram.hpp"
+
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <unistd.h>
+
+#include <cmath>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <mutex>
+#include <random>
+#include <sstream>
+#include <string>
+#include <vector>
+
+namespace k = strata::kernels;
+
+namespace {
+struct Call { uintptr_t addr; size_t len; int adv; int rc; };
+std::mutex g_mu;
+std::vector<Call> g_calls;
+}  // namespace
+
+extern "C" int __real_madvise(void* a, size_t n, int adv);
+extern "C" int __wrap_madvise(void* a, size_t n, int adv) {
+    const int rc = __real_madvise(a, n, adv);
+    std::lock_guard<std::mutex> lk(g_mu);
+    g_calls.push_back({(uintptr_t) a, n, adv, rc});
+    return rc;
+}
+
+namespace {
+size_t mark() { std::lock_guard<std::mutex> lk(g_mu); return g_calls.size(); }
+std::vector<Call> since(size_t m) {
+    std::lock_guard<std::mutex> lk(g_mu);
+    return std::vector<Call>(g_calls.begin() + (std::ptrdiff_t) m, g_calls.end());
+}
+
+// ---- the fixture of src/ngram/ple_reader_test.cpp at c1c9e576, copied unchanged ----
+void expected_row(uint32_t row, uint32_t rb, uint8_t* out) {
+    for (uint32_t b = 0; b < rb; ++b) out[b] = (uint8_t) ((row * 2654435761u + b * 97u) >> 7);
+    std::memcpy(out, &row, 4);
+}
+uint32_t gguf_type_id(const char* name) {
+    static const struct { const char* name; uint32_t id; } ids[] = {
+        {"IQ4_NL", 20}, {"Q4_0", 2}, {"Q4_1", 3}, {"Q5_0", 6}, {"Q5_1", 7}, {"Q8_0", 8}, {"BF16", 30}, {"F8_E4M3", 24}};
+    for (const auto& e : ids)
+        if (std::strcmp(e.name, name) == 0) return e.id;
+    return 0xFFFFFFFFu;
+}
+std::string write_format_table(const std::string& dir, const k::PleFormatInfo& f, uint32_t rows, uint64_t claimed_rows = 0) {
+    const std::string path = dir + "/ple_format_selftest.gguf";
+    std::ofstream out(path, std::ios::binary);
+    if (!out) { std::fprintf(stderr, "cannot write %s\n", path.c_str()); return {}; }
+    const auto le = [](auto value, int bytes) {
+        std::string s((size_t) bytes, '\0');
+        for (int i = 0; i < bytes; ++i) s[(size_t) i] = (char) ((value >> (8 * i)) & 0xff);
+        return s;
+    };
+    const auto str = [&](const char* s) { return le((uint64_t) std::strlen(s), 8) + std::string(s); };
+    const uint64_t n_kv = f.needs_scale ? 3 : 1;
+    std::string head = "GGUF" + le(3u, 4) + le(1ull, 8) + le(n_kv, 8);
+    head += str("general.architecture") + le(8u, 4) + str("strata-ple");
+    if (f.needs_scale) {
+        const float scale = 0.75f;
+        uint32_t sb;
+        std::memcpy(&sb, &scale, 4);
+        head += str("strata.ple.format") + le(8u, 4) + str("f8_e4m3");
+        head += str("strata.ple.scale") + le(6u, 4) + le(sb, 4);       // 6 = FLOAT32
+    }
+    head += str("per_layer_token_embd.weight") + le(2u, 4);
+    head += le((uint64_t) k::PLE_HEAD_DIM, 8) + le(claimed_rows != 0 ? claimed_rows : (uint64_t) rows, 8);
+    head += le(gguf_type_id(f.name), 4) + le(0ull, 8);
+    while (head.size() % 32) head += '\0';
+    out.write(head.data(), (std::streamsize) head.size());
+    std::vector<uint8_t> r(f.row_bytes);
+    for (uint32_t i = 0; i < rows; ++i) {
+        expected_row(i, f.row_bytes, r.data());
+        out.write((const char*) r.data(), (std::streamsize) f.row_bytes);
+    }
+    out.close();
+    return out ? path : std::string();
+}
+// ---- end of the copied fixture ----
+
+long vmlck_kb() {
+    std::ifstream f("/proc/self/status");
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind("VmLck:", 0) == 0) return std::strtol(line.c_str() + 6, nullptr, 10);
+    return -1;
+}
+
+bool has_cap_ipc_lock() {
+    std::ifstream f("/proc/self/status");
+    std::string line;
+    while (std::getline(f, line))
+        if (line.rfind("CapEff:", 0) == 0) return (std::strtoull(line.c_str() + 7, nullptr, 16) >> 14) & 1;   // CAP_IPC_LOCK = 14
+    return false;
+}
+
+// Start of the mapping of `path` at file offset 0, from /proc/self/maps; 0 if it is not mapped.
+uintptr_t map_base(const std::string& path) {
+    const std::string canon = std::filesystem::canonical(path).string();
+    std::ifstream f("/proc/self/maps");
+    std::string line;
+    uintptr_t found = 0;
+    int n = 0;
+    while (std::getline(f, line)) {
+        std::istringstream ss(line);
+        std::string range, perms, off, dev, inode, p;
+        ss >> range >> perms >> off >> dev >> inode;
+        std::getline(ss >> std::ws, p);
+        if (p != canon || std::strtoull(off.c_str(), nullptr, 16) != 0) continue;
+        found = (uintptr_t) std::strtoull(range.c_str(), nullptr, 16);
+        ++n;
+    }
+    return n == 1 ? found : 0;
+}
+
+struct Fixture {
+    const k::PleFormatInfo* f = nullptr;
+    std::string path;
+    uint32_t n_rows = 0;
+    uint64_t ds = 0;                 // file offset of row 0
+    std::vector<uint32_t> straddle;  // rows whose bytes cross a 4 KiB page
+};
+
+// The rows of one gather_batch: random rows plus the first and last row, rows past the end, duplicates, rows that
+// cross a page, and rows at the 4096-row window edges.  Index 5 is the only invalid row of the first token, so one
+// token has 15 in-range rows.
+std::vector<uint32_t> make_rows(const Fixture& fx, size_t nr, uint32_t seed) {
+    std::mt19937 rng(seed);
+    std::vector<uint32_t> br(nr);
+    for (auto& r : br) r = rng() % fx.n_rows;
+    const auto put = [&](size_t i, uint32_t v) { if (i < nr) br[i] = v; };
+    put(0, 0);
+    put(1, fx.n_rows - 1);
+    put(5, fx.n_rows + 7);
+    if (nr > 6) br[6] = br[2];                 // a duplicate inside the first token
+    put(8, fx.straddle[0]);
+    put(9, fx.straddle[1]);
+    put(17, 0xFFFFFFFFu);
+    put(18, fx.n_rows);
+    if (nr > 20) br[20] = br[1];               // a duplicate across tokens
+    put(4095, fx.n_rows);                      // the last row of the first window: invalid
+    put(4096, fx.straddle[2]);                 // the first row of the second window
+    put(4097, fx.straddle[2]);
+    put(8191, fx.straddle[3]);
+    put(8192, fx.n_rows + 1);
+    if (nr > 30) br[nr - 1] = fx.n_rows - 1;   // the last row of the batch
+    return br;
+}
+
+std::vector<Call> expected_calls(const Fixture& fx, const std::vector<uint32_t>& br, uintptr_t data) {
+    std::vector<Call> out;
+    for (uint32_t r : br) {
+        if (r >= fx.n_rows) continue;
+        const uintptr_t r0 = data + (uintptr_t) r * fx.f->row_bytes;
+        const uintptr_t p0 = r0 & ~(uintptr_t) 4095;
+        out.push_back({p0, (size_t) (r0 + fx.f->row_bytes - p0), MADV_WILLNEED, 0});
+    }
+    return out;
+}
+
+size_t in_range(const Fixture& fx, const std::vector<uint32_t>& br) {
+    size_t n = 0;
+    for (uint32_t r : br) n += r < fx.n_rows;
+    return n;
+}
+
+struct Tally { int pass = 0, fail = 0, uncovered = 0; long neg_zero_direct = 0, neg_zero_mapped = 0, pos_zero = 0; };
+
+struct Ctx {
+    bool new_contract = true;
+    Tally* tally = nullptr;
+    std::vector<std::string> fails;
+};
+
+// One gather_batch on an open table: values against the format's dequantizer, and the madvise calls made inside it.
+// expect_hints < 0 means "one per in-range row"; the calls are then compared one by one with the rows' addresses.
+bool gather_step(Ctx& c, const Fixture& fx, k::PleTable& t, bool mapped, size_t nt, long expect_hints, uint32_t seed,
+                 std::string& why, long& hints_out) {
+    const std::vector<uint32_t> br = make_rows(fx, nt * (size_t) k::PLE_N_HEADS, seed);
+    std::vector<float> out(br.size() * (size_t) k::PLE_HEAD_DIM + 1, 12345.0f);
+    std::string err;
+    const size_t m = mark();
+    const bool ok = t.gather_batch(br.data(), nt, out.data(), err);
+    const std::vector<Call> calls = since(m);
+    if (!ok) { why = "gather_batch failed: " + err; return false; }
+    long willneed = 0, other = 0, bad_rc = 0;
+    for (const Call& x : calls) {
+        (x.adv == MADV_WILLNEED ? willneed : other)++;
+        bad_rc += x.rc != 0;
+    }
+    hints_out = willneed;
+    const long want = expect_hints < 0 ? (long) in_range(fx, br) : expect_hints;
+    char buf[256];
+    if (other != 0) { std::snprintf(buf, sizeof buf, "%ld madvise calls other than WILLNEED", other); why = buf; return false; }
+    if (bad_rc != 0) { std::snprintf(buf, sizeof buf, "%ld madvise calls failed", bad_rc); why = buf; return false; }
+    if (willneed != want) { std::snprintf(buf, sizeof buf, "hints=%ld expected=%ld", willneed, want); why = buf; return false; }
+    if (willneed > 0) {
+        const uintptr_t base = map_base(fx.path);
+        if (base == 0) { why = "the table is not mapped exactly once"; return false; }
+        const std::vector<Call> exp = expected_calls(fx, br, base + fx.ds);
+        for (size_t i = 0; i < exp.size(); ++i)
+            if (calls[i].addr != exp[i].addr || calls[i].len != exp[i].len) {
+                std::snprintf(buf, sizeof buf, "hint %zu covers [%#lx, +%zu), not row %zu's [%#lx, +%zu)", i,
+                              (unsigned long) calls[i].addr, calls[i].len, i, (unsigned long) exp[i].addr, exp[i].len);
+                why = buf;
+                return false;
+            }
+    }
+    std::vector<uint8_t> raw(fx.f->row_bytes);
+    float ref[k::PLE_HEAD_DIM];
+    for (size_t i = 0; i < br.size(); ++i) {
+        const float* got = out.data() + i * (size_t) k::PLE_HEAD_DIM;
+        if (br[i] >= fx.n_rows) {
+            for (int d = 0; d < k::PLE_HEAD_DIM; ++d) {
+                if (got[d] != 0.0f) { std::snprintf(buf, sizeof buf, "invalid row %zu: value %d is %g, not 0", i, d, got[d]); why = buf; return false; }
+                if (std::signbit(got[d])) (mapped ? c.tally->neg_zero_mapped : c.tally->neg_zero_direct)++;
+                else c.tally->pos_zero++;
+            }
+            continue;
+        }
+        expected_row(br[i], fx.f->row_bytes, raw.data());
+        fx.f->dequant(raw.data(), fx.f->needs_scale ? 0.75f : 1.0f, ref);
+        if (std::memcmp(got, ref, sizeof ref) != 0) { std::snprintf(buf, sizeof buf, "row %zu (table row %u) differs", i, br[i]); why = buf; return false; }
+    }
+    if (out.back() != 12345.0f) { why = "gather_batch wrote past the end of the output"; return false; }
+    return true;
+}
+
+enum Mode { LOCKED, LOCKED_NOHINT, REOPEN_UNLOCKED, MMAP_NOHINT, LOCK_REFUSED, DIRECT, MMAP, REOPEN_LOCKED };
+const char* mode_name(Mode m) {
+    switch (m) {
+        case LOCKED: return "locked";
+        case LOCKED_NOHINT: return "locked-nohint";
+        case REOPEN_UNLOCKED: return "reopen-unlocked";
+        case MMAP_NOHINT: return "mmap-nohint";
+        case LOCK_REFUSED: return "lock-refused";
+        case DIRECT: return "direct";
+        case MMAP: return "mmap";
+        case REOPEN_LOCKED: return "reopen-locked";
+    }
+    return "?";
+}
+
+k::PleIoOptions options(k::PleIo mode, bool lock) {
+    k::PleIoOptions io;
+    io.mode = mode;
+    io.max_inflight = 8;
+    io.cache_rows = 0;
+    io.lock = lock;
+    return io;
+}
+
+// Open; returns the whole-table hints open() made, and checks locked() and VmLck against what the case needs.
+// need_locked: 1 = must be locked (else uncovered), 0 = must not be locked (a lock is then uncovered or a failure).
+enum Opened { OPEN_OK, OPEN_FAIL, OPEN_UNCOVERED };
+Opened open_table(const Fixture& fx, k::PleTable& t, const k::PleIoOptions& io, int need_locked, bool refuse_lock,
+                  std::string& why) {
+    struct rlimit old {};
+    getrlimit(RLIMIT_MEMLOCK, &old);
+    if (refuse_lock) {
+        struct rlimit zero = old;
+        zero.rlim_cur = 0;
+        if (setrlimit(RLIMIT_MEMLOCK, &zero) != 0) { why = "setrlimit(RLIMIT_MEMLOCK, 0) failed"; return OPEN_FAIL; }
+    }
+    const long v0 = vmlck_kb();
+    const size_t m = mark();
+    std::string err;
+    const bool ok = t.open(fx.path, err, io);
+    const std::vector<Call> calls = since(m);
+    const long v1 = vmlck_kb();
+    if (refuse_lock) setrlimit(RLIMIT_MEMLOCK, &old);
+    if (!ok) { why = "open failed: " + err; return OPEN_FAIL; }
+    const bool want_table_hint = io.mode == k::PleIo::Mmap && io.lock;
+    if ((long) calls.size() != (want_table_hint ? 1 : 0)) {
+        why = "open() made " + std::to_string(calls.size()) + " madvise calls";
+        return OPEN_FAIL;
+    }
+    const uint64_t need = (uint64_t) fx.n_rows * fx.f->row_bytes;
+    if (t.locked()) {
+        const uintptr_t base = map_base(fx.path);
+        const uintptr_t a0 = (base + fx.ds) & ~(uintptr_t) 4095, a1 = base + fx.ds + need;
+        const long want_kb = (long) ((a1 - a0 + 4095) / 4096 * 4);
+        if (v1 - v0 != want_kb) {
+            why = "locked, but VmLck grew by " + std::to_string(v1 - v0) + " kB, not " + std::to_string(want_kb);
+            return OPEN_FAIL;
+        }
+    } else if (v1 != v0) {
+        why = "not locked, but VmLck changed by " + std::to_string(v1 - v0) + " kB";
+        return OPEN_FAIL;
+    }
+    if (need_locked == 1 && !t.locked()) { why = "mlock did not succeed here"; return OPEN_UNCOVERED; }
+    if (need_locked == 0 && t.locked()) {
+        if (refuse_lock) { why = "the lock succeeded with RLIMIT_MEMLOCK 0 (CAP_IPC_LOCK?)"; return OPEN_UNCOVERED; }
+        why = "locked() is true for a table that was not asked to lock";
+        return OPEN_FAIL;
+    }
+    return OPEN_OK;
+}
+
+// One case.  Returns 0 pass, 1 fail, 2 uncovered.
+int run_case(Ctx& c, const Fixture& fx, Mode mode, size_t nt) {
+    const long locked_hints = c.new_contract ? 0 : -1;
+    std::string why;
+    long hints = -2;
+    const long vm0 = vmlck_kb();
+    int rc = 0;
+    {
+        k::PleTable t;
+        k::ple_prefetch_enable(mode != LOCKED_NOHINT && mode != MMAP_NOHINT);
+        const uint32_t seed = (uint32_t) (nt * 31 + (size_t) mode);
+        Opened o = OPEN_OK;
+        switch (mode) {
+            case LOCKED:
+            case LOCKED_NOHINT:
+                o = open_table(fx, t, options(k::PleIo::Mmap, true), 1, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, mode == LOCKED ? locked_hints : 0, seed, why, hints)) rc = 1;
+                break;
+            case MMAP_NOHINT:
+                o = open_table(fx, t, options(k::PleIo::Mmap, false), 0, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, 0, seed, why, hints)) rc = 1;
+                break;
+            case MMAP:
+                o = open_table(fx, t, options(k::PleIo::Mmap, false), 0, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, -1, seed, why, hints)) rc = 1;
+                break;
+            case LOCK_REFUSED:
+                o = open_table(fx, t, options(k::PleIo::Mmap, true), 0, true, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, -1, seed, why, hints)) rc = 1;
+                break;
+            case DIRECT:   // --ple-io ram's lock flag is ignored in Direct mode: no mapping, no lock, no hint
+                o = open_table(fx, t, options(k::PleIo::Direct, true), 0, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, false, nt, 0, seed, why, hints)) rc = 1;
+                break;
+            case REOPEN_UNLOCKED:   // locked, close(), then the same object opened unlocked
+                o = open_table(fx, t, options(k::PleIo::Mmap, true), 1, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, locked_hints, seed, why, hints)) { why = "before close: " + why; rc = 1; }
+                if (o == OPEN_OK && rc == 0) {
+                    t.close();
+                    if (t.locked() || t.is_open()) { why = "close() left the table locked or open"; rc = 1; }
+                    else if (vmlck_kb() != vm0) { why = "VmLck is " + std::to_string(vmlck_kb()) + " kB after close(), not " + std::to_string(vm0); rc = 1; }
+                    else {
+                        o = open_table(fx, t, options(k::PleIo::Mmap, false), 0, false, why);
+                        if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, -1, seed + 1, why, hints)) { why = "after reopen: " + why; rc = 1; }
+                    }
+                }
+                break;
+            case REOPEN_LOCKED:   // unlocked, then open() again locked without close() (open closes first)
+                o = open_table(fx, t, options(k::PleIo::Mmap, false), 0, false, why);
+                if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, -1, seed, why, hints)) { why = "unlocked: " + why; rc = 1; }
+                if (o == OPEN_OK && rc == 0) {
+                    o = open_table(fx, t, options(k::PleIo::Mmap, true), 1, false, why);
+                    if (o == OPEN_OK && !gather_step(c, fx, t, true, nt, locked_hints, seed + 1, why, hints)) { why = "reopened locked: " + why; rc = 1; }
+                }
+                break;
+        }
+        k::ple_prefetch_enable(true);
+        if (o == OPEN_FAIL) rc = 1;
+        if (o == OPEN_UNCOVERED) rc = 2;
+    }
+    if (rc == 0 && vmlck_kb() != vm0) { why = "VmLck did not return to " + std::to_string(vm0) + " kB after the table was destroyed"; rc = 1; }
+    if (rc == 1) {
+        char buf[512];
+        std::snprintf(buf, sizeof buf, "FAIL %s %s nt=%zu: %s", fx.f->name, mode_name(mode), nt, why.c_str());
+        c.fails.push_back(buf);
+        std::printf("%s\n", buf);
+        c.tally->fail++;
+    } else if (rc == 2) {
+        std::printf("UNCOVERED %s %s nt=%zu: %s\n", fx.f->name, mode_name(mode), nt, why.c_str());
+        c.tally->uncovered++;
+    } else {
+        c.tally->pass++;
+    }
+    return rc;
+}
+}  // namespace
+
+int main(int argc, char** argv) {
+    std::string dir = std::filesystem::temp_directory_path().string();
+    bool new_contract = true, extra = false;
+    for (int i = 1; i < argc; ++i) {
+        const std::string a = argv[i];
+        if (a == "--dir" && i + 1 < argc) dir = argv[++i];
+        else if (a == "--contract" && i + 1 < argc) {
+            const std::string v = argv[++i];
+            if (v != "new" && v != "old") { std::fprintf(stderr, "--contract new|old\n"); return 2; }
+            new_contract = v == "new";
+        } else if (a == "--extra") extra = true;
+        else { std::fprintf(stderr, "usage: contract [--dir D] [--contract new|old] [--extra]\n"); return 2; }
+    }
+    struct rlimit rl {};
+    getrlimit(RLIMIT_MEMLOCK, &rl);
+    std::printf("contract=%s RLIMIT_MEMLOCK soft=%lld hard=%lld CAP_IPC_LOCK=%d formats=%d\n", new_contract ? "new" : "old",
+                (long long) rl.rlim_cur, (long long) rl.rlim_max, (int) has_cap_ipc_lock(), k::ple_format_count());
+    Tally main_t, extra_t;
+    Ctx c;
+    c.new_contract = new_contract;
+    const Mode reviewer_modes[] = {LOCKED, LOCKED_NOHINT, REOPEN_UNLOCKED, MMAP_NOHINT, LOCK_REFUSED, DIRECT};
+    const size_t reviewer_nt[] = {0, 1, 16, 255, 256, 257, 700};
+    const uint32_t rows = 20000;
+    for (int i = 0; i < k::ple_format_count(); ++i) {
+        Fixture fx;
+        fx.f = &k::ple_formats()[i];
+        fx.n_rows = rows;
+        fx.path = write_format_table(dir, *fx.f, rows);
+        if (fx.path.empty()) { std::printf("FAIL %s: no table\n", fx.f->name); main_t.fail++; continue; }
+        fx.ds = std::filesystem::file_size(fx.path) - (uint64_t) rows * fx.f->row_bytes;
+        for (uint32_t r = 0; r < rows && fx.straddle.size() < 4; ++r) {
+            const uint64_t a = fx.ds + (uint64_t) r * fx.f->row_bytes;
+            if (a / 4096 != (a + fx.f->row_bytes - 1) / 4096) fx.straddle.push_back(r);
+        }
+        if (fx.straddle.size() < 4) { std::printf("FAIL %s: no rows cross a page\n", fx.f->name); main_t.fail++; continue; }
+        c.tally = &main_t;
+        for (Mode m : reviewer_modes)
+            for (size_t nt : reviewer_nt) run_case(c, fx, m, nt);
+        if (extra) {
+            c.tally = &extra_t;
+            for (Mode m : {MMAP, REOPEN_LOCKED})
+                for (size_t nt : reviewer_nt) run_case(c, fx, m, nt);
+            for (Mode m : reviewer_modes)
+                for (size_t nt : {(size_t) 2, (size_t) 512, (size_t) 513, (size_t) 1024}) run_case(c, fx, m, nt);
+        }
+        std::filesystem::remove(fx.path);
+    }
+    const auto line = [](const char* what, const Tally& t) {
+        std::printf("%s: %d cases, %d pass, %d fail, %d uncovered\n", what, t.pass + t.fail + t.uncovered, t.pass, t.fail,
+                    t.uncovered);
+    };
+    line("reviewer matrix (formats x 6 modes x 7 token counts)", main_t);
+    if (extra) line("extra cases", extra_t);
+    std::printf("invalid-row zeros: +0 %ld values, -0 %ld (mapped) and %ld (direct)\n", main_t.pos_zero + extra_t.pos_zero,
+                main_t.neg_zero_mapped + extra_t.neg_zero_mapped, main_t.neg_zero_direct + extra_t.neg_zero_direct);
+    const int fail = main_t.fail + extra_t.fail, unc = main_t.uncovered + extra_t.uncovered;
+    std::printf("%s\n", fail ? "FAILED" : unc ? "PASSED WITH UNCOVERED CASES" : "PASSED");
+    return fail ? 1 : unc ? 3 : 0;
+}

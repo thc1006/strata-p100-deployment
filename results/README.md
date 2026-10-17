@@ -1,8 +1,8 @@
 # Test results
 
-Raw output of all tests, grouped by tag (the start of the file name). The `deploy/...` paths in the files are the old locations from before the 2026-10-18 directory reorganization; the contents are kept as they were. Only the host name was replaced with `<host>` before publication.
+Raw output of all tests, grouped by tag (the start of the file name). The `deploy/...` paths in the files are the old locations from before the 2026-10-18 directory reorganization; the contents are kept as they were. Only the host name was replaced with `<host>` before publication. In the `pr2918-*` files, `<work>`, `<rocm>` and `<oneapi>` stand for temporary folders.
 
-The long-document requests are taken from Strata's documentation (`docs/*.md` and `README.md`). Some files (for example `*-trace.txt` and `ple_hint_probe.jsonl`) contain excerpts of these documents or of model answers. `ple_hint_count.cpp.txt` contains code copied from Strata's `src/ngram/ple_reader_test.cpp`. Strata is licensed under the MIT License, Copyright (c) 2026 Niko1221 and the Strata contributors; the full license text is in [`LICENSE-strata.txt`](LICENSE-strata.txt).
+The long-document requests are taken from Strata's documentation (`docs/*.md` and `README.md`). Some files (for example `*-trace.txt` and `ple_hint_probe.jsonl`) contain excerpts of these documents or of model answers. `ple_hint_count.cpp.txt` and `pr2918-contract.cpp.txt` contain code copied from Strata's `src/ngram/ple_reader_test.cpp`, and `pr2918-mutants.diff.txt` contains excerpts of its `src/kernels/ngram.cpp`. Strata is licensed under the MIT License, Copyright (c) 2026 Niko1221 and the Strata contributors; the full license text is in [`LICENSE-strata.txt`](LICENSE-strata.txt).
 
 | Tag | Date | Contents | Summarized in |
 |---|---|---|---|
@@ -15,6 +15,7 @@ The long-document requests are taken from Strata's documentation (`docs/*.md` an
 | `ple_prefetch_*` | 10-16 | Probes of the PLE read-ahead hint on ZFS: one record for `deployed-noplepf`; the other 10 belong to the 0.1.44.1 A/B | Deployment record section 4 and section 3.6; `AB-0.1.44.1.md` |
 | `v431-*`, `v441-*`, `v441pf-*`, `ab-v441-driver.log` | 10-16 | A/B of 0.1.43.1 against 0.1.44.1, and 0.1.44.1 with the read-ahead hint on | `AB-0.1.44.1.md`; deployment record section 3.6 |
 | `z-*`, `e-*`, `ab-v045*-driver.log`, `ple_hint_probe.jsonl`, `ple-hint-count-harness.txt`, `ple_hint_count.cpp.txt`, `ple-selftest-*.log` | 10-17 | A/B of 0.1.45 and the skip-hint-when-locked patch (upstream PR #2918); `z-` on ZFS, `e-` on an ext4 copy | `AB-0.1.45-ple-hint.md`; deployment record section 3.7 |
+| `pr2918-*` | 10-18 | Checking the PR #2918 test: a hint-count harness (`pr2918-contract.cpp.txt`) and its output, the test against broken versions of the engine code (`pr2918-mutants.diff.txt`), and the CUDA, HIP and SYCL builds of the amended PR | Deployment record section 3.7 |
 | `engine-log-20261016-extract.txt`, `fault-injection-journal.txt` | 10-16 | Verbatim excerpts of the engine log (with the original line numbers); excerpts of the systemd journal | Deployment record, notes on the sources of the numbers |
 | `setup-20261016.log` | 10-16 | Full output of `setup.sh` | `docs/runbooks/rebuild.md` step 5 |
 | `check-drift-full-20261018.txt` | 10-18 | Full output of one `scripts/check-drift.sh --full` run (including model file hashes, 590 s) | `docs/runbooks/rebuild.md` step 7 |

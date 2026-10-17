@@ -1,0 +1,106 @@
+# Broken versions of src/kernels/ngram.cpp (PR #2918 head, sha256 22a867fd...) used to check the test, 2026-10-18.
+
+## noguard: the check removed (0.1.45)
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -577,9 +577,6 @@
+         }
+         if (k > 0) (void) PrefetchVirtualMemory(GetCurrentProcess(), k, ranges, 0);
+ #else
+-        // A locked table (--ple-io ram) is resident: nothing to fetch.  The hint would still cost a system call a row,
+-        // and on ZFS an ARC prefetch of the row's record (zpl_fadvise -> dmu_prefetch), cached page or not (#2281).
+-        if (impl_->locked) return;
+         for (size_t i = a; i < b; ++i) {
+             if (rows[i] >= impl_->n_rows) continue;
+             const uintptr_t r0 = (uintptr_t) (impl_->data + (size_t) rows[i] * impl_->rb);
+
+## asked: the check tests the lock request
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -213,6 +213,7 @@
+     strata::ngram::PleReader::Ticket ticket;
+     bool pending = false;
+     bool locked = false;
++    bool asked = false;
+     // the table is shared by the prompt path and the decode windows; they can use it at once (one on a worker thread)
+     std::recursive_mutex mu;
+     uint32_t rows[PLE_N_HEADS] = {};
+@@ -387,6 +388,7 @@
+         }
+ #endif
+     }
++    impl_->asked = io.mode == PleIo::Mmap && io.lock;
+     impl_->mode = io.mode;
+     return true;
+ }
+@@ -579,7 +581,7 @@
+ #else
+         // A locked table (--ple-io ram) is resident: nothing to fetch.  The hint would still cost a system call a row,
+         // and on ZFS an ARC prefetch of the row's record (zpl_fadvise -> dmu_prefetch), cached page or not (#2281).
+-        if (impl_->locked) return;
++        if (impl_->asked) return;
+         for (size_t i = a; i < b; ++i) {
+             if (rows[i] >= impl_->n_rows) continue;
+             const uintptr_t r0 = (uintptr_t) (impl_->data + (size_t) rows[i] * impl_->rb);
+
+## stale: close() does not clear locked
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -429,7 +429,6 @@
+     wait_prefetches();
+     impl_->reader.close();
+     impl_->pending = false;
+-    impl_->locked = false;   // the unmap below releases the lock
+     impl_->mode = PleIo::Mmap;
+     delete impl_->file;
+     impl_->file = nullptr;
+
+## early: gather_batch returns early when locked
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -558,6 +558,7 @@
+         return true;
+     }
+     wait_prefetches();
++    if (impl_->locked) return true;
+     // #1984 #1971: a mapped table that is not in the file cache served this loop as serial demand faults, one random
+     // 4 KiB page at a time (16 rows a token, 16 x the chunk's tokens for a prompt), and the first chunk of a prompt has
+     // only layer 0 to hide it behind: a cold 27 GB table at ~0.2-1 ms a fault is minutes with no progress mark, which
+
+## liar: locked set before mlock returns
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -379,6 +379,7 @@
+             for (unsigned t = 0; t < threads; ++t) pool.emplace_back(touch);
+             for (auto& t : pool) t.join();
+         }
++        impl_->locked = true;   // mutant: set before the outcome is known
+         if (mlock((const void*) a0, a1 - a0) == 0) {
+             impl_->locked = true;
+         } else {
+
+## inverted: the check inverted
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -579,7 +579,7 @@
+ #else
+         // A locked table (--ple-io ram) is resident: nothing to fetch.  The hint would still cost a system call a row,
+         // and on ZFS an ARC prefetch of the row's record (zpl_fadvise -> dmu_prefetch), cached page or not (#2281).
+-        if (impl_->locked) return;
++        if (!impl_->locked) return;
+         for (size_t i = a; i < b; ++i) {
+             if (rows[i] >= impl_->n_rows) continue;
+             const uintptr_t r0 = (uintptr_t) (impl_->data + (size_t) rows[i] * impl_->rb);
+
+## noflag: the lock taken but locked never set
+--- a/src/kernels/ngram.cpp
++++ b/src/kernels/ngram.cpp
+@@ -380,7 +380,7 @@
+             for (auto& t : pool) t.join();
+         }
+         if (mlock((const void*) a0, a1 - a0) == 0) {
+-            impl_->locked = true;
++            /* mutant: the lock is taken but not recorded */
+         } else {
+             std::fprintf(stderr, "strata: PLE table mlock failed (%s; raise `ulimit -l`): its pages stay faulted in "
+                                  "but may be reclaimed\n", std::strerror(errno));

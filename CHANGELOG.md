@@ -25,6 +25,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Fixed
 
+- README and deployment record: a ZFS prefetch reads a record from disk only when the record is not in the ARC; they said that every hint read a whole record. The deployment record also said that `zpl_fadvise` is the same in OpenZFS 2.4.4 and master; those versions rewrite it, though they still start a prefetch for every hint. Section 3.7 now counts ZFS's read completion in the CPU time.
 - Deployment record: the Poisson conclusion for PR #2050 (previously stated as within the noise), the scope of the 0.1.44.1 conclusion, two upstream dates (previously in UTC), the source of the retry at 10-17 22:15, and several times and units.
 - `results/SUMMARY.md`: the Poisson p50 of the first 6 groups was the upper median. `bench/report.py` now recalculates it from the per-request data with nearest-rank, the same as for the other groups.
 - `configure_strata_q3.py`: also rewrites the config in the standard format when it differs only in indentation or a BOM. Backup numbers now continue after the highest existing number.

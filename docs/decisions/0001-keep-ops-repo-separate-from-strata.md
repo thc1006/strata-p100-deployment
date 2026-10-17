@@ -47,6 +47,6 @@ Option 3, git submodule:
 
 ## More Information
 
-- Uses of `thc1006/Strata`: sending upstream PRs (#2918), keeping the deployed commit (a tag, not yet created) and holding patch branches when needed.
+- Uses of `thc1006/Strata`: sending upstream PRs (#2918) and holding patch branches when needed. The deployed commit is not tagged there: the rebuild runbook downloads it from upstream by its commit hash (decided on 2026-10-18).
 - When to re-evaluate: when the production service must run a change that upstream has not released, for example if #2918 is not accepted and a code fix should replace the flag. The approach then is to open a deployment branch on the fork and to record that branch's commit in this repository.
 - At the next upgrade, make `~/dev/strata` a git checkout (of a specific tag), so that `git status` shows local changes.

@@ -1,0 +1,30 @@
+[14:30:03] serve_load 1,2,4 (exp-prefill4096)
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      1         33.7           36.5     1.20/1.30        15.18/15.58     0
+      2         60.3           33.0     1.60/2.33        16.97/17.48     0
+      4        100.3           28.6     2.63/4.35        20.41/20.70     0
+[14:32:42] replicate (exp-prefill4096)
+  reasoning-v1: prompt 284 tok, prompt 113.8 tok/s, decode 50.5 tok/s, TTFT 2.55 s
+  code-v1: prompt 219 tok, prompt 103.8 tok/s, decode 49.2 tok/s, TTFT 2.14 s
+  docs-4.4k: prompt 4353 tok, prompt 301.1 tok/s, decode 42.2 tok/s, TTFT 14.51 s
+  docs-32k: prompt 32001 tok, prompt 804.0 tok/s, decode 40.9 tok/s, TTFT 39.89 s
+[14:36:49] think4 (exp-prefill4096)
+  per user client tok/s: [30.6, 32.44, 32.18, 28.76] total s: [46.45, 51.65, 54.3, 37.62] reasoning chunks: [418, 335, 237, 180]
+  per user client tok/s: [31.7, 31.09, 30.98, 29.76] total s: [44.55, 47.86, 55.87, 42.96] reasoning chunks: [425, 205, 269, 180]
+  per user client tok/s: [29.69, 32.2, 31.36, 29.6] total s: [48.72, 50.66, 50.65, 40.51] reasoning chunks: [446, 327, 91, 180]
+[14:39:30] worst (exp-prefill4096)
+  TTFT first/last: [35.32] [141.38] decode: [4.41, 7.91, 29.88, 3.23]
+[14:42:06] burst 4x8192
+{"ttft_first_s":17.89,"ttft_last_s":71.13,"decode_tok_s_median":7.8149999999999995,"aggregate_tok_s":12.88,"wall_s":79.53}
+[14:43:27] burst 4x16384
+{"ttft_first_s":25.69,"ttft_last_s":101.17,"decode_tok_s_median":5.705,"aggregate_tok_s":9.02,"wall_s":109.61}
+[14:45:18] admit 3 decoders + 16K
+{"newcomer":{"prompt_tokens":16374,"ttft_s":24.75},"before":[34.3,34.2,34.2],"during":[0.08,0.08,0.08],"during_window_s":[24.75,24.75,24.75]}
+[14:46:26] coldjoin (exp-prefill4096)
+  decoders longest pause: [41.65, 24.32] paused: [42.57, 41.66] chunks while joining: [2, 3] joiners TTFT: [24.15, 35.52]
+[14:48:03] preempt (exp-prefill4096)
+  short question TTFT / done: 35.28 / 35.53 s; long prompt TTFT: 35.06 s
+[14:48:42] poisson (exp-prefill4096)
+  rate 0.1/s: goodput 20%, errors 0, TTFT p50/p95 21.96/79.52 s, longest pause p95/max 24.88/24.93 s
+[14:54:55] done

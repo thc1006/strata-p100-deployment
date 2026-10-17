@@ -1,0 +1,28 @@
+tag z-off-1  tree /home/thc1006/dev/strata-0.1.45  at 2026-10-17 19:36:12
+tree head 477ac13cb  src diff: 
+config /home/thc1006/dev/strata-0.1.45/cfg-zfs-off.json sha256 4d608e8567ffdb87
+engine pid 371376 exe /home/thc1006/dev/strata-0.1.45/engine-cuda12/strata sha256 00869ac7b733d821
+engine args: /home/thc1006/dev/strata-0.1.45/engine-cuda12/strata --serve --pack /home/thc1006/dev/Strata-data/packs/iq3_xxs --native /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf --expert-profile /home/thc1006/dev/strata/data/expert-profile.bin --spec-min-p 0.5 --mtp /home/thc1006/dev/Strata-data/mtp/rt --max-context 32768 --kv int8 --expert-cache auto --prefill 2048 --pool-workers 6 --batch-groups auto --vram-reserve-mib 1536 --ple-io ram --spec 4 --conversation-cache-mib 8192 --conversation-cache-slots 8 --conversation-cache-min-tokens 1024 --conversation-cache-min-free-mib 8192 --resident-experts --trim-stage-weights --no-kv-grow --no-ple-prefetch --layer-split 13,26,38 --batch 4 
+VmLck: 28125136 kB
+health: {"status": "ok", "max_context": 32768, "model": "qwen3.8-flash-next-iq3_xxs", "images": false, "api_key": false, "image_generation": false, "loaded": true, "service": "strata"}
+--- start-up lines
+[strata] 2026-10-17 19:28:52 engine started: /home/thc1006/dev/strata-0.1.45/engine-cuda12/strata --serve --pack /home/thc1006/dev/Strata-data/packs/iq3_xxs --native /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf --expert-profile /home/thc1006/dev/strata/data/expert-profile.bin --spec-min-p 0.5 --mtp /home/thc1006/dev/Strata-data/mtp/rt --max-context 32768 --kv int8 --expert-cache auto --prefill 2048 --pool-workers 6 --batch-groups auto --vram-reserve-mib 1536 --ple-io ram --spec 4 --conversation-cache-mib 8192 --conversation-cache-slots 8 --conversation-cache-min-tokens 1024 --conversation-cache-min-free-mib 8192 --resident-experts --trim-stage-weights --no-kv-grow --no-ple-prefetch --layer-split 13,26,38 --batch 4
+strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,26,38)
+strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+strata generate: PLE table locked in RAM (--ple-io ram) in 7.4 s
+strata generate: layer split: CUDA1 loads the dense weights of layers 13-25 only
+strata generate: layer split: CUDA1 PCIe probe 11.4 GB/s (best of 11.0 11.4 10.3 9.8) -> pcie_frac 0.31
+strata generate: layer split: CUDA1 holds its weights; 14.64 GiB free (its session follows the split search)
+strata generate: layer split: CUDA2 loads the dense weights of layers 26-37 only
+strata generate: layer split: CUDA2 PCIe probe 11.4 GB/s (best of 11.4 11.4 11.0 11.1) -> pcie_frac 0.31
+strata generate: layer split: CUDA2 holds its weights; 14.67 GiB free (its session follows the split search)
+strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+strata generate: layer split: CUDA3 PCIe probe 11.3 GB/s (best of 11.3 10.8 11.2 11.1) -> pcie_frac 0.31
+strata generate: layer split: CUDA3 holds its weights; 14.81 GiB free (its session follows the split search)
+strata generate: profile /home/thc1006/dev/strata/data/expert-profile.bin: 24576 ranked pairs, built for 24576 slots
+strata generate: layer split: CUDA1 holds its weights, session [13, 26); 14.48 GiB free
+strata generate: layer split: CUDA2 holds its weights, session [26, 38); 14.52 GiB free
+strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.25 GiB free
+strata generate: expert cache auto: 13.80 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 5669 slots
+strata generate: expert cache 6656 slots, 9.41 GiB of VRAM; policy is
+strata generate: pre-filled 6656 of 6656 slots from the profile in 75.3 s (134 MB/s); slot 0 verified

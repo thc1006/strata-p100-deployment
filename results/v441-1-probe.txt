@@ -1,0 +1,3 @@
+{"offset": 777777, "prompt_tokens": 15986, "engine_prompt_tok_s": 708.3, "ttft_s": 22.63, "sda4_read_gb": 0.0, "prefetch_misses": 0, "error": null}
+{"offset": 333333, "prompt_tokens": 16012, "engine_prompt_tok_s": 703.7, "ttft_s": 22.81, "sda4_read_gb": 0.0, "prefetch_misses": 0, "error": null}
+{"offset": 222222, "prompt_tokens": 16000, "engine_prompt_tok_s": 707.5, "ttft_s": 22.67, "sda4_read_gb": 0.0, "prefetch_misses": 1, "error": null}

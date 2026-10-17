@@ -1,0 +1,55 @@
+{
+ "samples": 1709,
+ "seconds": 3623.6,
+ "gpu0": {
+  "peak_mem_mib": 13562.0,
+  "min_free_mib": 2822,
+  "mean_util_pct": 55.1,
+  "sm_mhz_when_busy_min": 1316.0,
+  "max_temp_c": 63.0,
+  "max_watt": 249.7,
+  "throttle_reasons_seen": [
+   "0x0000000000000004"
+  ]
+ },
+ "gpu1": {
+  "peak_mem_mib": 13878.0,
+  "min_free_mib": 2506,
+  "mean_util_pct": 54.9,
+  "sm_mhz_when_busy_min": 1316.0,
+  "max_temp_c": 57.0,
+  "max_watt": 227.13,
+  "throttle_reasons_seen": []
+ },
+ "gpu2": {
+  "peak_mem_mib": 14256.0,
+  "min_free_mib": 2128,
+  "mean_util_pct": 53.3,
+  "sm_mhz_when_busy_min": 1316.0,
+  "max_temp_c": 55.0,
+  "max_watt": 215.28,
+  "throttle_reasons_seen": []
+ },
+ "gpu3": {
+  "peak_mem_mib": 14436.0,
+  "min_free_mib": 1948,
+  "mean_util_pct": 55.0,
+  "sm_mhz_when_busy_min": 1328.0,
+  "max_temp_c": 54.0,
+  "max_watt": 221.55,
+  "throttle_reasons_seen": []
+ },
+ "storage": {
+  "disk_read_gb": 0.1,
+  "swap_in_gb": 0.009,
+  "arc_demand_misses": 2420
+ },
+ "host": {
+  "min_mem_avail_gib": 20.657,
+  "swap_used_start_gib": 0.502,
+  "swap_used_max_gib": 0.502,
+  "engine_rss_start_gib": 30.919,
+  "engine_rss_max_gib": 31.612,
+  "arc_max_gib": 8.028
+ }
+}

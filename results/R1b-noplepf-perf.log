@@ -1,0 +1,30 @@
+[07:44:56] serve_load 1,2,4 (R1b-noplepf)
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      1         34.8           37.7     1.14/1.22        14.73/15.24     0
+      2         59.2           32.4     1.55/2.32        17.27/17.75     0
+      4         85.9           24.1     2.64/4.44        23.83/24.15     0
+[07:47:44] replicate (R1b-noplepf)
+  reasoning-v1: prompt 285 tok, prompt 114.1 tok/s, decode 50.5 tok/s, TTFT 2.53 s
+  code-v1: prompt 218 tok, prompt 102.9 tok/s, decode 48.4 tok/s, TTFT 2.15 s
+  docs-4.4k: prompt 4343 tok, prompt 405.6 tok/s, decode 41.4 tok/s, TTFT 10.75 s
+  docs-32k: prompt 31991 tok, prompt 767.2 tok/s, decode 37.7 tok/s, TTFT 41.78 s
+[07:51:47] think4 (R1b-noplepf)
+  per user client tok/s: [26.47, 26.28, 26.11, 26.22] total s: [56.25, 58.13, 50.09, 47.15] reasoning chunks: [387, 338, 91, 292]
+  per user client tok/s: [25.83, 27.35, 26.88, 26.32] total s: [53.97, 56.74, 53.69, 46.13] reasoning chunks: [460, 226, 99, 303]
+  per user client tok/s: [25.72, 27.18, 27.34, 25.65] total s: [52.6, 54.71, 52.03, 45.41] reasoning chunks: [443, 327, 99, 227]
+[07:54:37] worst (R1b-noplepf)
+  TTFT first/last: [37.0] [146.97] decode: [24.53, 7.11, 4.02, 3.13]
+[07:57:21] burst 4x8192
+{"ttft_first_s":15.91,"ttft_last_s":61.05,"decode_tok_s_median":8.125,"wall_s":70.85}
+[07:58:32] burst 4x16384
+{"ttft_first_s":25.1,"ttft_last_s":102.57,"decode_tok_s_median":5.59,"wall_s":112.72}
+[08:00:25] admit 3 decoders + 16K
+{"newcomer":{"prompt_tokens":16709,"ttft_s":24.42},"before":[33.5,33.5,33.6],"during":[0.08,0.08,0.08]}
+[08:01:26] coldjoin (R1b-noplepf)
+  decoders longest pause: [38.34, 38.34] paused: [39.29, 38.34] chunks while joining: [1, 2] joiners TTFT: [23.41, 32.21]
+[08:03:06] preempt (R1b-noplepf)
+  short question TTFT: 37.12 long prompt TTFT: 36.95
+[08:03:46] poisson (R1b-noplepf)
+  rate 0.1/s: goodput 30%, errors 0, TTFT p50/p95 17.68/91.5 s, longest pause p95/max 23.5/23.5 s
+[08:09:57] done

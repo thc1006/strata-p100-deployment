@@ -1,0 +1,271 @@
+strata serve: prompt 66 tokens = 0 reused + 66 read in 1235 ms (53.4 tok/s), 512 generated in 14365 ms (35.6 tok/s), drafts accepted 239 of 468, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 75531.2 MB from storage (14773349 major faults) for 42920.1 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 1164 ms (56.7 tok/s), 512 generated in 13750 ms (37.2 tok/s), drafts accepted 250 of 456, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 1119 ms (59.0 tok/s), 512 generated in 14054 ms (36.4 tok/s), drafts accepted 245 of 465, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 1127 ms (58.6 tok/s), 1 generated in 36 ms (27.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 66 reused + 1 read in 0 ms (13913.6 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (9 major faults) for 0.0 MB of expert reads
+strata serve: prompt 61 tokens = 0 reused + 61 read in 948 ms (64.4 tok/s), 1 generated in 31 ms (32.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (11 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1021 group-steps, 1021 rows in 16102 ms = 63.4 rows/s (admissions included)
+strata serve: prompt 61 tokens = 0 reused + 61 read in 877 ms (69.6 tok/s), 1 generated in 33 ms (29.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 61 reused + 1 read in 0 ms (57863.7 tok/s), 1 generated in 28 ms (35.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 947 ms (69.7 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1021 group-steps, 1021 rows in 15923 ms = 64.1 rows/s (admissions included)
+strata serve: prompt 61 tokens = 0 reused + 61 read in 875 ms (69.8 tok/s), 1 generated in 33 ms (29.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 61 reused + 1 read in 0 ms (12656.3 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 948 ms (69.6 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1021 group-steps, 1021 rows in 15926 ms = 64.1 rows/s (admissions included)
+strata serve: prompt 66 tokens = 0 reused + 66 read in 950 ms (69.4 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 66 reused + 1 read in 0 ms (11021.3 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 0 reused + 67 read in 958 ms (69.9 tok/s), 1 generated in 29 ms (34.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 61 tokens = 0 reused + 61 read in 914 ms (66.7 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 1026 ms (64.3 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 2043 group-steps, 2043 rows in 19601 ms = 104.2 rows/s (admissions included)
+strata serve: prompt 61 tokens = 0 reused + 61 read in 875 ms (69.7 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 61 reused + 1 read in 0 ms (25010.0 tok/s), 1 generated in 29 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 0 reused + 67 read in 958 ms (69.9 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 950 ms (69.5 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 948 ms (69.6 tok/s), 1 generated in 29 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 2043 group-steps, 2043 rows in 19348 ms = 105.6 rows/s (admissions included)
+strata serve: prompt 61 tokens = 0 reused + 61 read in 875 ms (69.7 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 61 reused + 1 read in 0 ms (26810.4 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 948 ms (69.6 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 66 tokens = 0 reused + 66 read in 948 ms (69.6 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 0 reused + 67 read in 959 ms (69.9 tok/s), 1 generated in 29 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 2043 group-steps, 2043 rows in 19319 ms = 105.7 rows/s (admissions included)
+strata serve: prompt 36 tokens = 0 reused + 36 read in 550 ms (65.4 tok/s), 8 generated in 204 ms (39.2 tok/s), drafts accepted 3 of 4, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 284 tokens = 0 reused + 284 read in 2662 ms (106.7 tok/s), 256 generated in 5068 ms (50.5 tok/s), drafts accepted 171 of 234, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 2.3 MB from storage (396 major faults) for 0.0 MB of expert reads
+strata serve: prompt 287 tokens = 0 reused + 287 read in 2514 ms (114.2 tok/s), 256 generated in 5052 ms (50.7 tok/s), drafts accepted 170 of 232, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 284 tokens = 0 reused + 284 read in 2496 ms (113.8 tok/s), 256 generated in 5134 ms (49.9 tok/s), drafts accepted 172 of 240, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 219 tokens = 0 reused + 219 read in 2109 ms (103.9 tok/s), 256 generated in 5266 ms (48.6 tok/s), drafts accepted 166 of 240, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 218 tokens = 0 reused + 218 read in 2101 ms (103.8 tok/s), 256 generated in 5206 ms (49.2 tok/s), drafts accepted 168 of 237, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 220 tokens = 0 reused + 220 read in 2119 ms (103.8 tok/s), 256 generated in 5163 ms (49.6 tok/s), drafts accepted 167 of 229, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 4340 tokens = 0 reused + 4340 read in 14102 ms (307.7 tok/s), 256 generated in 6073 ms (42.2 tok/s), drafts accepted 144 of 231, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (2 major faults) for 0.0 MB of expert reads
+strata serve: prompt 4353 tokens = 0 reused + 4353 read in 14471 ms (300.8 tok/s), 256 generated in 5947 ms (43.0 tok/s), drafts accepted 139 of 209, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (22 major faults) for 0.0 MB of expert reads
+strata serve: prompt 4371 tokens = 0 reused + 4371 read in 14516 ms (301.1 tok/s), 256 generated in 6263 ms (40.9 tok/s), drafts accepted 138 of 211, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 31941 tokens = 0 reused + 31941 read in 39094 ms (817.0 tok/s), 256 generated in 6972 ms (36.7 tok/s), drafts accepted 126 of 232, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 32001 tokens = 0 reused + 32001 read in 39804 ms (804.0 tok/s), 256 generated in 6210 ms (41.2 tok/s), drafts accepted 146 of 217, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 32012 tokens = 0 reused + 32012 read in 39865 ms (803.0 tok/s), 256 generated in 6266 ms (40.9 tok/s), drafts accepted 146 of 225, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 59 tokens = 0 reused + 59 read in 1945 ms (30.3 tok/s), 1 generated in 34 ms (29.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 60 tokens = 59 reused + 1 read in 0 ms (16020.2 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 60 tokens = 0 reused + 60 read in 924 ms (64.9 tok/s), 1 generated in 30 ms (33.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 61 tokens = 0 reused + 61 read in 943 ms (64.7 tok/s), 1 generated in 30 ms (33.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 0 reused + 62 read in 952 ms (65.1 tok/s), 1 generated in 30 ms (33.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 5363 group-steps, 5363 rows in 49597 ms = 108.1 rows/s (admissions included)
+strata serve: prompt 1569 tokens = 1568 reused + 1 read in 64 ms (15.7 tok/s), 107 generated in 2534 ms (42.2 tok/s), drafts accepted 50 of 73, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 58 tokens = 0 reused + 58 read in 1053 ms (55.1 tok/s), 1 generated in 35 ms (28.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 59 tokens = 58 reused + 1 read in 0 ms (53954.9 tok/s), 1 generated in 30 ms (33.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 57 tokens = 0 reused + 57 read in 966 ms (59.0 tok/s), 1 generated in 30 ms (33.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 0 reused + 62 read in 1059 ms (58.5 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 56 tokens = 0 reused + 56 read in 976 ms (57.4 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 5236 group-steps, 5236 rows in 46664 ms = 112.2 rows/s (admissions included)
+strata serve: prompt 1441 tokens = 1440 reused + 1 read in 83 ms (12.1 tok/s), 316 generated in 7878 ms (40.1 tok/s), drafts accepted 151 of 240, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 60 tokens = 0 reused + 60 read in 1209 ms (49.6 tok/s), 1 generated in 36 ms (27.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 61 tokens = 60 reused + 1 read in 0 ms (48243.9 tok/s), 1 generated in 31 ms (32.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 58 tokens = 0 reused + 58 read in 998 ms (58.1 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 59 tokens = 0 reused + 59 read in 1015 ms (58.2 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 63 tokens = 0 reused + 63 read in 1065 ms (59.2 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 5482 group-steps, 5482 rows in 49256 ms = 111.3 rows/s (admissions included)
+strata serve: prompt 26932 tokens = 0 reused + 26932 read in 34330 ms (784.5 tok/s), 1 generated in 36 ms (27.9 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 26933 tokens = 26932 reused + 1 read in 0 ms (3555.9 tok/s), 1 generated in 30 ms (33.7 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 27016 tokens = 0 reused + 27016 read in 35033 ms (771.2 tok/s), 1 generated in 31 ms (32.3 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (2 major faults) for 0.0 MB of expert reads
+strata serve: prompt 26957 tokens = 0 reused + 26957 read in 34948 ms (771.3 tok/s), 1 generated in 30 ms (33.5 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 26960 tokens = 0 reused + 26960 read in 34927 ms (771.9 tok/s), 1 generated in 31 ms (32.3 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1483 group-steps, 1483 rows in 118380 ms = 12.5 rows/s (admissions included)
+strata serve: prompt 27317 tokens = 27316 reused + 1 read in 447 ms (2.2 tok/s), 2 generated in 94 ms (21.2 tok/s), drafts accepted 3 of 3, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8199 tokens = 0 reused + 8199 read in 17569 ms (466.7 tok/s), 1 generated in 31 ms (31.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8200 tokens = 8199 reused + 1 read in 0 ms (19520.2 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8214 tokens = 0 reused + 8214 read in 17707 ms (463.9 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (4 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8152 tokens = 0 reused + 8152 read in 17445 ms (467.3 tok/s), 1 generated in 30 ms (33.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8174 tokens = 0 reused + 8174 read in 17466 ms (468.0 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1019 group-steps, 1019 rows in 61463 ms = 16.6 rows/s (admissions included)
+strata serve: prompt 16403 tokens = 0 reused + 16403 read in 25047 ms (654.9 tok/s), 1 generated in 36 ms (28.0 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 16404 tokens = 16403 reused + 1 read in 0 ms (6160.7 tok/s), 1 generated in 30 ms (33.2 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 16379 tokens = 0 reused + 16379 read in 24908 ms (657.6 tok/s), 1 generated in 30 ms (33.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 16337 tokens = 0 reused + 16337 read in 24922 ms (655.5 tok/s), 1 generated in 30 ms (33.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 16377 tokens = 0 reused + 16377 read in 24853 ms (659.0 tok/s), 1 generated in 30 ms (33.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 986 group-steps, 986 rows in 83693 ms = 11.8 rows/s (admissions included)
+strata serve: prompt 64 tokens = 0 reused + 64 read in 1091 ms (58.7 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 65 tokens = 64 reused + 1 read in 0 ms (30926.2 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 62 tokens = 0 reused + 62 read in 906 ms (68.4 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 61 tokens = 0 reused + 61 read in 877 ms (69.5 tok/s), 1 generated in 29 ms (34.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 16374 tokens = 0 reused + 16374 read in 24664 ms (663.9 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 3669 group-steps, 3669 rows in 61247 ms = 59.9 rows/s (admissions included)
+strata serve: prompt 1218 tokens = 1217 reused + 1 read in 226 ms (4.4 tok/s), 171 generated in 4403 ms (38.8 tok/s), drafts accepted 84 of 162, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 57 tokens = 0 reused + 57 read in 884 ms (64.5 tok/s), 1 generated in 29 ms (34.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 54 tokens = 0 reused + 54 read in 783 ms (69.0 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15948 tokens = 0 reused + 15948 read in 24064 ms (662.7 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 8009 tokens = 0 reused + 8009 read in 17130 ms (467.5 tok/s), 1 generated in 30 ms (33.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 3707 group-steps, 3707 rows in 93132 ms = 39.8 rows/s (admissions included)
+strata serve: prompt 1782 tokens = 1781 reused + 1 read in 186 ms (5.4 tok/s), 77 generated in 1971 ms (39.1 tok/s), drafts accepted 42 of 83, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 27963 tokens = 0 reused + 27963 read in 34988 ms (799.2 tok/s), 1 generated in 36 ms (27.9 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 27964 tokens = 27963 reused + 1 read in 0 ms (3332.8 tok/s), 1 generated in 30 ms (33.6 tok/s), drafts accepted 0 of 0, 2 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 41 tokens = 0 reused + 41 read in 862 ms (47.6 tok/s), 1 generated in 29 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 14 group-steps, 14 rows in 1222 ms = 11.5 rows/s (admissions included)
+strata serve: prompt 27973 tokens = 27972 reused + 1 read in 197 ms (5.1 tok/s), 54 generated in 1331 ms (40.6 tok/s), drafts accepted 29 of 43, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 71 tokens = 0 reused + 71 read in 1461 ms (48.6 tok/s), 218 generated in 4459 ms (48.9 tok/s), drafts accepted 135 of 187, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (2 major faults) for 0.0 MB of expert reads
+strata serve: prompt 289 tokens = 288 reused + 1 read in 0 ms (27429.6 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 71 tokens = 0 reused + 71 read in 1201 ms (59.1 tok/s), 1 generated in 29 ms (34.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 5 group-steps, 5 rows in 1435 ms = 3.5 rows/s (admissions included)
+strata serve: prompt 75 tokens = 74 reused + 1 read in 55 ms (18.3 tok/s), 220 generated in 4432 ms (49.6 tok/s), drafts accepted 142 of 192, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1936 tokens = 0 reused + 1936 read in 7659 ms (252.8 tok/s), 1 generated in 35 ms (28.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1937 tokens = 1936 reused + 1 read in 0 ms (7685.1 tok/s), 1 generated in 30 ms (33.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 71 tokens = 0 reused + 71 read in 1341 ms (52.9 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 340 group-steps, 340 rows in 6506 ms = 52.3 rows/s (admissions included)
+strata serve: prompt 2109 tokens = 2108 reused + 1 read in 69 ms (14.5 tok/s), 168 generated in 4351 ms (38.6 tok/s), drafts accepted 80 of 148, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15924 tokens = 0 reused + 15924 read in 24089 ms (661.1 tok/s), 1 generated in 35 ms (28.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15925 tokens = 15924 reused + 1 read in 0 ms (4400.1 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1936 tokens = 0 reused + 1936 read in 7818 ms (247.6 tok/s), 1 generated in 30 ms (33.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1935 tokens = 0 reused + 1935 read in 7735 ms (250.2 tok/s), 1 generated in 29 ms (34.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1936 tokens = 0 reused + 1936 read in 7761 ms (249.4 tok/s), 1 generated in 29 ms (34.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 73 tokens = 0 reused + 73 read in 1317 ms (55.4 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 1565 group-steps, 1565 rows in 38432 ms = 40.7 rows/s (admissions included)
+strata serve: prompt 2351 tokens = 2350 reused + 1 read in 69 ms (14.4 tok/s), 65 generated in 1544 ms (42.1 tok/s), drafts accepted 35 of 51, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 70 tokens = 0 reused + 70 read in 1257 ms (55.7 tok/s), 231 generated in 5033 ms (45.9 tok/s), drafts accepted 140 of 209, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 301 tokens = 300 reused + 1 read in 0 ms (14357.9 tok/s), 1 generated in 30 ms (33.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 70 tokens = 0 reused + 70 read in 1221 ms (57.3 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1933 tokens = 0 reused + 1933 read in 7644 ms (252.9 tok/s), 1 generated in 29 ms (34.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 7872 tokens = 0 reused + 7872 read in 16884 ms (466.2 tok/s), 1 generated in 30 ms (33.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1934 tokens = 0 reused + 1934 read in 7757 ms (249.3 tok/s), 1 generated in 30 ms (33.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 70 tokens = 0 reused + 70 read in 1286 ms (54.5 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 7874 tokens = 0 reused + 7874 read in 16783 ms (469.2 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 7873 tokens = 0 reused + 7873 read in 16895 ms (466.0 tok/s), 1 generated in 30 ms (33.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1934 tokens = 0 reused + 1934 read in 7764 ms (249.1 tok/s), 1 generated in 30 ms (33.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 7873 tokens = 0 reused + 7873 read in 16892 ms (466.1 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1932 tokens = 0 reused + 1932 read in 7744 ms (249.5 tok/s), 1 generated in 29 ms (34.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 68 tokens = 0 reused + 68 read in 1070 ms (63.5 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 0 reused + 67 read in 970 ms (69.1 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 71 tokens = 0 reused + 71 read in 1199 ms (59.2 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1934 tokens = 0 reused + 1934 read in 7633 ms (253.4 tok/s), 1 generated in 30 ms (33.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 7871 tokens = 0 reused + 7871 read in 16891 ms (466.0 tok/s), 1 generated in 30 ms (33.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 70 tokens = 0 reused + 70 read in 1318 ms (53.1 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 70 tokens = 0 reused + 70 read in 1204 ms (58.1 tok/s), 1 generated in 28 ms (35.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15923 tokens = 0 reused + 15923 read in 24056 ms (661.9 tok/s), 1 generated in 31 ms (32.5 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1935 tokens = 0 reused + 1935 read in 7802 ms (248.0 tok/s), 1 generated in 29 ms (34.8 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 67 tokens = 0 reused + 67 read in 1058 ms (63.3 tok/s), 1 generated in 29 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata batch (pipelined, 4 groups of 1): 6463 group-steps, 6463 rows in 221340 ms = 29.2 rows/s (admissions included)
+strata serve: prompt 2172 tokens = 2171 reused + 1 read in 62 ms (16.1 tok/s), 94 generated in 2356 ms (39.9 tok/s), drafts accepted 46 of 80, 0 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads

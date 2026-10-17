@@ -1,0 +1,32 @@
+[21:42:32] === ext4-up
+[21:42:40] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.5 GiB
+[21:45:22] ext4 copy done in 162 s: 28800138432 bytes (source 28800138432); loop /dev/loop4, ext4   rw,noatime
+[21:45:26] first GiB identical
+[21:45:27] last GiB identical
+[21:45:27] symlink /mnt/ple-ext4/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf -> /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+[21:45:27] === e-off-0 (V cfg-ext4-off)
+[21:45:28] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 50.8 GiB
+Running as unit: strata-ab-v045b.service
+[21:55:11] loaded after 578 s
+[22:01:47] done e-off-0: 3 prompt rows, 3 decode rows
+[22:01:47] === e-hint-1 (V cfg-ext4-hint mem)
+[22:01:58] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 58.1 GiB
+Running as unit: strata-ab-v045b.service
+[22:09:12] loaded after 430 s
+[22:17:17] done e-hint-1: 3 prompt rows, 3 decode rows
+[22:17:17] === e-off-1 (V cfg-ext4-off)
+[22:17:28] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.6 GiB
+Running as unit: strata-ab-v045b.service
+[22:24:47] loaded after 436 s
+[22:31:25] done e-off-1: 3 prompt rows, 3 decode rows
+[22:31:25] === e-hint-2 (V cfg-ext4-hint)
+[22:31:37] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.5 GiB
+Running as unit: strata-ab-v045b.service
+[22:38:54] loaded after 434 s
+[22:45:33] done e-hint-2: 3 prompt rows, 3 decode rows
+[22:45:33] finishing (exit 0)
+[22:45:45] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.6 GiB
+[22:45:53] unmounted /mnt/ple-ext4
+[22:45:53] removed /home/thc1006/dev/ple-ext4.img
+[22:53:34] loaded after 2 s
+[22:53:34] strata-q3: active

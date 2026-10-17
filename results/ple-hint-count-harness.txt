@@ -1,0 +1,210 @@
+######## ngram.cpp from release, memlock normal
+RLIMIT_MEMLOCK soft 8428400640
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+ok (0 failures)
+######## ngram.cpp from release, memlock zero
+RLIMIT_MEMLOCK soft 0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+--no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+ok (0 failures)
+(mlock-failed warnings: 28)
+######## ngram.cpp from patched, memlock normal
+RLIMIT_MEMLOCK soft 8428400640
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=1    rows_in_range=15     WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=16   rows_in_range=255    WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     ram, --no-ple-prefetch       locked=1 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+ok (0 failures)
+######## ngram.cpp from patched, memlock zero
+RLIMIT_MEMLOCK soft 0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+IQ4_NL   ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+IQ4_NL   ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+IQ4_NL   direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+F8_E4M3  ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+F8_E4M3  ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+F8_E4M3  direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q5_1     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q5_1     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q5_1     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q8_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q8_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+--no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q8_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+Q4_0     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+Q4_0     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+Q4_0     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=1    rows_in_range=15     WILLNEED_in_gather=15     rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=16   rows_in_range=255    WILLNEED_in_gather=255    rows_differing=0
+BF16     ram (mmap + lock)            locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     mmap (no lock)               locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=11199  rows_differing=0
+BF16     ram, --no-ple-prefetch       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     mmap, --no-ple-prefetch      locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+BF16     direct                       locked=0 tokens=700  rows_in_range=11199  WILLNEED_in_gather=0      rows_differing=0
+ok (0 failures)
+(mlock-failed warnings: 28)

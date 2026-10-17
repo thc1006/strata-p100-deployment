@@ -1,0 +1,30 @@
+[09:43:29] serve_load 1,2,4 (R4-pr2050-p8192)
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      1         33.3           36.2     1.19/1.25        15.39/15.47     0
+      2         60.2           32.9     1.62/2.40        16.99/17.66     0
+      4         99.4           28.4     2.71/4.49        20.59/21.02     0
+[09:46:08] replicate (R4-pr2050-p8192)
+  reasoning-v1: prompt 284 tok, prompt 114.0 tok/s, decode 50.3 tok/s, TTFT 2.54 s
+  code-v1: prompt 218 tok, prompt 103.7 tok/s, decode 48.7 tok/s, TTFT 2.13 s
+  docs-4.4k: prompt 4341 tok, prompt 407.1 tok/s, decode 42.5 tok/s, TTFT 10.71 s
+  docs-32k: prompt 31990 tok, prompt 552.3 tok/s, decode 41.0 tok/s, TTFT 58.0 s
+[09:51:01] think4 (R4-pr2050-p8192)
+  per user client tok/s: [32.08, 30.89, 30.26, 30.54] total s: [45.09, 50.38, 51.2, 37.19] reasoning chunks: [328, 338, 99, 180]
+  per user client tok/s: [30.75, 30.62, 32.18, 29.52] total s: [42.39, 49.82, 51.37, 45.26] reasoning chunks: [320, 327, 99, 180]
+  per user client tok/s: [29.25, 32.73, 30.88, 29.76] total s: [41.97, 46.15, 42.66, 40.0] reasoning chunks: [321, 205, 99, 180]
+[09:53:29] worst (R4-pr2050-p8192)
+  TTFT first/last: [53.81] [250.31] decode: [14.28, 14.49, 39.06, 14.89]
+[09:57:50] burst 4x8192
+{"ttft_first_s":14.75,"ttft_last_s":88.68,"decode_tok_s_median":11.559999999999999,"wall_s":95.36}
+[09:59:26] burst 4x16384
+{"ttft_first_s":35.1,"ttft_last_s":163.73,"decode_tok_s_median":11.355,"wall_s":170.32}
+[10:02:16] admit 3 decoders + 16K
+{"newcomer":{"prompt_tokens":16707,"ttft_s":40.33},"before":[34.1,34.2,34.2],"during":[6.67,6.64,6.62]}
+[10:03:29] coldjoin (R4-pr2050-p8192)
+  decoders longest pause: [14.48, 14.48] paused: [43.15, 44.2] chunks while joining: [461, 461] joiners TTFT: [35.69, 51.2]
+[10:05:11] preempt (R4-pr2050-p8192)
+  short question TTFT: 13.98 long prompt TTFT: 54.52
+[10:06:08] poisson (R4-pr2050-p8192)
+  rate 0.1/s: goodput 20%, errors 0, TTFT p50/p95 41.92/120.81 s, longest pause p95/max 15.42/15.63 s
+[10:13:17] done

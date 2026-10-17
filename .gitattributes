@@ -1,0 +1,2 @@
+# results/ 是工具寫出的原始輸出（例如 monitor.py 的 CSV 用 CRLF），換行保持原樣
+results/** -text

@@ -1,0 +1,12 @@
+tag v431-1-traced  engine pid 256295  exe /home/thc1006/dev/strata/engine-cuda12/strata  at 2026-10-16 19:11:13
+engine args: --ple-io ram --no-ple-prefetch 
+{"offset": 555555, "prompt_tokens": 15973, "engine_prompt_tok_s": 700.2, "ttft_s": 22.86, "sda4_read_gb": 0.002, "prefetch_misses": 0, "error": null}
+{"offset": 444444, "prompt_tokens": 15912, "engine_prompt_tok_s": 696.5, "ttft_s": 22.91, "sda4_read_gb": 0.0, "prefetch_misses": 0, "error": null}
+{"offset": 111111, "prompt_tokens": 15996, "engine_prompt_tok_s": 700.3, "ttft_s": 22.9, "sda4_read_gb": 0.0, "prefetch_misses": 0, "error": null}
+--- engine system calls during the probe (perf stat -p 256295)
+syscalls:sys_enter_madvise         192
+syscalls:sys_enter_fadvise64       0
+--- kernel functions, all CPUs (ftrace function profiler; time includes callees)
+dbuf_prefetch      calls     114706  total       41.2 ms  mean 0.36 us
+dmu_prefetch       calls         20  total       65.0 ms  mean 3249.92 us
+generic_fadvise    calls         66  total        0.2 ms  mean 2.81 us

@@ -1,0 +1,20 @@
+Provenance: console output of probes run by hand on 2026-10-16, copied verbatim from the terminal.
+Not produced by a script that wrote this file; the reproducible probe for the deployed
+configuration is deploy/stress/ple_prefetch_probe.py (results in ple_prefetch_probe.jsonl).
+Counters: sda = whole disk at that time (/sys/block/sda/stat; swap-in on sda2 was negligible: pswpin 85 pages).
+
+R1 (--ple-io ram, PLE read-ahead hints ON), service started 06:52:38, probes at about 07:3x:
+  probe 1 (offset 777777): prompt_tokens 15987, engine prompt 428.2 tok/s, TTFT 37.4 s, 38.1 s window:
+          sda read 15496.1 MB, arc_prefetch_data_misses +118216, arc_demand_data_misses +11, engine rchar +86802 B,
+          engine read_bytes +1550036992 B, pgpgin +15132892 KB, pgmajfault +156
+  probe 2 (offset 333333): prompt_tokens 16009, engine prompt 407.2 tok/s, TTFT 39.37 s, sda read 17.36 GB;
+          experts.bin mapping RSS 0.0 -> 0.0 GiB, PLE mapping RSS 26.82 -> 26.82 GiB (locked)
+  probe 3 (offset 222222): prompt_tokens 15997, TTFT 36.41 s, sda read 17.8 GB; per-process read_bytes deltas:
+          six z_rd_int_* ZFS kernel threads ~2.7-2.8 GB each (the reads are ZFS prefetch I/O)
+R1b (--ple-io ram + --no-ple-prefetch), service started about 07:3x, same three offsets:
+  {"prompt_tokens": 15986, "engine_prompt_tok_s": 670.1, "ttft_s": 23.98, "sda_read_gb": 0.04, "prefetch_misses": 5}
+  {"prompt_tokens": 16010, "engine_prompt_tok_s": 675.3, "ttft_s": 23.76, "sda_read_gb": 0.0, "prefetch_misses": 0}
+  {"prompt_tokens": 15997, "engine_prompt_tok_s": 682.0, "ttft_s": 23.51, "sda_read_gb": 0.0, "prefetch_misses": 0}
+Corroborating files: R1-pleram-disk.csv (sda reads 110.9 GB during R1's worst scenario, 100.3 GB during its Poisson
+run), R1b-noplepf-monitor-all.json (0.049 GB over the whole R1b run), stress.jsonl replicate docs-32k
+(R1 526-542 tok/s vs R1b 767-768 tok/s).

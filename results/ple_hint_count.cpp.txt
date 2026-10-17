@@ -1,0 +1,137 @@
+// Adapted from Strata's src/ngram/ple_reader_test.cpp (MIT License, Copyright (c) 2026 Niko1221 and the Strata
+// contributors; full text in results/LICENSE-strata.txt).
+#include "strata/kernels/ngram.hpp"
+#include "strata/ngram/ple_reader.hpp"
+#include "strata/platform/direct_file.hpp"
+#include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
+#include <random>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <vector>
+#include <sys/mman.h>
+#include <sys/resource.h>
+#include <atomic>
+
+// Count every madvise the PLE code makes (-Wl,--wrap=madvise) and pass it on to the real one.
+extern "C" int __real_madvise(void* a, size_t n, int adv);
+static std::atomic<long> g_willneed{0}, g_other{0};
+extern "C" int __wrap_madvise(void* a, size_t n, int adv) {
+    (adv == MADV_WILLNEED ? g_willneed : g_other)++;
+    return __real_madvise(a, n, adv);
+}
+
+namespace ng = strata::ngram;
+namespace k = strata::kernels;
+namespace {
+int g_fail = 0;
+void expected_row(uint32_t row, uint32_t rb, uint8_t* out) {
+    for (uint32_t b = 0; b < rb; ++b) out[b] = (uint8_t) ((row * 2654435761u + b * 97u) >> 7);
+    std::memcpy(out, &row, 4);
+}
+uint32_t gguf_type_id(const char* name) {
+    static const struct { const char* name; uint32_t id; } ids[] = {
+        {"IQ4_NL", 20}, {"Q4_0", 2}, {"Q4_1", 3}, {"Q5_0", 6}, {"Q5_1", 7}, {"Q8_0", 8}, {"BF16", 30}, {"F8_E4M3", 24}};
+    for (const auto& e : ids)
+        if (std::strcmp(e.name, name) == 0) return e.id;
+    return 0xFFFFFFFFu;
+}
+std::string write_format_table(const std::string& dir, const k::PleFormatInfo& f, uint32_t rows, uint64_t claimed_rows = 0) {
+    const std::string path = dir + "/ple_format_selftest.gguf";
+    std::ofstream out(path, std::ios::binary);
+    if (!out) { std::fprintf(stderr, "cannot write %s\n", path.c_str()); return {}; }
+    const auto le = [](auto value, int bytes) {
+        std::string s((size_t) bytes, '\0');
+        for (int i = 0; i < bytes; ++i) s[(size_t) i] = (char) ((value >> (8 * i)) & 0xff);
+        return s;
+    };
+    const auto str = [&](const char* s) { return le((uint64_t) std::strlen(s), 8) + std::string(s); };
+    const uint64_t n_kv = f.needs_scale ? 3 : 1;
+    std::string head = "GGUF" + le(3u, 4) + le(1ull, 8) + le(n_kv, 8);
+    head += str("general.architecture") + le(8u, 4) + str("strata-ple");
+    if (f.needs_scale) {
+        const float scale = 0.75f;
+        uint32_t sb;
+        std::memcpy(&sb, &scale, 4);
+        head += str("strata.ple.format") + le(8u, 4) + str("f8_e4m3");
+        head += str("strata.ple.scale") + le(6u, 4) + le(sb, 4);       // 6 = FLOAT32
+    }
+    head += str("per_layer_token_embd.weight") + le(2u, 4);
+    head += le((uint64_t) k::PLE_HEAD_DIM, 8) + le(claimed_rows != 0 ? claimed_rows : (uint64_t) rows, 8);
+    head += le(gguf_type_id(f.name), 4) + le(0ull, 8);
+    while (head.size() % 32) head += '\0';
+    out.write(head.data(), (std::streamsize) head.size());
+    std::vector<uint8_t> r(f.row_bytes);
+    for (uint32_t i = 0; i < rows; ++i) {
+        expected_row(i, f.row_bytes, r.data());
+        out.write((const char*) r.data(), (std::streamsize) f.row_bytes);
+    }
+    out.close();
+    return out ? path : std::string();
+}
+}  // namespace
+
+// One scenario: open the table, run gather_batch over nt tokens of rows, count WILLNEED calls made inside gather_batch
+// only (not open's whole-table hint), and check every row against the format's own dequantizer.
+static void scenario(const k::PleFormatInfo& f, const std::string& path, uint32_t rows, const char* name,
+                     k::PleIo mode, bool lock, bool prefetch, size_t nt) {
+    k::ple_prefetch_enable(prefetch);
+    k::PleTable t;
+    std::string err;
+    k::PleIoOptions io;
+    io.mode = mode; io.max_inflight = 8; io.cache_rows = 0; io.lock = lock;
+    if (!t.open(path, err, io)) { std::printf("%-8s %-28s open failed: %s\n", f.name, name, err.c_str()); ++g_fail; return; }
+    std::mt19937 rng(7);
+    const size_t nr = nt * 16;
+    std::vector<uint32_t> br(nr);
+    for (size_t i = 0; i < nr; ++i) br[i] = rng() % rows;
+    if (nr > 5) br[5] = rows + 7;                              // one out of range (mapped: zeros)
+    std::vector<float> out(nr * k::PLE_HEAD_DIM);
+    const long w0 = g_willneed.load();
+    const bool ok = t.gather_batch(br.data(), nt, out.data(), err);
+    const long hints = g_willneed.load() - w0;
+    size_t bad = 0, valid_rows = 0;
+    std::vector<uint8_t> raw(f.row_bytes);
+    float ref[k::PLE_HEAD_DIM];
+    for (size_t i = 0; i < nr && ok; ++i) {
+        if (br[i] >= rows) {
+            if (mode == k::PleIo::Mmap) for (int d = 0; d < k::PLE_HEAD_DIM; ++d) bad += out[i * k::PLE_HEAD_DIM + d] != 0.0f;
+            continue;
+        }
+        ++valid_rows;
+        expected_row(br[i], f.row_bytes, raw.data());
+        f.dequant(raw.data(), f.needs_scale ? 0.75f : 1.0f, ref);
+        bad += std::memcmp(out.data() + i * k::PLE_HEAD_DIM, ref, sizeof ref) != 0;
+    }
+    std::printf("%-8s %-28s locked=%d tokens=%-4zu rows_in_range=%-6zu WILLNEED_in_gather=%-6ld rows_differing=%zu%s\n",
+                f.name, name, (int) t.locked(), nt, valid_rows, hints, bad, ok ? "" : "  gather_batch FAILED");
+    if (!ok || bad) ++g_fail;
+    k::ple_prefetch_enable(true);
+}
+
+int main(int argc, char** argv) {
+    const std::string dir = argc > 1 ? argv[1] : "/tmp";
+    struct rlimit rl;
+    getrlimit(RLIMIT_MEMLOCK, &rl);
+    std::printf("RLIMIT_MEMLOCK soft %lld\n", (long long) rl.rlim_cur);
+    const uint32_t rows = 20000;
+    for (int i = 0; i < k::ple_format_count(); ++i) {
+        const k::PleFormatInfo& f = k::ple_formats()[i];
+        const std::string path = write_format_table(dir, f, rows);
+        if (path.empty()) { ++g_fail; continue; }
+        for (size_t nt : {(size_t) 1, (size_t) 16, (size_t) 700})
+            scenario(f, path, rows, "ram (mmap + lock)", k::PleIo::Mmap, true, true, nt);
+        scenario(f, path, rows, "mmap (no lock)", k::PleIo::Mmap, false, true, 700);
+        scenario(f, path, rows, "ram, --no-ple-prefetch", k::PleIo::Mmap, true, false, 700);
+        scenario(f, path, rows, "mmap, --no-ple-prefetch", k::PleIo::Mmap, false, false, 700);
+        scenario(f, path, rows, "direct", k::PleIo::Direct, false, true, 700);
+        std::filesystem::remove(path);
+    }
+    std::printf("%s (%d failures)\n", g_fail ? "FAIL" : "ok", g_fail);
+    return g_fail ? 1 : 0;
+}

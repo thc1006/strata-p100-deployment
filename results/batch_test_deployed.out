@@ -1,0 +1,13 @@
+solo 0: 128 tokens in 5.5s  DONE 128 23 834.0 4644.1 length 64 110 0 0 0 0 0 0.0 23 0
+solo 1: 128 tokens in 4.0s  DONE 128 25 658.4 3329.6 length 88 104 0 0 0 0 0 0.0 25 0
+solo 2: 128 tokens in 4.4s  DONE 128 27 659.6 3780.6 length 80 110 0 0 0 0 0 0.0 27 0
+solo 3: 128 tokens in 5.0s  DONE 128 32 753.4 4228.0 length 68 112 0 0 0 0 0 0.0 32 0
+batch: 4 slots, 512 tokens; admissions 3.0s; then 4.1s -> aggregate 72.7 tok/s overall, 81.9 tok/s from the first batch token
+slot 0: 128 tokens, solo 128: IDENTICAL
+    'Le **B-tree** (ou arbre B) est une structure de donn\xe9es \xe9quilibr\xe9e, tr\xe8s utilis\xe9e dans les syst\xe8mes de gestion de bases de donn\xe9es (comme MySQL, PostgreSQL) et '
+slot 1: 128 tokens, solo 128: IDENTICAL
+    '```python\ndef merge_intervals(intervals: list[list[int]]) -> list[list[int]]:\n    """\n    Merge overlapping intervals.\n\n    Args:\n        intervals: A list of i'
+slot 2: 128 tokens, solo 128: IDENTICAL
+    'Here is a detailed comparison of **TCP** (Transmission Control Protocol) and **QUIC** (Quick UDP Internet Connections) across the three specific dimensions: **H'
+slot 3: 128 tokens, solo 128: IDENTICAL
+    "L'histoire du calcul de $\\pi$ (pi) est une \xe9pop\xe9e fascinante qui traverse les mill\xe9naires, refl\xe9tant l'\xe9volution de la pens\xe9e math\xe9matique, de la g\xe9om\xe9trie pure"

@@ -1,0 +1,26 @@
+[18:37:42] === A:v431-1
+[18:37:53] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 51.8 GiB
+finished v431-1
+[19:12:25] done A:v431-1
+[19:12:25] === B:v441-1
+[19:12:37] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.6 GiB
+Running as unit: strata-ab-v441.service
+[19:20:01] loaded after 440 s
+finished v441-1
+[20:13:13] done B:v441-1
+[20:13:13] === C:v441pf
+[20:13:25] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 58.7 GiB
+Running as unit: strata-ab-v441.service
+[20:20:49] loaded after 440 s
+[20:27:36] done C:v441pf
+[20:27:36] === B:v441-2
+[20:27:47] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.8 GiB
+Running as unit: strata-ab-v441.service
+[20:35:13] loaded after 442 s
+finished v441-2
+[21:02:05] done B:v441-2
+[21:02:05] === A:v431-2
+[21:02:17] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.8 GiB
+finished v431-2
+[21:37:02] done A:v431-2
+[21:37:02] strata-q3: active; exit 0

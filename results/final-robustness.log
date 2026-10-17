@@ -1,0 +1,52 @@
+[11:06:23] boundary (final)
+   {'prompt_tokens': 27878, 'room': 4882, 'over_by_one_status': 400, 'exact_fit_status': 200, 'exact_fit_first_token_s': 35.61, 'pass': True}
+[11:06:59] disconnect (final)
+  others finished: [768, 722, 768] fifth TTFT: 0.66 pass: True
+[11:07:26] multiturn (final)
+  20 turns + 22 extra requests, 0 failures; cached by turn: [[0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]
+[11:14:44] budget (final)
+  budget 128: reasoning chunks 144, answer 34 (want 34), finish stop, TTFT content 4.44 s
+  budget 512: reasoning chunks 528, answer 34 (want 34), finish stop, TTFT content 16.2 s
+[11:15:20] qa (final)
+  solo 16/16, four at a time 14/16
+    從 1 加到 100 的總和是多少？ want 5050: solo 5050, concurrent None
+    甲單獨 3 小時完成一件工作，乙單獨 6 小時完成，兩人合作需要幾小時？ want 2: solo 2, concurrent None
+[11:17:10] overload: 8 and 12 clients on 4 slots
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      8         82.3           24.9     8.99/16.38       19.22/24.88     0
+     12         82.6           24.8    14.93/28.45       25.77/37.19     0
+[11:18:12] needle 30k at depths 10/50/90
+  30k depth  10%: FOUND  (30,618 prompt tokens, 39 s)
+  30k depth  50%: FOUND  (30,618 prompt tokens, 39 s)
+  30k depth  90%: FOUND  (30,619 prompt tokens, 39 s)
+3 of 3 found
+[11:20:09] early close
+solo: OK -> 'Blue '
+batch: OK -> 'Blue '
+[11:20:13] poisson (final)
+  rate 0.05/s: goodput 73%, errors 0, TTFT p50/p95 7.74/29.05 s, longest pause p95/max 25.29/29.89 s
+[11:31:00] poisson (final)
+  rate 0.2/s: goodput 20%, errors 0, TTFT p50/p95 42.33/202.0 s, longest pause p95/max 30.57/30.57 s
+[11:36:08] soak (final)
+  203 requests, 0 errors, 119765 tokens
+[12:06:49] engine log since this run: errors, refusals, watchdog, warnings
+engine prompt lines (batched requests log more than one): 414
+      4 strata verify: captured the N-token window (upload no error, sync no error)
+[12:06:49] server journal since this run: HTTP errors, refusals, restarts
+ 十  16 12:06:16 <host> python[175512]: [strata] thinking: 64 of budget 512 (max 2048) tokens, 5.3 tok/s, 13 s
+ 十  16 12:06:17 <host> python[175512]: [strata] thinking: 91 of budget 512 (max 2048) tokens, 6.9 tok/s, 14 s
+ 十  16 12:06:18 <host> python[175512]: [strata] thinking: 123 of budget 512 (max 2048) tokens, 8.7 tok/s, 15 s
+ 十  16 12:06:19 <host> python[175512]: [strata] thinking: 155 of budget 512 (max 2048) tokens, 10.2 tok/s, 17 s
+ 十  16 12:06:20 <host> python[175512]: [strata] thinking: 187 of budget 512 (max 2048) tokens, 11.6 tok/s, 18 s
+ 十  16 12:06:21 <host> python[175512]: [strata] thinking: 220 of budget 512 (max 2048) tokens, 12.8 tok/s, 19 s
+ 十  16 12:06:22 <host> python[175512]: [strata] thinking: 254 of budget 512 (max 2048) tokens, 13.9 tok/s, 20 s
+ 十  16 12:06:23 <host> python[175512]: [strata] thinking: 288 of budget 512 (max 2048) tokens, 15.0 tok/s, 21 s
+ 十  16 12:06:24 <host> python[175512]: [strata] thinking: 322 of budget 512 (max 2048) tokens, 15.9 tok/s, 22 s
+ 十  16 12:06:25 <host> python[175512]: [strata] thinking: 357 of budget 512 (max 2048) tokens, 16.8 tok/s, 23 s
+ 十  16 12:06:27 <host> python[175512]: [strata] answering: 427 of max 2048 tokens, 18.3 tok/s, 25 s
+ 十  16 12:06:28 <host> python[175512]: [strata] answering: 462 of max 2048 tokens, 19.0 tok/s, 26 s
+ 十  16 12:06:29 <host> python[175512]: [strata] answering: 497 of max 2048 tokens, 19.6 tok/s, 27 s
+ 十  16 12:06:30 <host> python[175512]: [strata] answering: 532 of max 2048 tokens, 20.2 tok/s, 28 s
+ 十  16 12:06:31 <host> python[175512]: [strata] answering: 567 of max 2048 tokens, 20.7 tok/s, 29 s
+[12:06:49] done

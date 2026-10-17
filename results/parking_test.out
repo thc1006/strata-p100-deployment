@@ -1,0 +1,5 @@
+live (reference): prompt A 3682 tokens, follow-up 3807 tokens, reused 3781, follow-up in 3.76 s; restore lines: none
+parked (A, B, A): prompt A 3682 tokens, follow-up 3807 tokens, reused 3782, follow-up in 3.12 s; restore lines: ['restored 3782 tokens (live) in 54.4 ms; parked=0 bytes=57763576']
+follow-up tokens: IDENTICAL (92 / 92)
+    '1. **Movable Type**: This foundational technology originated in East Asia and served as the precursor to later printing innovations.\n2. **Gutenberg**: Johannes Gutenberg’s press in Mainz around 1450 m'
+second park of A: 57697920 bytes of K/V reused (retained from its restore)

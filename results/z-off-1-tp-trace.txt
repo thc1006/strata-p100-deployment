@@ -1,0 +1,19 @@
+tag z-off-1-tp  mode prompt  sleep-time 1  engine pid 371376  exe /home/thc1006/dev/strata-0.1.45/engine-cuda12/strata  at 2026-10-17 19:39:40
+engine args: --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf --ple-io ram --no-ple-prefetch 
+{"offset": 555555, "mode": "prompt", "prompt_tokens": 15972, "completion_tokens": 32, "finish": "length", "engine_prompt_tok_s": 697.5, "ttft_s": 22.96, "engine_decode_tok_s": 45.9, "client_decode_tok_s": 46.52, "drafts": "20/24", "error": null, "wall_s": 23.66, "disk_gb": 0.002, "prefetch_data_misses": 0, "prefetch_data_hits": 0, "demand_data_misses": 31, "demand_data_hits": 794, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 14.209, "cpu_full_s": 0.0, "memory_some_s": 0.042, "memory_full_s": 0.038, "io_some_s": 0.018, "io_full_s": 0.012, "engine_user_s": 23.2, "engine_sys_s": 0.34, "arc_evict_s": 0.0, "z_rd_int_s": -0.01, "z_rd_iss_s": 0.0, "text_sha": "af2ac41e357efea8", "text_head": "Strata is an inference engine designed to run la"}
+{"offset": 444444, "mode": "prompt", "prompt_tokens": 15909, "completion_tokens": 32, "finish": "length", "engine_prompt_tok_s": 689.8, "ttft_s": 23.12, "engine_decode_tok_s": 51.9, "client_decode_tok_s": 52.81, "drafts": "20/22", "error": null, "wall_s": 23.74, "disk_gb": 0.0, "prefetch_data_misses": 0, "prefetch_data_hits": 0, "demand_data_misses": 19, "demand_data_hits": 876, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 15.229, "cpu_full_s": 0.0, "memory_some_s": 0.021, "memory_full_s": 0.02, "io_some_s": 0.018, "io_full_s": 0.016, "engine_user_s": 23.3, "engine_sys_s": 0.38, "arc_evict_s": 0.17, "z_rd_int_s": 0.02, "z_rd_iss_s": 0.0, "text_sha": "b760fb8062a0a195", "text_head": "Strata is an experimental inference engine desig"}
+{"offset": 111111, "mode": "prompt", "prompt_tokens": 15994, "completion_tokens": 32, "finish": "length", "engine_prompt_tok_s": 690.2, "ttft_s": 23.23, "engine_decode_tok_s": 40.9, "client_decode_tok_s": 41.26, "drafts": "18/26", "error": null, "wall_s": 24.01, "disk_gb": 0.002, "prefetch_data_misses": 0, "prefetch_data_hits": 0, "demand_data_misses": 31, "demand_data_hits": 656, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 15.322, "cpu_full_s": 0.0, "memory_some_s": 0.002, "memory_full_s": 0.002, "io_some_s": 0.031, "io_full_s": 0.027, "engine_user_s": 23.6, "engine_sys_s": 0.4, "arc_evict_s": 0.01, "z_rd_int_s": 0.02, "z_rd_iss_s": 0.0, "text_sha": "f135b149016ead1a", "text_head": "Strata is an inference engine designed to run la"}
+--- engine during the probe (perf stat -p 371376)
+syscalls:sys_enter_madvise         192
+syscalls:sys_enter_fadvise64       0
+context-switches                   27056
+task-clock                         71192.53
+--- kernel functions, all CPUs (ftrace function profiler; time includes callees; sleep-time 1)
+arc_get_data_impl.constprop.0    calls       2824  total        6.9 ms  mean 2.45 us
+arc_read                         calls        585  total       59.8 ms  mean 102.31 us
+arc_wait_for_eviction            calls       9021  total      172.2 ms  mean 19.09 us
+dbuf_prefetch                    calls     122921  total      118.3 ms  mean 0.96 us
+dbuf_prefetch_impl               calls     122931  total       48.1 ms  mean 0.39 us
+dmu_prefetch                     calls         42  total      147.8 ms  mean 3518.25 us
+do_madvise                       calls       1522  total       32.2 ms  mean 21.16 us
+generic_fadvise                  calls         60  total        0.1 ms  mean 2.39 us

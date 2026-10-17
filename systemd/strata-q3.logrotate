@@ -1,0 +1,13 @@
+# /etc/logrotate.d/strata-q3: the engine appends to its log and never rotates it (copytruncate is safe for append mode).
+# Rotation by size, so it is rare (~600 B a request): server.py keeps byte offsets into this log for its crash
+# diagnostics and the Monitor view, which a truncate makes stale until the next start.
+/home/thc1006/dev/strata/strata-iq3_xxs.log {
+    su thc1006 thc1006
+    size 50M
+    rotate 8
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+}

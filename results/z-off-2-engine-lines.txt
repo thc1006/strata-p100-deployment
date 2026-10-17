@@ -1,0 +1,48 @@
+strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,26,38)
+strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+strata generate: PLE table locked in RAM (--ple-io ram) in 7.1 s
+strata generate: layer split: CUDA1 loads the dense weights of layers 13-25 only
+strata generate: layer split: CUDA1 PCIe probe 11.4 GB/s (best of 11.3 11.3 11.2 11.4) -> pcie_frac 0.31
+strata generate: layer split: CUDA1 holds its weights; 14.64 GiB free (its session follows the split search)
+strata generate: layer split: CUDA2 loads the dense weights of layers 26-37 only
+strata generate: layer split: CUDA2 PCIe probe 11.7 GB/s (best of 11.6 11.6 11.7 11.5) -> pcie_frac 0.32
+strata generate: layer split: CUDA2 holds its weights; 14.67 GiB free (its session follows the split search)
+strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+strata generate: layer split: CUDA3 PCIe probe 11.7 GB/s (best of 11.6 11.7 11.7 11.6) -> pcie_frac 0.32
+strata generate: layer split: CUDA3 holds its weights; 14.81 GiB free (its session follows the split search)
+strata generate: PLE on, table 320001536 rows of /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+strata generate: layer split: CUDA1 holds its weights, session [13, 26); 14.48 GiB free
+strata generate: layer split: CUDA2 holds its weights, session [26, 38); 14.52 GiB free
+strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.25 GiB free
+strata generate: layer split, CUDA1: 13.86 GiB free of 15.89, room for experts 12.26 GiB
+strata generate: layer split: CUDA1 runs layers 13-25, expert cache 6656 slots (9.88 GiB), 6656 of its 6656 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA2: 13.90 GiB free of 15.89, room for experts 12.30 GiB
+strata generate: layer split: CUDA2 runs layers 26-37, expert cache 6144 slots (11.43 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA3: 12.84 GiB free of 15.89, room for experts 11.25 GiB
+strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (9.25 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+strata generate: layer split: CUDA0 runs layers 0-12
+strata generate: session is up (engine 0.1.45)
+strata serve: layer split: 100% of the experts resident, the prompt path's streamed ring 96 slots
+strata serve: layer split: layers 0-12 (CUDA0), 13-25 (CUDA1), 26-37 (CUDA2), 38-47 (CUDA3), one hand-off per window
+strata serve: prompt 15984 tokens = 0 reused + 15984 read in 22667 ms (705.2 tok/s), 32 generated in 808 ms (39.6 tok/s), drafts accepted 19 of 24, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 46645.9 MB from storage (8012414 major faults) for 42920.1 MB of expert reads
+strata serve: prompt 16008 tokens = 0 reused + 16008 read in 23296 ms (687.1 tok/s), 32 generated in 671 ms (47.7 tok/s), drafts accepted 22 of 29, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (34 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15997 tokens = 0 reused + 15997 read in 22922 ms (697.9 tok/s), 32 generated in 948 ms (33.7 tok/s), drafts accepted 14 of 29, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1506 tokens = 0 reused + 1506 read in 7087 ms (212.5 tok/s), 115 generated in 3002 ms (38.3 tok/s), drafts accepted 42 of 69, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1448 tokens = 0 reused + 1448 read in 6527 ms (221.9 tok/s), 512 generated in 10507 ms (48.7 tok/s), drafts accepted 321 of 431, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1457 tokens = 0 reused + 1457 read in 6603 ms (220.7 tok/s), 512 generated in 9484 ms (54.0 tok/s), drafts accepted 358 of 431, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15972 tokens = 0 reused + 15972 read in 22835 ms (699.5 tok/s), 32 generated in 697 ms (45.9 tok/s), drafts accepted 20 of 24, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15909 tokens = 0 reused + 15909 read in 23042 ms (690.4 tok/s), 32 generated in 617 ms (51.9 tok/s), drafts accepted 20 of 22, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 15994 tokens = 0 reused + 15994 read in 23141 ms (691.1 tok/s), 32 generated in 782 ms (40.9 tok/s), drafts accepted 18 of 26, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1491 tokens = 0 reused + 1491 read in 7158 ms (208.3 tok/s), 243 generated in 6758 ms (36.0 tok/s), drafts accepted 95 of 171, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (1 major faults) for 0.0 MB of expert reads
+strata serve: prompt 1485 tokens = 0 reused + 1485 read in 6477 ms (229.3 tok/s), 512 generated in 10116 ms (50.6 tok/s), drafts accepted 326 of 409, 1 checkpoints
+strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads

@@ -1,0 +1,18 @@
+tag z-off-1-td  mode decode  sleep-time 1  engine pid 371376  exe /home/thc1006/dev/strata-0.1.45/engine-cuda12/strata  at 2026-10-17 19:42:22
+engine args: --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf --ple-io ram --no-ple-prefetch 
+{"offset": 135791, "mode": "decode", "prompt_tokens": 1491, "completion_tokens": 243, "finish": "stop", "engine_prompt_tok_s": 211.6, "ttft_s": 7.08, "engine_decode_tok_s": 36.4, "client_decode_tok_s": 36.28, "drafts": "95/171", "error": null, "wall_s": 13.76, "disk_gb": 0.0, "prefetch_data_misses": 0, "prefetch_data_hits": 0, "demand_data_misses": 5, "demand_data_hits": 620, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 1.126, "cpu_full_s": 0.0, "memory_some_s": 0.0, "memory_full_s": 0.0, "io_some_s": 0.007, "io_full_s": 0.006, "engine_user_s": 13.2, "engine_sys_s": 0.52, "arc_evict_s": 0.0, "z_rd_int_s": 0.0, "z_rd_iss_s": 0.0, "text_sha": "8f12c12ba00589d5", "text_head": "該推理引擎透過批次處理與流水線技術，在消費級個人電腦上高效運行大型混合專家（MoE）模型。它利用"}
+{"offset": 975310, "mode": "decode", "prompt_tokens": 1485, "completion_tokens": 512, "finish": "length", "engine_prompt_tok_s": 228.3, "ttft_s": 6.54, "engine_decode_tok_s": 50.5, "client_decode_tok_s": 50.57, "drafts": "326/409", "error": null, "wall_s": 16.68, "disk_gb": 0.0, "prefetch_data_misses": 0, "prefetch_data_hits": 0, "demand_data_misses": 5, "demand_data_hits": 494, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 1.065, "cpu_full_s": 0.0, "memory_some_s": 0.001, "memory_full_s": 0.001, "io_some_s": 0.004, "io_full_s": 0.004, "engine_user_s": 16.64, "engine_sys_s": 0.0, "arc_evict_s": 0.0, "z_rd_int_s": 0.0, "z_rd_iss_s": 0.0, "text_sha": "0fd93a73b42628b9", "text_head": "ash\nclaude mcp add strata -- python C:\\Users\\you"}
+--- engine during the probe (perf stat -p 371376)
+syscalls:sys_enter_madvise         16
+syscalls:sys_enter_fadvise64       0
+context-switches                   3853
+task-clock                         30355.83
+--- kernel functions, all CPUs (ftrace function profiler; time includes callees; sleep-time 1)
+arc_get_data_impl.constprop.0    calls       1165  total        3.0 ms  mean 2.61 us
+arc_read                         calls        333  total       15.7 ms  mean 47.06 us
+arc_wait_for_eviction            calls       1165  total        0.7 ms  mean 0.58 us
+dbuf_prefetch                    calls      57765  total       52.4 ms  mean 0.91 us
+dbuf_prefetch_impl               calls      57765  total       21.7 ms  mean 0.38 us
+dmu_prefetch                     calls        418  total       64.6 ms  mean 154.43 us
+do_madvise                       calls        716  total       13.4 ms  mean 18.72 us
+generic_fadvise                  calls         28  total        0.0 ms  mean 1.37 us

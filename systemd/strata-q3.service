@@ -1,0 +1,43 @@
+[Unit]
+Description=Strata Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080)
+Wants=zfs-arc-max.service nvidia-persistenced.service
+After=zfs-arc-max.service nvidia-persistenced.service
+# a crash loop must not re-lock 27 GiB of RAM again and again.  The preflight waits for memory instead of failing fast,
+# so these starts are real attempts; when the limit is hit, strata-q3-health retries after 30 min (no silent outage).
+StartLimitIntervalSec=1h
+StartLimitBurst=4
+
+[Service]
+Type=simple
+User=thc1006
+Group=thc1006
+WorkingDirectory=/home/thc1006/dev/strata
+Environment=PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+# GPUs present, RAM available for the locked PLE table, config unchanged, no second copy (scripts/strata-preflight.sh)
+ExecStartPre=/home/thc1006/dev/p100-q3-deployment/scripts/strata-preflight.sh
+# server.py directly, not run-iq3_xxs.sh or ./setup.sh: setup's start path rewrites "--prefill 2048" to "auto"
+ExecStart=/home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/serve/server.py --engine strata --config /home/thc1006/dev/strata/strata-iq3_xxs.json --port 8080
+# "active" only once the model is loaded
+ExecStartPost=/home/thc1006/dev/p100-q3-deployment/scripts/strata-wait-ready.sh
+# the preflight may wait up to 25 min for memory and 2 min for the GPUs; a load takes ~9 min, wait-ready allows 30
+TimeoutStartSec=75min
+# --ple-io ram mlocks the ~26.8 GiB PLE table; the resident expert copy is page-locked too
+LimitMEMLOCK=infinity
+LimitNOFILE=65536
+# under memory pressure this service is the one to go (it holds ~30 GiB), not another user's job; and none of it
+# goes to swap (measured: 428 MB of server.py/engine pages swapped out after a load, back on the request path)
+OOMScoreAdjust=500
+MemorySwapMax=0
+NoNewPrivileges=yes
+ProtectSystem=full
+PrivateTmp=yes
+# SIGTERM goes to server.py only (it sends QUIT to the engine, up to ~60 s); what is left when server.py exits is killed
+# at once, and everything after TimeoutStopSec.  During the ~9 min load server.py has no SIGTERM handler yet, so a stop
+# then ends it at once and the engine is killed (not graceful, but harmless)
+KillMode=mixed
+TimeoutStopSec=120
+Restart=on-failure
+RestartSec=120
+
+[Install]
+WantedBy=multi-user.target

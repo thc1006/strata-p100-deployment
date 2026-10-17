@@ -1,0 +1,25 @@
+# tools/sm60_dp4a_check.cu, built with: nvcc -O3 -arch=sm_60 -Iinclude (Cuda compilation tools, release 12.9, V12.9.86); 2026-10-16 14:00:14
+== GPU 0
+device: Tesla P100-PCIE-16GB (sm_60)
+cases=1073741824 mismatches=0
+byte loop 93.3 ms  STRATA_DP4A 43.0 ms  speedup 2.17x
+cuda: no error
+exit=0
+== GPU 1
+device: Tesla P100-PCIE-16GB (sm_60)
+cases=1073741824 mismatches=0
+byte loop 93.3 ms  STRATA_DP4A 43.0 ms  speedup 2.17x
+cuda: no error
+exit=0
+== GPU 2
+device: Tesla P100-PCIE-16GB (sm_60)
+cases=1073741824 mismatches=0
+byte loop 93.3 ms  STRATA_DP4A 39.0 ms  speedup 2.39x
+cuda: no error
+exit=0
+== GPU 3
+device: Tesla P100-PCIE-16GB (sm_60)
+cases=1073741824 mismatches=0
+byte loop 88.8 ms  STRATA_DP4A 41.0 ms  speedup 2.17x
+cuda: no error
+exit=0

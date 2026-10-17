@@ -1,0 +1,7 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# perf record output of the kprobe passes (hundreds of MB each); the parsed results are in results/*-mem.txt
+*.perf.data
+*.perf.data.old

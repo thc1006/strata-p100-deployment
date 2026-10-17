@@ -1,0 +1,24 @@
+# scripts/check-drift.sh --full on 2026-10-18 01:10–01:20, run under nice -n 19 ionice -c3 (the version before that day's later fixes); the last line is the wall time.
+== installed files
+ok     /etc/systemd/system/strata-q3.service
+ok     /etc/systemd/system/strata-q3-health.service
+ok     /etc/systemd/system/strata-q3-health.timer
+ok     /etc/systemd/system/zfs-arc-max.service
+ok     /etc/logrotate.d/strata-q3
+ok     /usr/local/sbin/strata-q3-health
+== Strata config
+ok     /home/thc1006/dev/strata/strata-iq3_xxs.json
+ok     setup's config + configure_strata_q3.py --profile deployed = the deployed snapshot
+== deployed files (sha256, config/deployed-artifacts.sha256)
+ok     strata/engine-cuda12/strata
+ok     strata/strata-iq3_xxs.json
+ok     strata/data/expert-profile.bin
+ok     Strata-data/mtp/rt/dense.bin
+ok     Strata-data/mtp/rt/draft_vocab.bin
+ok     Strata-data/mtp/rt/experts.bin
+ok     Strata-data/packs/iq3_xxs/index.txt
+ok     Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+ok     Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+
+no drift
+exit=0 in 590 s

@@ -1,0 +1,6 @@
+# The three request templates in examples/requests/, sent once each on 2026-10-16 after deployment (the [部署] config, running since 15:28).
+# Raw streamed responses: example-request-<name>.sse.gz (gzip of curl's output). Times are curl's %{time_total};
+# the counts below are recomputed from the .sse.gz files.
+request-normal.json: http 200, 57.06 s, finish_reason stop, completion_tokens 2452, reasoning chunks 317, content chunks 2035
+request-deep.json: http 200, 142.99 s, finish_reason stop, completion_tokens 6043, reasoning chunks 1732, content chunks 3947
+request-fast.json: http 200, 46.14 s, finish_reason length, completion_tokens 2048, reasoning chunks 106, content chunks 1851

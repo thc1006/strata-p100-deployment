@@ -1,0 +1,6 @@
+# started on Sat Oct 17 20:27:05 2026
+
+192,,syscalls:sys_enter_madvise,71199364112,100.00,2.697,/sec
+0,,syscalls:sys_enter_fadvise64,71199364112,100.00,0.000,/sec
+26521,,context-switches,71199364112,100.00,372.489,/sec
+71199.36,msec,task-clock,71199364112,100.00,0.967,CPUs utilized

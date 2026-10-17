@@ -1,0 +1,2 @@
+[ perf record: Woken up 39 times to write data ]
+[ perf record: Captured and wrote 308.697 MB /home/thc1006/dev/p100-q3-deployment/deploy/results/z-hint-2-m-mem.perf.data (3828972 samples) ]

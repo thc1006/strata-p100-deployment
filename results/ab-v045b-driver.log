@@ -1,0 +1,26 @@
+[21:04:09] === z-lkoff (L cfg-zfs-off)
+[21:04:14] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 51.9 GiB
+Running as unit: strata-ab-v045b.service
+[21:12:10] loaded after 472 s
+[21:18:54] done z-lkoff: 3 prompt rows, 3 decode rows
+[21:18:54] === z-hint-2 (V cfg-zfs-hint mem)
+[21:19:06] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 55.5 GiB
+Running as unit: strata-ab-v045b.service
+[21:26:32] loaded after 442 s
+[21:36:46] done z-hint-2: 3 prompt rows, 3 decode rows
+[21:36:46] === ext4-up
+[21:36:58] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.6 GiB
+[21:39:56] ext4 copy done in 178 s: 28800138432 bytes (source 28800138432); loop /dev/loop4, ext4   rw,noatime
+[21:40:01] first GiB identical
+[21:40:02] last GiB identical
+[21:40:02] === e-off-0 (V cfg-ext4-off)
+[21:40:02] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 51.3 GiB
+Running as unit: strata-ab-v045b.service
+[21:40:24] strata-ab-v045b is not active
+[21:40:24] finishing (exit 1)
+[21:40:24] stopped: no engine, :8080 free, all GPUs < 300 MiB; MemAvailable 52.5 GiB
+[21:40:33] unmounted /mnt/ple-ext4
+[21:40:33] removed /home/thc1006/dev/ple-ext4.img
+Job for strata-q3.service canceled.
+[21:42:32] strata-q3.service is not active
+[21:42:32] strata-q3: deactivating

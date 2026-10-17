@@ -1,0 +1,17 @@
+[Unit]
+Description=Cap the ZFS ARC at 8 GiB (Strata P100 Q3 deployment: leaves RAM for the PLE table and resident experts)
+ConditionPathExists=/sys/module/zfs/parameters/zfs_arc_max
+After=zfs-load-module.service
+Before=strata-q3.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# zfs_arc_shrinker_limit=0 (OpenZFS's newer default): the ARC gives memory back without a per-call cap when the
+# kernel asks, so a sudden demand does not end in an OOM kill while the ARC is still large
+ExecStart=/bin/sh -ec 'echo 8589934592 > /sys/module/zfs/parameters/zfs_arc_max; echo 0 > /sys/module/zfs/parameters/zfs_arc_shrinker_limit'
+# No ExecStop: writing 0 at run time does not lift the cap on OpenZFS 2.2 (it would only show 0).  To undo:
+# systemctl disable zfs-arc-max.service and reboot.
+
+[Install]
+WantedBy=multi-user.target

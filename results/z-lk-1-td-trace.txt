@@ -1,0 +1,18 @@
+tag z-lk-1-td  mode decode  sleep-time 1  engine pid 377095  exe /home/thc1006/dev/strata-0.1.45-locked/engine-cuda12/strata  at 2026-10-17 19:56:39
+engine args: --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf --ple-io ram 
+{"offset": 135791, "mode": "decode", "prompt_tokens": 1491, "completion_tokens": 243, "finish": "stop", "engine_prompt_tok_s": 211.2, "ttft_s": 7.1, "engine_decode_tok_s": 36.0, "client_decode_tok_s": 35.89, "drafts": "95/171", "error": null, "wall_s": 13.85, "disk_gb": 0.001, "prefetch_data_misses": 1, "prefetch_data_hits": 0, "demand_data_misses": 12, "demand_data_hits": 438, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 1.07, "cpu_full_s": 0.0, "memory_some_s": 0.0, "memory_full_s": 0.0, "io_some_s": 0.009, "io_full_s": 0.008, "engine_user_s": 13.25, "engine_sys_s": 0.55, "machine_user_s": 14.43, "machine_nice_s": 0.0, "machine_system_s": 2.66, "machine_idle_s": 93.0, "machine_iowait_s": 0.16, "machine_irq_s": 0.0, "machine_softirq_s": 0.25, "machine_steal_s": 0.0, "arc_evict_s": 0.0, "z_rd_int_s": 0.02, "z_rd_iss_s": 0.0, "zfs_threads_gone": 0, "text_sha": "8f12c12ba00589d5", "text_head": "該推理引擎透過批次處理與流水線技術，在消費級個人電腦上高效運行大型混合專家（MoE）模型。它利用"}
+{"offset": 975310, "mode": "decode", "prompt_tokens": 1485, "completion_tokens": 512, "finish": "length", "engine_prompt_tok_s": 228.8, "ttft_s": 6.53, "engine_decode_tok_s": 50.5, "client_decode_tok_s": 50.57, "drafts": "326/409", "error": null, "wall_s": 16.67, "disk_gb": 0.001, "prefetch_data_misses": 1, "prefetch_data_hits": 0, "demand_data_misses": 9, "demand_data_hits": 705, "memory_throttle_count": 0, "evict_skip": 0, "cpu_some_s": 1.125, "cpu_full_s": 0.0, "memory_some_s": 0.001, "memory_full_s": 0.0, "io_some_s": 0.02, "io_full_s": 0.017, "engine_user_s": 16.59, "engine_sys_s": 0.0, "machine_user_s": 18.12, "machine_nice_s": 0.0, "machine_system_s": 2.42, "machine_idle_s": 111.88, "machine_iowait_s": 0.26, "machine_irq_s": 0.0, "machine_softirq_s": 0.25, "machine_steal_s": 0.0, "arc_evict_s": 0.01, "z_rd_int_s": 0.01, "z_rd_iss_s": 0.0, "zfs_threads_gone": 0, "text_sha": "0fd93a73b42628b9", "text_head": "ash\nclaude mcp add strata -- python C:\\Users\\you"}
+--- engine during the probe (perf stat -p 377095)
+syscalls:sys_enter_madvise         16
+syscalls:sys_enter_fadvise64       0
+context-switches                   4285
+task-clock                         30385.54
+--- kernel functions, all CPUs (ftrace function profiler; time includes callees; sleep-time 1)
+arc_get_data_impl.constprop.0    calls       1039  total        2.8 ms  mean 2.66 us
+arc_read                         calls        162  total       13.2 ms  mean 81.30 us
+arc_wait_for_eviction            calls       1039  total        0.7 ms  mean 0.64 us
+dbuf_prefetch                    calls      57359  total       59.8 ms  mean 1.04 us
+dbuf_prefetch_impl               calls      57361  total       24.2 ms  mean 0.42 us
+dmu_prefetch                     calls         12  total       74.0 ms  mean 6169.37 us
+do_madvise                       calls        563  total       15.8 ms  mean 28.12 us
+generic_fadvise                  calls         30  total        0.1 ms  mean 1.84 us

@@ -1,0 +1,222 @@
+# Copied 2026-10-18 from ~/dev/strata-0.1.44.1/strata-iq3_xxs-prefetch.log (the v441pf arm's whole engine log; sha256 8f0d63e7b05f7e7b8a4ce11679b58f7e2b121bd0a105b0a2df777168e4041d65).
+# 'strata serve:' and 'strata generate:' lines, each prefixed with its line number in that log. The C arm ran only
+# serve_load and the two probes, so bench/ab_versions.sh wrote no engine-lines file for it.
+2:strata generate: memory guard: limit 62.8 GiB (source: meminfo), current 4.4 GiB, reclaimable cache credited 0.0 GiB; available 58.4 GiB (MemAvailable 58.4 GiB), floor 8192 MiB
+3:strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,26,38)
+4:strata generate: PCIe probe: 10.4 GB/s host->device (best of 10.2 10.4 9.8 10.3) -> pcie_frac 0.29 (default 0.55)
+5:strata generate: this CPU has no AVX-512: the expert kernels run on AVX-2 (multi-token for the i-quant gate/up rows)
+6:strata generate: native pack: /home/thc1006/dev/Strata-data/packs/iq3_xxs experts (largest blob 2.33 MB), token embedding IQ3_S in mapped host memory (260 MiB, 1.6 s)
+7:strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+8:strata generate: 538 MiB of weights loaded from /home/thc1006/dev/Strata-data/packs/iq3_xxs in 0.7 s (827 canonical tensors skipped: served natively)
+9:strata generate: 81 native projection matrices, 449.89 MiB of weights, in 13.2 s
+10:strata generate: PLE table locked in RAM (--ple-io ram) in 7.0 s
+11:strata generate: layer split: CUDA1 loads the dense weights of layers 13-25 only
+12:strata generate: layer split: CUDA1 PCIe probe 11.8 GB/s (best of 11.8 11.4 10.7 10.9) -> pcie_frac 0.32
+13:strata generate: layer split: CUDA1 holds its weights; 14.64 GiB free (its session follows the split search)
+14:strata generate: layer split: CUDA2 loads the dense weights of layers 26-37 only
+15:strata generate: layer split: CUDA2 PCIe probe 11.9 GB/s (best of 11.7 11.7 11.9 11.2) -> pcie_frac 0.33
+16:strata generate: layer split: CUDA2 holds its weights; 14.68 GiB free (its session follows the split search)
+17:strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+18:strata generate: layer split: CUDA3 PCIe probe 11.0 GB/s (best of 11.0 11.0 11.0 11.0) -> pcie_frac 0.30
+19:strata generate: layer split: CUDA3 holds its weights; 14.81 GiB free (its session follows the split search)
+20:strata generate: profile /home/thc1006/dev/strata/data/expert-profile.bin: 24576 ranked pairs, built for 24576 slots
+21:strata generate: PLE on, table 320001536 rows of /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+22:strata generate: layer split: CUDA1 holds its weights, session [13, 26); 14.49 GiB free
+23:strata generate: layer split: CUDA2 holds its weights, session [26, 38); 14.52 GiB free
+24:strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.26 GiB free
+25:strata generate: --batch-groups auto: 4 groups of 1 slot
+26:strata generate: --batch: 4 slot sessions on CUDA0 (0.16 GiB each); 13.81 GiB free
+27:strata generate: --batch: 4 slot sessions on CUDA1 (0.16 GiB each); 13.86 GiB free
+28:strata generate: --batch: 4 slot sessions on CUDA2 (0.15 GiB each); 13.90 GiB free
+29:strata generate: --batch: 4 slot sessions on CUDA3 (0.15 GiB each); 13.67 GiB free
+30:strata generate: --batch 4: the slot sessions take 0.62 GiB of VRAM on CUDA0 that the expert cache would otherwise hold
+32:strata generate: GPU 0: Tesla P100-PCIE-16GB, compute capability 6.0
+33:strata generate: experts via mmap (--mmap-experts; the A/B arm of R2.1)
+34:strata generate: GPU host-callback thread started before host-core pinning
+35:strata generate: CPU pool tasks/phase: 21 (automatic), participating threads: 7
+36:strata generate: 6 pool workers on logical processors 1,2,3,4,5,6, the host thread on 0 (draining too) (--host-core first)
+38:strata generate: expert cache auto: 13.81 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 5672 slots
+39:strata generate: expert cache 6656 slots, 9.41 GiB of VRAM; policy is
+40:strata generate: the GPU computes the experts in the cache; it rounds differently from the CPU,
+44:strata generate: the profile fill asks for 256 pairs ahead (STRATA_FILL_AHEAD)
+45:strata generate: pre-filled 6656 of 6656 slots from the profile in 76.6 s (132 MB/s); slot 0 verified
+46:strata generate: layer split, CUDA1: 13.86 GiB free of 15.89, room for experts 12.27 GiB
+47:strata generate: layer split: CUDA1 runs layers 13-25, expert cache 6656 slots (9.88 GiB), 6656 of its 6656 profiled pairs; slot 0 verified
+48:strata generate: layer split, CUDA2: 13.90 GiB free of 15.89, room for experts 12.31 GiB
+49:strata generate: layer split: CUDA2 runs layers 26-37, expert cache 6144 slots (11.43 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+50:strata generate: layer split, CUDA3: 12.85 GiB free of 15.89, room for experts 11.25 GiB
+51:strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (9.25 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+52:strata generate: layer split: CUDA0 runs layers 0-12
+53:strata generate: R4 hit path ON - resident experts are computed on the GPU
+54:strata generate: 6 expert-pool workers + the host thread
+55:strata generate: session is up (engine 0.1.44.1)
+56:strata generate: token graph hit path: 24576 resident experts, decided on the device
+57:strata serve: layer split: 100% of the experts resident, the prompt path's streamed ring 96 slots
+70:strata generate: resident RAM mode: 1.12 GiB of experts in RAM (page-locked), 6656 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)
+71:strata serve:   CUDA0 keeps its own prompt buffers (1.11 GiB of 4.39 GiB free): no loan
+72:strata serve:   CUDA1 keeps its own prompt buffers (1.11 GiB of 3.98 GiB free): no loan
+73:strata serve:   CUDA3 keeps its own prompt buffers (1.11 GiB of 3.59 GiB free): no loan
+74:strata serve:   CUDA2 prompt path borrows 604 of its 6144 slots (1.12 GiB)
+75:strata serve: lend sizing: the prompt path borrows 604 slots (ring 96 slots at chunk 2048), 604 of them keep their experts in RAM too
+82:strata serve: layer split: layers 0-12 (CUDA0), 13-25 (CUDA1), 26-37 (CUDA2), 38-47 (CUDA3), one hand-off per window
+90:strata serve: adaptive overlap: off: not on a layer split
+91:strata serve: 3201 MiB of VRAM free with everything loaded
+92:strata serve: CUDA1: 2783 MiB of VRAM free with everything loaded
+93:strata serve: CUDA2: 2383 MiB of VRAM free with everything loaded
+94:strata serve: CUDA3: 2193 MiB of VRAM free with everything loaded
+143:strata serve: prompt 66 tokens = 0 reused + 66 read in 1335 ms (49.5 tok/s), 512 generated in 14429 ms (35.5 tok/s), drafts accepted 252 of 481, 1 checkpoints
+144:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+145:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+146:strata serve: file tier I/O this request: the OS read 46827.6 MB from storage (8017292 major faults) for 42920.1 MB of expert reads
+147:strata serve: suffix drafts: 1 windows, 2 of 3 drafts accepted
+148:strata serve: conversation cache: skip parking (577 tokens, below the 1024 minimum; parked=0)
+149:strata serve: prompt 66 tokens = 0 reused + 66 read in 1143 ms (57.7 tok/s), 512 generated in 14434 ms (35.5 tok/s), drafts accepted 242 of 475, 1 checkpoints
+150:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+151:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+152:strata serve: file tier I/O this request: the OS read 94.8 MB from storage (2 major faults) for 0.0 MB of expert reads
+153:strata serve: conversation cache: skip parking (577 tokens, below the 1024 minimum; parked=0)
+154:strata serve: prompt 66 tokens = 0 reused + 66 read in 1115 ms (59.2 tok/s), 512 generated in 14279 ms (35.9 tok/s), drafts accepted 247 of 473, 1 checkpoints
+155:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+156:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+157:strata serve: file tier I/O this request: the OS read 74.3 MB from storage (0 major faults) for 0.0 MB of expert reads
+158:strata serve: conversation cache: skip parking (579 tokens, below the 1024 minimum; parked=0)
+159:strata serve: prompt 66 tokens = 0 reused + 66 read in 1108 ms (59.6 tok/s), 1 generated in 36 ms (27.9 tok/s), drafts accepted 0 of 0, 1 checkpoints
+160:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+161:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+162:strata serve: file tier I/O this request: the OS read 0.4 MB from storage (0 major faults) for 0.0 MB of expert reads
+164:strata serve: prompt 67 tokens = 66 reused + 1 read in 0 ms (13385.3 tok/s), 1 generated in 31 ms (32.7 tok/s), drafts accepted 0 of 0, 1 checkpoints
+165:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+166:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+167:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (10 major faults) for 0.0 MB of expert reads
+172:strata serve: conversation cache: skip parking (67 tokens, below the 1024 minimum; parked=0)
+174:strata serve: prompt 61 tokens = 0 reused + 61 read in 950 ms (64.2 tok/s), 1 generated in 31 ms (32.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+175:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+176:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+177:strata serve: file tier I/O this request: the OS read 1.2 MB from storage (10 major faults) for 0.0 MB of expert reads
+183:strata serve: conversation cache: skip parking (61 tokens, below the 1024 minimum; parked=0)
+185:strata serve: prompt 61 tokens = 0 reused + 61 read in 873 ms (69.8 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+186:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+187:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+188:strata serve: file tier I/O this request: the OS read 263.5 MB from storage (1 major faults) for 0.0 MB of expert reads
+189:strata serve: conversation cache: skip parking (61 tokens, below the 1024 minimum; parked=0)
+191:strata serve: prompt 66 tokens = 0 reused + 66 read in 945 ms (69.8 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+192:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+193:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+194:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+196:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+197:strata serve: prompt 61 tokens = 0 reused + 61 read in 873 ms (69.9 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+198:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+199:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+200:strata serve: file tier I/O this request: the OS read 205.7 MB from storage (0 major faults) for 0.0 MB of expert reads
+202:strata serve: prompt 62 tokens = 61 reused + 1 read in 0 ms (27875.3 tok/s), 1 generated in 28 ms (35.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+203:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+204:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+205:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+206:strata serve: conversation cache: skip parking (62 tokens, below the 1024 minimum; parked=0)
+208:strata serve: prompt 66 tokens = 0 reused + 66 read in 944 ms (69.9 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+209:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+210:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+211:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+213:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+214:strata serve: prompt 67 tokens = 0 reused + 67 read in 963 ms (69.6 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+215:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+216:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+217:strata serve: file tier I/O this request: the OS read 233.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+219:strata serve: prompt 68 tokens = 67 reused + 1 read in 0 ms (45907.4 tok/s), 1 generated in 28 ms (35.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+220:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+221:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+222:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+223:strata serve: conversation cache: skip parking (68 tokens, below the 1024 minimum; parked=0)
+225:strata serve: prompt 66 tokens = 0 reused + 66 read in 953 ms (69.3 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+226:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+227:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+228:strata serve: file tier I/O this request: the OS read 2.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+229:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+231:strata serve: prompt 66 tokens = 0 reused + 66 read in 988 ms (66.8 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+232:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+233:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+234:strata serve: file tier I/O this request: the OS read 0.4 MB from storage (0 major faults) for 0.0 MB of expert reads
+239:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+241:strata serve: prompt 61 tokens = 0 reused + 61 read in 943 ms (64.7 tok/s), 1 generated in 31 ms (32.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+242:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+243:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+244:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+250:strata serve: conversation cache: skip parking (61 tokens, below the 1024 minimum; parked=0)
+251:strata serve: prompt 66 tokens = 0 reused + 66 read in 975 ms (67.7 tok/s), 1 generated in 34 ms (29.6 tok/s), drafts accepted 0 of 0, 1 checkpoints
+252:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+253:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+254:strata serve: file tier I/O this request: the OS read 561.1 MB from storage (0 major faults) for 0.0 MB of expert reads
+256:strata serve: prompt 67 tokens = 66 reused + 1 read in 0 ms (25490.7 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+257:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+258:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+259:strata serve: file tier I/O this request: the OS read 0.4 MB from storage (0 major faults) for 0.0 MB of expert reads
+260:strata serve: conversation cache: skip parking (67 tokens, below the 1024 minimum; parked=0)
+262:strata serve: prompt 61 tokens = 0 reused + 61 read in 870 ms (70.1 tok/s), 1 generated in 29 ms (34.4 tok/s), drafts accepted 0 of 0, 1 checkpoints
+263:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+264:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+265:strata serve: file tier I/O this request: the OS read 0.7 MB from storage (0 major faults) for 0.0 MB of expert reads
+266:strata serve: conversation cache: skip parking (61 tokens, below the 1024 minimum; parked=0)
+268:strata serve: prompt 66 tokens = 0 reused + 66 read in 960 ms (68.7 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+269:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+270:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+271:strata serve: file tier I/O this request: the OS read 2.2 MB from storage (0 major faults) for 0.0 MB of expert reads
+272:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+274:strata serve: prompt 67 tokens = 0 reused + 67 read in 954 ms (70.2 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+275:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+276:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+277:strata serve: file tier I/O this request: the OS read 1.3 MB from storage (0 major faults) for 0.0 MB of expert reads
+279:strata serve: conversation cache: skip parking (67 tokens, below the 1024 minimum; parked=0)
+280:strata serve: prompt 67 tokens = 0 reused + 67 read in 956 ms (70.1 tok/s), 1 generated in 33 ms (30.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+281:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+282:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+283:strata serve: file tier I/O this request: the OS read 421.4 MB from storage (0 major faults) for 0.0 MB of expert reads
+285:strata serve: prompt 68 tokens = 67 reused + 1 read in 0 ms (47160.9 tok/s), 1 generated in 28 ms (35.2 tok/s), drafts accepted 0 of 0, 1 checkpoints
+286:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+287:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+288:strata serve: file tier I/O this request: the OS read 0.4 MB from storage (0 major faults) for 0.0 MB of expert reads
+289:strata serve: conversation cache: skip parking (68 tokens, below the 1024 minimum; parked=0)
+291:strata serve: prompt 61 tokens = 0 reused + 61 read in 870 ms (70.1 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+292:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+293:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+294:strata serve: file tier I/O this request: the OS read 0.1 MB from storage (0 major faults) for 0.0 MB of expert reads
+295:strata serve: conversation cache: skip parking (61 tokens, below the 1024 minimum; parked=0)
+297:strata serve: prompt 66 tokens = 0 reused + 66 read in 943 ms (70.0 tok/s), 1 generated in 29 ms (35.0 tok/s), drafts accepted 0 of 0, 1 checkpoints
+298:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+299:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+300:strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 major faults) for 0.0 MB of expert reads
+301:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+303:strata serve: prompt 66 tokens = 0 reused + 66 read in 945 ms (69.8 tok/s), 1 generated in 28 ms (35.1 tok/s), drafts accepted 0 of 0, 1 checkpoints
+304:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+305:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 0 blobs, files 0 blobs 42920.1 MB read
+306:strata serve: file tier I/O this request: the OS read 1.8 MB from storage (0 major faults) for 0.0 MB of expert reads
+308:strata serve: conversation cache: skip parking (66 tokens, below the 1024 minimum; parked=0)
+309:strata serve: prompt 15985 tokens = 0 reused + 15985 read in 31741 ms (503.6 tok/s), 32 generated in 724 ms (44.2 tok/s), drafts accepted 17 of 21, 1 checkpoints
+310:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+311:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 5436 blobs, files 0 blobs 42920.1 MB read
+312:strata serve: file tier I/O this request: the OS read 1054.3 MB from storage (405 major faults) for 0.0 MB of expert reads
+313:strata serve: conversation cache: parked 16016 tokens in 583.0 ms; parked=1 bytes=483329592 evictions=0 snapshot_bytes=483329592 reused_kv_bytes=0
+314:strata serve: prompt 16012 tokens = 0 reused + 16012 read in 34938 ms (458.3 tok/s), 32 generated in 664 ms (48.2 tok/s), drafts accepted 22 of 27, 1 checkpoints
+315:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+316:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 10872 blobs, files 0 blobs 42920.1 MB read
+317:strata serve: file tier I/O this request: the OS read 629.3 MB from storage (23 major faults) for 0.0 MB of expert reads
+318:strata serve: suffix drafts: 1 windows, 1 of 3 drafts accepted
+319:strata serve: conversation cache: parked 16044 tokens in 603.1 ms; parked=2 bytes=967087456 evictions=0 snapshot_bytes=483757864 reused_kv_bytes=0
+320:strata serve: prompt 16000 tokens = 0 reused + 16000 read in 33976 ms (470.9 tok/s), 32 generated in 983 ms (32.5 tok/s), drafts accepted 14 of 32, 1 checkpoints
+321:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+322:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 16308 blobs, files 0 blobs 42920.1 MB read
+323:strata serve: file tier I/O this request: the OS read 591.9 MB from storage (0 major faults) for 0.0 MB of expert reads
+324:strata serve: conversation cache: parked 16032 tokens in 624.1 ms; parked=3 bytes=1450661768 evictions=0 snapshot_bytes=483574312 reused_kv_bytes=0
+325:strata serve: prompt 15976 tokens = 0 reused + 15976 read in 34046 ms (469.2 tok/s), 32 generated in 649 ms (49.3 tok/s), drafts accepted 22 of 24, 1 checkpoints
+326:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+327:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 21744 blobs, files 0 blobs 42920.1 MB read
+328:strata serve: file tier I/O this request: the OS read 766.9 MB from storage (0 major faults) for 0.0 MB of expert reads
+329:strata serve: conversation cache: parked 16008 tokens in 616.5 ms; parked=4 bytes=1933868976 evictions=0 snapshot_bytes=483207208 reused_kv_bytes=0
+330:strata serve: prompt 15912 tokens = 0 reused + 15912 read in 34235 ms (464.8 tok/s), 32 generated in 719 ms (44.5 tok/s), drafts accepted 20 of 24, 1 checkpoints
+331:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+332:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 27180 blobs, files 0 blobs 42920.1 MB read
+333:strata serve: file tier I/O this request: the OS read 784.2 MB from storage (0 major faults) for 0.0 MB of expert reads
+334:strata serve: conversation cache: parked 15945 tokens in 676.5 ms; parked=5 bytes=2416152168 evictions=0 snapshot_bytes=482283192 reused_kv_bytes=0
+335:strata serve: prompt 15997 tokens = 0 reused + 15997 read in 33979 ms (470.8 tok/s), 32 generated in 676 ms (47.4 tok/s), drafts accepted 20 of 24, 1 checkpoints
+336:strata serve: resident RAM: 1.12 GiB of experts in RAM, 0 exchanged with the VRAM tier, 0 blob reads from the file
+337:strata serve: expert tiers: GPU 0 hits this request; since the start RAM 32616 blobs, files 0 blobs 42920.1 MB read
+338:strata serve: file tier I/O this request: the OS read 699.8 MB from storage (0 major faults) for 0.0 MB of expert reads

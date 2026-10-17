@@ -1,0 +1,16 @@
+{
+  "model": "qwen3.8-flash-next-iq3_xxs",
+  "messages": [
+    {
+      "role": "user",
+      "content": "請以繁體中文回答：比較模型量化對記憶體、推論速度與回答品質的影響，並清楚標示你的假設。"
+    }
+  ],
+  "reasoning_effort": "medium",
+  "reasoning_budget_tokens": 1024,
+  "max_tokens": 4096,
+  "stream": true,
+  "stream_options": {
+    "include_usage": true
+  }
+}

@@ -1,0 +1,5 @@
+[11:02:24] replicate (final-cold)
+  reasoning-v1: prompt 284 tok, prompt 110.1 tok/s, decode 50.7 tok/s, TTFT 2.61 s
+  code-v1: prompt 220 tok, prompt 104.4 tok/s, decode 48.5 tok/s, TTFT 2.14 s
+  docs-4.4k: prompt 4356 tok, prompt 406.9 tok/s, decode 41.6 tok/s, TTFT 10.76 s
+  docs-32k: prompt 31979 tok, prompt 798.8 tok/s, decode 38.2 tok/s, TTFT 40.12 s

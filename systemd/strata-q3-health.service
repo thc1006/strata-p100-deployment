@@ -1,0 +1,18 @@
+[Unit]
+Description=Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)
+After=strata-q3.service
+
+[Service]
+Type=oneshot
+# a root-owned copy of scripts/strata-health.sh: the repo is writable by the service's user
+ExecStart=/usr/local/sbin/strata-q3-health
+TimeoutStartSec=90s
+# It reads the Strata config (as the service's user), keeps its counters in /run/strata-q3-health between runs and
+# talks to systemd and 127.0.0.1:8080; nothing else needs to be writable.
+RuntimeDirectory=strata-q3-health
+RuntimeDirectoryMode=0700
+RuntimeDirectoryPreserve=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+NoNewPrivileges=yes

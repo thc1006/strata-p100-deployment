@@ -1,0 +1,14 @@
+# strata-wait-ready lines of strata-q3.service, copied 2026-10-18 from the journal (journalctl -u strata-q3).
+# Each is one start of the deployed service, from the end of preflight to /health "loaded": true.
+2026-10-16T11:01:52+0800 <host> strata-wait-ready.sh[175513]: strata-wait-ready: loaded after 542 s
+2026-10-16T12:20:20+0800 <host> strata-wait-ready.sh[189305]: strata-wait-ready: loaded after 442 s
+2026-10-16T12:57:40+0800 <host> strata-wait-ready.sh[191596]: strata-wait-ready: loaded after 494 s
+2026-10-16T13:17:28+0800 <host> strata-wait-ready.sh[193631]: strata-wait-ready: loaded after 446 s
+2026-10-16T13:50:37+0800 <host> strata-wait-ready.sh[200446]: strata-wait-ready: loaded after 436 s
+2026-10-16T14:29:56+0800 <host> strata-wait-ready.sh[204098]: strata-wait-ready: loaded after 500 s
+2026-10-16T15:02:29+0800 <host> strata-wait-ready.sh[209112]: strata-wait-ready: loaded after 428 s
+2026-10-16T15:35:54+0800 <host> strata-wait-ready.sh[216721]: strata-wait-ready: loaded after 442 s
+2026-10-16T18:45:13+0800 <host> strata-wait-ready.sh[256274]: strata-wait-ready: loaded after 438 s
+2026-10-16T21:09:50+0800 <host> strata-wait-ready.sh[300227]: strata-wait-ready: loaded after 450 s
+2026-10-17T22:53:34+0800 <host> strata-wait-ready.sh[471248]: strata-wait-ready: loaded after 458 s
+2026-10-18T00:30:47+0800 <host> strata-wait-ready.sh[502444]: strata-wait-ready: loaded after 438 s

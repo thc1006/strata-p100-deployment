@@ -1,0 +1,18 @@
+[06:24:09] replicate (baseline)
+  reasoning-v1: prompt 283 tok, prompt 105.5 tok/s, decode 47.0 tok/s, TTFT 2.72 s
+  code-v1: prompt 221 tok, prompt 96.9 tok/s, decode 49.4 tok/s, TTFT 2.32 s
+  docs-4.4k: prompt 4341 tok, prompt 389.3 tok/s, decode 37.3 tok/s, TTFT 11.19 s
+  docs-32k: prompt 31989 tok, prompt 569.2 tok/s, decode 32.4 tok/s, TTFT 56.28 s
+[06:31:08] think4 (baseline)
+  per user client tok/s: [17.49, 17.27, 20.38, 16.26] total s: [81.36, 87.06, 107.21, 70.16] reasoning chunks: [436, 337, 419, 182]
+  per user client tok/s: [20.78, 21.07, 22.18, 20.36] total s: [63.95, 70.86, 72.23, 54.07] reasoning chunks: [391, 337, 99, 180]
+  per user client tok/s: [21.48, 20.59, 20.89, 20.32] total s: [70.08, 71.92, 71.21, 58.7] reasoning chunks: [414, 209, 91, 178]
+[06:35:19] worst (baseline)
+  TTFT first/last: [131.57] [412.63] decode: [21.22, 2.2, 0.78, 5.73]
+[06:42:32] burst 4x8K
+{"ttft_first_s":17.4,"ttft_last_s":116.35,"decode_tok_s_median":4.48,"wall_s":129.18}
+[06:44:42] burst 4x16K
+{"ttft_first_s":42.63,"ttft_last_s":164.99,"decode_tok_s_median":4.245,"wall_s":177.47}
+[06:47:39] admit 3 decoders + 16K
+{"newcomer":{"prompt_tokens":16703,"ttft_s":33.3},"before":[24.9,24.9,24.9],"during":[0.06,0.06,0.06]}
+[06:49:01] done

@@ -1,0 +1,30 @@
+[22:31:16] serve_load 1,2,4 (iq3xxs-1)
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      1         34.1           37.1     1.06/1.35        15.03/15.18     0
+      2         60.5           33.3     1.54/2.16        16.93/17.11     0
+      4        100.1           28.8     2.63/4.30        20.45/20.54     0
+[22:33:53] replicate (iq3xxs-1)
+  reasoning-v1: prompt 285 tok, prompt 113.7 tok/s, decode 50.0 tok/s, TTFT 2.53 s
+  code-v1: prompt 219 tok, prompt 103.8 tok/s, decode 50.8 tok/s, TTFT 2.14 s
+  docs-4.4k: prompt 4354 tok, prompt 391.4 tok/s, decode 42.9 tok/s, TTFT 11.17 s
+  docs-32k: prompt 32003 tok, prompt 793.8 tok/s, decode 38.4 tok/s, TTFT 40.41 s
+[22:37:54] think4 (iq3xxs-1)
+  per user client tok/s: [29.92, 32.01, 31.55, 31.63] total s: [49.46, 58.32, 52.51, 41.83] reasoning chunks: [439, 221, 99, 180]
+  per user client tok/s: [29.54, 32.35, 33.78, 29.61] total s: [42.81, 49.23, 63.02, 37.23] reasoning chunks: [321, 337, 443, 231]
+  per user client tok/s: [30.62, 31.42, 31.87, 31.65] total s: [46.68, 46.6, 57.97, 38.26] reasoning chunks: [491, 214, 301, 231]
+[22:40:53] worst (iq3xxs-1)
+  TTFT first/last: [35.97] [142.87] decode: [29.93, 7.71, 4.1, 3.13]
+[22:43:33] burst 4x8192
+{"ttft_first_s":15.09,"ttft_last_s":59.69,"decode_tok_s_median":8.83,"aggregate_tok_s":15.03,"wall_s":68.15}
+[22:44:42] burst 4x16384
+{"ttft_first_s":24.07,"ttft_last_s":94.7,"decode_tok_s_median":6.105,"aggregate_tok_s":9.69,"wall_s":103.13}
+[22:46:27] admit 3 decoders + 16K
+{"newcomer":{"prompt_tokens":16375,"ttft_s":23.24},"before":[34.3,34.2,34.2],"during":[0.09,0.09,0.09],"during_window_s":[23.24,23.24,23.24]}
+[22:47:33] coldjoin (iq3xxs-1)
+  decoders longest pause: [37.6, 37.59] paused: [38.58, 37.59] chunks while joining: [1, 2] joiners TTFT: [22.74, 31.45]
+[22:49:08] preempt (iq3xxs-1)
+  short question TTFT / done: 35.88 / 36.14 s; long prompt TTFT: 35.68 s
+[22:49:47] poisson (iq3xxs-1)
+  rate 0.1/s: goodput 33%, errors 0, TTFT p50/p95 15.72/68.57 s, longest pause p95/max 22.84/24.1 s
+[22:55:47] done

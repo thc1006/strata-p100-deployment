@@ -24,6 +24,8 @@ The long-document requests are taken from Strata's documentation (`docs/*.md` an
 | `check-drift-full-20261018.txt` | 10-18 | Full output of one `scripts/check-drift.sh --full` run (including model file hashes, 590 s) | `docs/runbooks/rebuild.md` step 7 |
 | `service-load-times.txt` | 10-16–10-18 | Load time of each start of the production service (copied from the journal on 2026-10-18) | Deployment record section 1 |
 | `example-request-*.sse.gz`, `example-requests.txt` | 10-16 | Raw streamed output (gzip) of the three sample requests of the original setup guide, and statistics recalculated from it | Deployment record section 3.5 |
+| `host-units-before-20261018.txt` | 10-18 | The state of every systemd unit `config/host-units.conf` turns off, before the change | `docs/runbooks/operations.md` |
+| `iq3xxs-1-*` | 10-18 | The standard perf set (`bench/run_profile.sh`) on the deployed IQ3_XXS engine, up for 20 hours, with the 8 GiB ARC and RAM floors, measured before the A/B tools were reviewed: not part of the IQ3_S A/B | Decision record 0004 |
 
 Not in git: `*.perf.data` (raw kprobe recordings, several hundred MB each; see `.gitignore`). The parsed results are in `z-hint-2-m-mem.txt` and `e-hint-1-m-mem.txt`.
 

@@ -13,10 +13,11 @@ Notable changes to this machine and this repository, newest first. There are no 
 - Unit tests went from 29 to 38. They cover preflight decisions, format differences, backups, concurrent modification and CLI errors.
 - `LICENSE` (Apache-2.0), `CONTRIBUTING.md`, `SECURITY.md`, `AGENTS.md` (instructions for coding agents), and `results/LICENSE-strata.txt` (Strata's MIT license, for the excerpts in `results/`).
 - `results/pr2918-*`: the check of the PR #2918 test (a hint-count harness and its output, and the test against seven broken versions of the engine code), and the CUDA, HIP and SYCL builds of the amended PR.
+- Upstream bug reports #2990 (`sycl/tools/build.sh` exits 1 after a successful build and 0 after a failed compile) and #2991 (two `ple_reader_selftest` runs that share the temp directory can crash or hang), in `docs/upstream/`; their raw results are `results/sycl-build-sh-exit-20261018.txt` and `results/ple-selftest-shared-tmp-20261018.txt`.
 
 ### Changed
 
-- Upstream PR #2918: the commit was amended to `5c5aded`. Its test now counts the row hints, so it fails when the check is removed, and the commit message and the description say that the ext4 copy was a loop file on the same ZFS pool. `docs/upstream/pr-2918.md` holds the new description.
+- Upstream PR #2918: the commit was amended to `25f40ed`, with the same engine code. Its test now counts the row hints, so it fails when the check is removed. The description is shorter and links to the raw results (`docs/upstream/pr-2918.md`); a comment on the PR says what changed (`docs/upstream/pr-2918-comment.md`).
 - The directories were reorganized by purpose ([decision 0002](docs/decisions/0002-repository-layout.md)). ExecStartPre and ExecStartPost in `strata-q3.service` now use paths under `scripts/`. After reinstalling, one restart verified the change: preflight and wait-ready both worked normally.
 - The deployment record keeps only the basis for each setting, the measurements and the limitations. The operating steps moved to `docs/runbooks/`, and the list of system changes moved to `docs/reference/`.
 - Cleanup before publication: the original setup guide received before deployment was removed (it had no author information); the host name was replaced with `<host>` in the documents and in the raw result files; the deployment record no longer contains working notes or a description of local account permissions. All documents were translated from Traditional Chinese into English, and the deployment record moved to `docs/deployment-record.md`.

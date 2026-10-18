@@ -59,7 +59,7 @@ sudo systemctl restart strata-q3   # the service is ready after about 7–9 minu
 | [System changes and how to undo them](docs/reference/system-changes.md) | Everything the deployment changed outside the repository |
 | [Deployment record](docs/deployment-record.md) | The evidence for each setting, measured results, known limits and the test method |
 | [Decision records](docs/decisions/) | [0001: keep this repository separate from Strata](docs/decisions/0001-keep-ops-repo-separate-from-strata.md); [0002: repository layout](docs/decisions/0002-repository-layout.md) |
-| Upstream posts | [Comment on issue #2281](docs/upstream/issue-2281-comment.md); [PR #2918](docs/upstream/pr-2918.md) |
+| Upstream posts | [Comment on issue #2281](docs/upstream/issue-2281-comment.md); [PR #2918](docs/upstream/pr-2918.md) and [its comment](docs/upstream/pr-2918-comment.md); bug reports [#2990](docs/upstream/issue-2990.md) (`sycl/tools/build.sh` exit status) and [#2991](docs/upstream/issue-2991.md) (`ple_reader_selftest` temp files) |
 | [Test results](results/README.md) | Index of the raw output files and the commands that regenerate the summaries |
 | [Changelog](CHANGELOG.md) | Changes by date |
 | [Contributing](CONTRIBUTING.md), [Security policy](SECURITY.md), [Instructions for coding agents](AGENTS.md) | How to report problems and send changes |

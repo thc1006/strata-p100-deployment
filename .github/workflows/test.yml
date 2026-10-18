@@ -1,4 +1,5 @@
 # The repository's checks on GitHub: scripts/test.sh --repo-only, on every push to main and every pull request.
+# scripts/deploy.sh deploys a commit of main only after the run of this file for its push passed: keep the file name.
 name: test
 
 on:

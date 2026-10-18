@@ -29,9 +29,9 @@ All numbers come from this machine. The [deployment record](docs/deployment-reco
 |---|---|
 | `config/` | Desired state: the tool arguments in `profile.conf`, snapshots of the Strata config, and a SHA-256 list of the deployed files |
 | `systemd/` | systemd units and the logrotate rule, installed to `/etc` |
-| `scripts/` | Scripts that run on the host: the pre-start check, the wait for the model load, the watchdog, the status and drift checks, the installer for system files, and the repository self-test |
+| `scripts/` | Scripts that run on the host: the pre-start check, the wait for the model load, the watchdog, the status and drift checks, the installer for system files, the repository self-test, and the deploy script |
 | `tools/` | `configure_strata_q3.py`, which turns the config that Strata's `setup.sh` writes into the deployed configuration |
-| `tests/` | Unit tests for `tools/` |
+| `tests/` | Unit tests for `tools/` and `scripts/deploy.sh` |
 | `bench/` | Load, latency, robustness, version A/B and tracing tests, and the engine build script |
 | `results/` | Raw test results ([index](results/README.md)) |
 | `examples/requests/` | Example API requests |
@@ -46,6 +46,7 @@ To build a new machine, follow [Rebuilding the deployment from scratch](docs/run
 scripts/check-deployment.sh        # service status; exits with 1 if it finds a problem
 scripts/check-drift.sh             # whether the machine matches the repository
 scripts/test.sh                    # repository self-test; run it before each commit
+scripts/deploy.sh                  # whether origin/main can be deployed here (runs its checks); --apply deploys it
 sudo systemctl restart strata-q3   # the service is ready after about 7–9 minutes
 ```
 
@@ -55,11 +56,12 @@ sudo systemctl restart strata-q3   # the service is ready after about 7–9 minu
 |---|---|
 | [Daily operations](docs/runbooks/operations.md) | Status, start and stop, logs, test requests, recovery from the failed state, preparation for long tests, rerunning the benchmarks |
 | [Changing the configuration](docs/runbooks/change-config.md) | Changing Strata parameters, systemd units or the watchdog |
+| [Deploying a commit from GitHub](docs/runbooks/deploy.md) | Bringing this checkout up to a newer `main` whose `test` workflow passed |
 | [Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) | Driver, CUDA 12.9.1, model download, Strata setup and the systemd install |
 | [Evaluating and upgrading Strata](docs/runbooks/upgrade-strata.md) | Building a new release and comparing it with the deployed one |
 | [System changes and how to undo them](docs/reference/system-changes.md) | Everything the deployment changed outside the repository |
 | [Deployment record](docs/deployment-record.md) | The evidence for each setting, measured results, known limits and the test method |
-| [Decision records](docs/decisions/) | [0001: keep this repository separate from Strata](docs/decisions/0001-keep-ops-repo-separate-from-strata.md); [0002: repository layout](docs/decisions/0002-repository-layout.md) |
+| [Decision records](docs/decisions/) | [0001: keep this repository separate from Strata](docs/decisions/0001-keep-ops-repo-separate-from-strata.md); [0002: repository layout](docs/decisions/0002-repository-layout.md); [0003: CI on GitHub, deployment pulled by this machine](docs/decisions/0003-ci-on-github-deploy-by-pull.md) |
 | Upstream posts | [Comment on issue #2281](docs/upstream/issue-2281-comment.md); [PR #2918](docs/upstream/pr-2918.md) and [its comment](docs/upstream/pr-2918-comment.md); bug reports [#2990](docs/upstream/issue-2990.md) (`sycl/tools/build.sh` exit status) and [#2991](docs/upstream/issue-2991.md) (`ple_reader_selftest` temp files) |
 | [Test results](results/README.md) | Index of the raw output files and the commands that regenerate the summaries |
 | [Changelog](CHANGELOG.md) | Changes by date |
@@ -71,6 +73,7 @@ sudo systemctl restart strata-q3   # the service is ready after about 7–9 minu
 2. Commit only after `scripts/test.sh` and `scripts/check-drift.sh` both pass, and add an entry to `CHANGELOG.md`. After a push, the `test` workflow on GitHub has to pass as well.
 3. Record each important decision in `docs/decisions/` (template: [adr-template.md](docs/decisions/adr-template.md)).
 4. Keep the checkout at `~/dev/p100-q3-deployment`. `strata-q3.service` calls the scripts in `scripts/` by absolute path.
+5. A change made outside this checkout, such as a pull request or a push from another clone, reaches the machine through `scripts/deploy.sh`, or by hand when it changes what is installed outside the checkout ([Deploying a commit from GitHub](docs/runbooks/deploy.md)).
 
 ## License
 

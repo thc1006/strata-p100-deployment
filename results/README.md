@@ -1,6 +1,6 @@
 # Test results
 
-Raw output of all tests, grouped by tag (the start of the file name). The `deploy/...` paths in the files are the old locations from before the 2026-10-18 directory reorganization; the contents are kept as they were. Only the host name was replaced with `<host>` before publication. In the `pr2918-*` files, `<work>`, `<rocm>` and `<oneapi>` stand for temporary folders.
+Raw output of all tests, grouped by tag (the start of the file name). The `deploy/...` paths in the files are the old locations from before the 2026-10-18 directory reorganization; the contents are kept as they were. Only the host name was replaced with `<host>` before publication. In the `pr2918-*` files, `<work>`, `<rocm>` and `<oneapi>` stand for temporary folders, and in `deploy-sh-mutants-20261018.txt`, `<tmp>` does.
 
 The long-document requests are taken from Strata's documentation (`docs/*.md` and `README.md`). Some files (for example `*-trace.txt` and `ple_hint_probe.jsonl`) contain excerpts of these documents or of model answers. `ple_hint_count.cpp.txt` and `pr2918-contract.cpp.txt` contain code copied from Strata's `src/ngram/ple_reader_test.cpp`, and `pr2918-mutants.diff.txt` contains excerpts of its `src/kernels/ngram.cpp`. Strata is licensed under the MIT License, Copyright (c) 2026 Niko1221 and the Strata contributors; the full license text is in [`LICENSE-strata.txt`](LICENSE-strata.txt).
 
@@ -16,6 +16,7 @@ The long-document requests are taken from Strata's documentation (`docs/*.md` an
 | `v431-*`, `v441-*`, `v441pf-*`, `ab-v441-driver.log` | 10-16 | A/B of 0.1.43.1 against 0.1.44.1, and 0.1.44.1 with the read-ahead hint on | `AB-0.1.44.1.md`; deployment record section 3.6 |
 | `z-*`, `e-*`, `ab-v045*-driver.log`, `ple_hint_probe.jsonl`, `ple-hint-count-harness.txt`, `ple_hint_count.cpp.txt`, `ple-selftest-*.log` | 10-17 | A/B of 0.1.45 and the skip-hint-when-locked patch (upstream PR #2918); `z-` on ZFS, `e-` on an ext4 copy | `AB-0.1.45-ple-hint.md`; deployment record section 3.7 |
 | `pr2918-*` | 10-18 | Checking the PR #2918 test: a hint-count harness (`pr2918-contract.cpp.txt`) and its output, the test against broken versions of the engine code (`pr2918-mutants.diff.txt`), and the CUDA, HIP and SYCL builds of the amended PR | Deployment record section 3.7 |
+| `deploy-sh-mutants-20261018.txt` | 10-18 | `tests/test_deploy.py` against 94 broken copies of `scripts/deploy.sh`, and the script that makes them | Decision record 0003 |
 | `sycl-build-sh-exit-20261018.txt`, `ple-selftest-shared-tmp-20261018.txt` | 10-18 | Two upstream problems found while building PR #2918: the exit status of `sycl/tools/build.sh`, and two runs of `ple_reader_test --selftest` that share one temp directory | Upstream bug reports in `docs/upstream/` |
 | `engine-log-20261016-extract.txt`, `fault-injection-journal.txt` | 10-16 | Verbatim excerpts of the engine log (with the original line numbers); excerpts of the systemd journal | Deployment record, notes on the sources of the numbers |
 | `setup-20261016.log` | 10-16 | Full output of `setup.sh` | `docs/runbooks/rebuild.md` step 5 |

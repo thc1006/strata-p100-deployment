@@ -1,0 +1,268 @@
+# tests/test_deploy.py against broken copies of scripts/deploy.sh, 2026-10-18.
+#
+# Each mutant below is a copy of deploy.sh with one deliberate bug, made by the text replacements in mutate.py (at the
+# end of this file). "caught" means that the tests failed on the copy; the name after "--" is the first failing test.
+# Machine: <host>, Ubuntu 22.04.5, Python 3.10.12, git 2.34.1, bash 5.1.16.  Command, in a scratch directory:
+#   python3 -B mutate.py <repo> 4        (4 copies at a time, each test run under nice -n 19)
+# Inputs (sha256): scripts/deploy.sh 4c36aff86583c2d154c9ced25a2e3597eebc452478825a22fd3d330e0c1679c3
+#                  tests/test_deploy.py c6d29dcf055bda158ea57abf0ab00a30c569f533c57c468dff60976e4a6b767c
+#                  mutate.py 31c4c33b435040ae9f5414b53b8a819e96799d2b17ebe443c8601a29872b7c68
+# <tmp> stands for the temporary directory of a test.  M00 is the unchanged script, on which the tests have to pass
+# ("survived").  M85 and M87 remove two defensive branches that no test can reach: a check log that grep cannot
+# read right after tail has read it, and a machine without git (the tests need git).
+
+M00 no change: survived  (26 s)
+M01 caught   drop the lock  -- FAIL: test_refuses_when_git_or_the_lock_fails (test_deploy.DeployTests)
+M02 caught   ignore flock's status  -- FAIL: test_refuses_when_git_or_the_lock_fails (test_deploy.DeployTests)
+M03 caught   drop the branch gate  -- FAIL: test_refuses_another_branch_or_a_detached_head (test_deploy.DeployTests)
+M04 caught   drop the local-changes gate  -- FAIL: test_refuses_local_changes (test_deploy.DeployTests)
+M05 caught   status without --untracked-files=all  -- FAIL: test_refuses_local_changes (test_deploy.DeployTests)
+M06 caught   drop the hidden-files gate  -- FAIL: test_refuses_local_changes (test_deploy.DeployTests) (flag='--skip-worktree')
+M07 caught   hidden files: skip-worktree only  -- FAIL: test_refuses_local_changes (test_deploy.DeployTests) (flag='--assume-unchanged')
+M08 caught   hidden files: assume-unchanged only  -- FAIL: test_refuses_local_changes (test_deploy.DeployTests) (flag='--skip-worktree')
+M09 caught   no fetch  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M10 caught   fetch without timeout  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M11 caught   up to date exits 1  -- FAIL: test_up_to_date_asks_nobody (test_deploy.DeployTests)
+M12 caught   drop the fast-forward gate  -- FAIL: test_refuses_commits_that_origin_does_not_have (test_deploy.DeployTests)
+M13 caught   swap the ancestor arguments  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M14 caught   drop the manual-path gate  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='systemd/strata-q3-deploy.timer')
+M15 caught   MANUAL without systemd/  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='systemd/strata-q3-deploy.timer')
+M16 caught   MANUAL without config/  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='config/profile.conf')
+M17 caught   MANUAL without the watchdog  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='scripts/strata-health.sh')
+M18 caught   MANUAL without the installer  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='scripts/install-system-files.sh')
+M19 caught   MANUAL without check-drift.sh  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='scripts/check-drift.sh')
+M20 caught   drop the first service check  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_STATES': 'activating'})
+M21 caught   drop the service check before the merge  -- FAIL: test_service_state (test_deploy.DeployTests)
+M22 caught   ignore a queued job  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_JOB': '42'})
+M23 caught   accept activating  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_STATES': 'activating'})
+M24 caught   accept reloading  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_STATES': 'reloading'})
+M25 caught   accept unknown states  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_STATES': 'activating'})
+M26 caught   refuse failed  -- FAIL: test_service_state (test_deploy.DeployTests) (state='failed')
+M27 caught   drop the GitHub-URL gate  -- FAIL: test_origin_must_be_github_and_its_password_stays_hidden (test_deploy.DeployTests)
+M28 caught   print the URL with its password  -- FAIL: test_origin_must_be_github_and_its_password_stays_hidden (test_deploy.DeployTests)
+M29 caught   drop the workflow gate  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='queued', runs=[{'status': 'queued', 'conclusion': None}])
+M30 caught   accept any completed run  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='completed failure', runs=[{'conclusion': 'failure'}])
+M31 caught   accept skipped and neutral  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='completed skipped', runs=[{'conclusion': 'skipped'}])
+M32 caught   no path filter  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='missing', runs=[{'path': '.github/workflows/other.yml'}])
+M33 caught   no head_sha filter  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='missing', runs=[{'head_sha': '0000000000000000000000000000000000000000'}])
+M34 caught   no event filter  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='missing', runs=[{'event': 'pull_request'}])
+M35 caught   no branch filter  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='missing', runs=[{'head_branch': 'other'}])
+M36 caught   the oldest run decides  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='in_progress', runs=[{}, {'status': 'in_progress', 'conclusion': None}])
+M37 caught   the first listed run decides  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='in_progress', runs=[{}, {'status': 'in_progress', 'conclusion': None}])
+M38 caught   no pagination check  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests)
+M39 caught   missing counts as success  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='missing', runs=[{'path': '.github/workflows/other.yml'}])
+M40 caught   unreadable counts as success  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests)
+M41 caught   ask about HEAD  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M42 caught   curl without -f  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests)
+M43 caught   checks without a time limit  -- ERROR: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M44 caught   a timeout reads as an exit status  -- FAIL: test_refuses_a_commit_whose_checks_fail_here (test_deploy.DeployTests) (timeout='test.sh')
+M45 caught   ignore the exit status  -- FAIL: test_refuses_a_commit_whose_checks_fail_here (test_deploy.DeployTests) (files={'FAIL_TEST': ''})
+M46 caught   ignore the last line  -- FAIL: test_refuses_a_commit_whose_checks_fail_here (test_deploy.DeployTests) (files={'QUIET_TEST': ''})
+M47 caught   ignore DRIFT lines  -- FAIL: test_refuses_a_commit_whose_checks_fail_here (test_deploy.DeployTests) (files={'DRIFT_EXIT0': ''})
+M48 caught   skip the new test.sh  -- ERROR: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M49 caught   run this checkout's test.sh  -- ERROR: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M50 caught   skip the new check-drift.sh  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M51 caught   run this checkout's check-drift.sh  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M52 caught   skip the check after the merge  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M53 caught   drift after the merge exits 0  -- FAIL: test_reports_drift_that_appears_after_the_fast_forward (test_deploy.DeployTests)
+M54 caught   --apply ignored  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M55 caught   a dry run merges  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M56 caught   export HEAD  -- ERROR: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M57 caught   AT_START without tools/  -- FAIL: test_names_what_the_service_runs_at_its_next_start (test_deploy.DeployTests)
+M58 caught   AT_START without the preflight  -- FAIL: test_names_what_the_service_runs_at_its_next_start (test_deploy.DeployTests)
+M59 caught   AT_START without wait-ready  -- FAIL: test_names_what_the_service_runs_at_its_next_start (test_deploy.DeployTests)
+M60 caught   always print the restart hint  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M61 caught   no EXIT trap  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M62 caught   refusals on stdout  -- FAIL: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M63 caught   refusals exit 0  -- FAIL: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M64 caught   unknown arguments mean a dry run  -- FAIL: test_usage (test_deploy.DeployTests) (args=['--force'])
+M65 caught   git status failure ignored  -- FAIL: test_refuses_when_git_or_the_lock_fails (test_deploy.DeployTests)
+M66 caught   merge failure ignored  -- FAIL: test_keeps_ignored_files (test_deploy.DeployTests)
+M67 caught   export failure ignored  -- FAIL: test_refuses_when_git_or_the_lock_fails (test_deploy.DeployTests)
+M68 caught   keep the caller's git variables  -- FAIL: test_ignores_the_callers_git_variables (test_deploy.DeployTests)
+M69 caught   no control-character filter  -- FAIL: test_prints_no_control_characters (test_deploy.DeployTests)
+M70 caught   lock only before the merge  -- FAIL: test_refuses_when_git_or_the_lock_fails (test_deploy.DeployTests)
+M71 caught   service check after the drift check  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_STATES': 'activating'})
+M72 caught   manual gate after GitHub  -- FAIL: test_refuses_commits_that_apply_outside_this_checkout (test_deploy.DeployTests) (path='systemd/strata-q3-deploy.timer')
+M73 caught   service check before up-to-date  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M74 caught   GitHub gate after the checks  -- FAIL: test_refuses_without_a_passing_run (test_deploy.DeployTests) (state='queued', runs=[{'status': 'queued', 'conclusion': None}])
+M75 caught   lock fd open in the checks  -- FAIL: test_a_deploy_that_replaces_this_script (test_deploy.DeployTests)
+M76 caught   auto gc allowed  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M77 caught   no trap for Ctrl-C  -- FAIL: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M78 caught   the trap leaves the check running  -- FAIL: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M79 caught   checks in the foreground  -- ERROR: test_ctrl_c_stops_it_before_the_merge (test_deploy.DeployTests)
+M80 caught   checks without -k  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M81 caught   no checkout check before the merge  -- FAIL: test_refuses_when_the_checkout_changes_during_the_checks (test_deploy.DeployTests) (during='git -C <tmp>/live checkout -q -b other')
+M82 caught   no HEAD check before the merge  -- FAIL: test_refuses_when_the_checkout_changes_during_the_checks (test_deploy.DeployTests) (during='git -C <tmp>/live commit -q --allow-empty -m moved')
+M83 caught   the merge overwrites ignored files  -- FAIL: test_keeps_ignored_files (test_deploy.DeployTests)
+M84 caught   file names unquoted  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M85 survived a grep error reads as no DRIFT lines
+M86 caught   bidi characters printed  -- FAIL: test_prints_no_control_characters (test_deploy.DeployTests)
+M87 survived no check that git is installed
+M88 caught   a failed Job query passes  -- FAIL: test_service_state (test_deploy.DeployTests) (env={'STUB_JOB_FAIL': '1'})
+M89 caught   curl without --max-time  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M90 caught   no per_page  -- FAIL: test_dry_run_reports_and_apply_fast_forwards (test_deploy.DeployTests)
+M91 caught   check logs printed raw  -- FAIL: test_prints_no_control_characters (test_deploy.DeployTests)
+M92 caught   ssh URLs refused  -- FAIL: test_origin_must_be_github_and_its_password_stays_hidden (test_deploy.DeployTests) (url='ssh://git@github.com/example/ops.git')
+M93 caught   the host is case-sensitive  -- FAIL: test_origin_must_be_github_and_its_password_stays_hidden (test_deploy.DeployTests) (url='https://GitHub.com/example/ops')
+M94 caught   a trailing slash is kept  -- FAIL: test_origin_must_be_github_and_its_password_stays_hidden (test_deploy.DeployTests) (url='https://github.com/example/ops/')
+94 mutants: 92 caught, 2 survived, 0 invalid
+
+real	4m30.593s
+user	4m0.375s
+sys	11m50.897s
+
+# ---- mutate.py ----
+
+"""Mutation testing of scripts/deploy.sh against tests/test_deploy.py, on copies in this directory.
+Usage: mutate.py <repo> [workers]; each mutant is a list of (old, new) replacements that must each match once."""
+import concurrent.futures as cf, os, shutil, subprocess, sys, time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+REPO = Path(sys.argv[1]); WORKERS = int(sys.argv[2]) if len(sys.argv) > 2 else 4
+SRC = (REPO / "scripts" / "deploy.sh").read_text(); TEST = (REPO / "tests" / "test_deploy.py").read_text()
+
+FLOCK = 'flock -n 9; case $? in 0) ;; 1) refuse "another scripts/deploy.sh is running" ;; *) refuse "flock failed" ;; esac\n'
+SVC1 = '  state=$(service_idle) || refuse "$UNIT is $state; deploy when it is not starting or stopping"\n  ok "$UNIT is $state"\n'
+SVC2 = '  state=$(service_idle) || refuse "$UNIT is $state; deploy when it is not starting or stopping"\n  git merge'
+FETCH = '  limited 120 - git "${GIT_OPTS[@]}" fetch'
+MANUALB = ('  manual=$(git diff --name-only "$head" "$target" -- "${MANUAL[@]}" | tr \'\\n\' \' \') || refuse "git diff failed"\n'
+           '  [ -z "$manual" ] || refuse "the commits change ${manual% }, which apply outside this checkout; deploy them by hand"\n'
+           '  ok "nothing in the commits applies outside this checkout"\n')
+GATE = ('  [ "$state" = "completed success" ] || refuse "the newest run of $WORKFLOW for $short is ${state:-unreadable}"\n'
+        '  ok "the newest run of $WORKFLOW for $short passed"\n')
+CHANGED = '  changed=$(git diff --name-only "$head" "$target" -- "${AT_START[@]}"'
+BG = 'else timeout -k 10 "$seconds" "$@" > "$out" 2>&1 < /dev/null 9>&- &\n  fi'
+MUTANTS = [
+ ("M01", "drop the lock", [(FLOCK, "\n")]),
+ ("M02", "ignore flock's status", [("flock -n 9; case $? in", "flock -n 9; case 0 in")]),
+ ("M03", "drop the branch gate", [('[ "$(git symbolic-ref -q --short HEAD)" = main ] ||', "true ||")]),
+ ("M04", "drop the local-changes gate", [('[ -z "$st" ] || refuse', "true || refuse")]),
+ ("M05", "status without --untracked-files=all", [(" --untracked-files=all", "")]),
+ ("M06", "drop the hidden-files gate", [("if grep -q -E '^([a-z]|S) ' <<< \"$st\"; then", "if false; then")]),
+ ("M07", "hidden files: skip-worktree only", [("'^([a-z]|S) '", "'^S '")]),
+ ("M08", "hidden files: assume-unchanged only", [("'^([a-z]|S) '", "'^[a-z] '")]),
+ ("M09", "no fetch", [(FETCH + " -q origin +refs/heads/main:refs/remotes/origin/main ||", "  true ||")]),
+ ("M10", "fetch without timeout", [('if [ "$out" = - ]; then timeout -k 10 "$seconds" "$@"', 'if [ "$out" = - ]; then "$@"')]),
+ ("M11", "up to date exits 1", [("printable)\"; exit 0; fi", "printable)\"; exit 1; fi")]),
+ ("M12", "drop the fast-forward gate", [('git merge-base --is-ancestor "$head" "$target" ||', "true ||")]),
+ ("M13", "swap the ancestor arguments", [('--is-ancestor "$head" "$target"', '--is-ancestor "$target" "$head"')]),
+ ("M14", "drop the manual-path gate", [('[ -z "$manual" ] || refuse', "true || refuse")]),
+ ("M15", "MANUAL without systemd/", [("MANUAL=(systemd/ ", "MANUAL=(")]),
+ ("M16", "MANUAL without config/", [(" config/ scripts/strata-health.sh", " scripts/strata-health.sh")]),
+ ("M17", "MANUAL without the watchdog", [(" scripts/strata-health.sh scripts/install", " scripts/install")]),
+ ("M18", "MANUAL without the installer", [(" scripts/install-system-files.sh scripts/check-drift.sh)", " scripts/check-drift.sh)")]),
+ ("M19", "MANUAL without check-drift.sh", [(" scripts/check-drift.sh)\nAT_START", ")\nAT_START")]),
+ ("M20", "drop the first service check", [(SVC1, "")]),
+ ("M21", "drop the service check before the merge", [(SVC2, "  git merge")]),
+ ("M22", "ignore a queued job", [('  [ -z "$job" ] || { echo "$state, with job $job queued"; return 1; }\n', "")]),
+ ("M23", "accept activating", [("case $state in active|inactive|failed)", "case $state in active|inactive|failed|activating)")]),
+ ("M24", "accept reloading", [("case $state in active|inactive|failed)", "case $state in active|inactive|failed|reloading)")]),
+ ("M25", "accept unknown states", [("active|inactive|failed) ;; *) return 1 ;; esac", "active|inactive|failed) ;; *) ;; esac")]),
+ ("M26", "refuse failed", [("case $state in active|inactive|failed)", "case $state in active|inactive)")]),
+ ("M27", "drop the GitHub-URL gate", [("[[ $url =~ $github ]] || refuse", "[[ $url =~ $github ]] || true")]),
+ ("M28", "print the URL with its password", [("$(sed -E 's#^([a-z+]+://)[^/@]*@#\\1#' <<< \"$url\")", "$url")]),
+ ("M29", "drop the workflow gate", [('[ "$state" = "completed success" ] || refuse "the newest', 'true || refuse "the newest')]),
+ ("M30", "accept any completed run", [('[ "$state" = "completed success" ] || refuse "the newest', '[[ "$state" == completed* ]] || refuse "the newest')]),
+ ("M31", "accept skipped and neutral", [('[ "$state" = "completed success" ] || refuse "the newest', '[[ "$state" =~ ^completed\\ (success|skipped|neutral)$ ]] || refuse "the newest')]),
+ ("M32", "no path filter", [('r["path"] == workflow and ', "")]),
+ ("M33", "no head_sha filter", [(' and r["head_sha"] == sha', "")]),
+ ("M34", "no event filter", [('and r["event"] == "push" and ', "and ")]),
+ ("M35", "no branch filter", [(' and r["head_branch"] == "main"]', "]")]),
+ ("M36", "the oldest run decides", [("newest = max(runs,", "newest = min(runs,")]),
+ ("M37", "the first listed run decides", [('newest = max(runs, key=lambda r: r["run_number"])', "newest = runs[0]")]),
+ ("M38", "no pagination check", [('    if data["total_count"] > len(data["workflow_runs"]):\n        print("unreadable: more runs than one page")\n    elif not runs:', "    if not runs:")]),
+ ("M39", "missing counts as success", [('print("missing")', 'print("completed success")')]),
+ ("M40", "unreadable counts as success", [('    print("unreadable")\nEOF', '    print("completed success")\nEOF')]),
+ ("M41", "ask about HEAD", [("head_sha=$target&", "head_sha=$head&")]),
+ ("M42", "curl without -f", [("curl -q -fsS", "curl -q -sS")]),
+ ("M43", "checks without a time limit", [('else timeout -k 10 "$seconds" "$@" > "$out"', 'else "$@" > "$out"')]),
+ ("M44", "a timeout reads as an exit status", [('if [ $rc = 124 ] || [ $rc = 137 ]; then why="it did not finish in $LIMIT s"\n  elif', "if")]),
+ ("M45", "ignore the exit status", [('  elif [ $rc != 0 ]; then why="exit $rc"\n', "")]),
+ ("M46", "ignore the last line", [('  elif [ "$(tail -n 1 "$3")" != "$2" ]; then why="exit 0, but no \\"$2\\" at the end"\n', "")]),
+ ("M47", "ignore DRIFT lines", [('0) why="exit 0, but with DRIFT lines" ;;', "0) return 0 ;;")]),
+ ("M48", "skip the new test.sh", [('if ! check_of_target "$tmp/tree/scripts/test.sh"', 'if false && check_of_target "$tmp/tree/scripts/test.sh"')]),
+ ("M49", "run this checkout's test.sh", [('check_of_target "$tmp/tree/scripts/test.sh"', 'check_of_target "$D/scripts/test.sh"')]),
+ ("M50", "skip the new check-drift.sh", [('if ! check_of_target "$tmp/tree/scripts/check-drift.sh"', 'if false && check_of_target "$tmp/tree/scripts/check-drift.sh"')]),
+ ("M51", "run this checkout's check-drift.sh", [('check_of_target "$tmp/tree/scripts/check-drift.sh"', 'check_of_target "$D/scripts/check-drift.sh"')]),
+ ("M52", "skip the check after the merge", [("if ! check_of_target scripts/check-drift.sh", "if false && check_of_target scripts/check-drift.sh")]),
+ ("M53", "drift after the merge exits 0", [('now finds drift: $why" >&2\n    exit 1', 'now finds drift: $why" >&2\n    exit 0')]),
+ ("M54", "--apply ignored", [('if [ $apply = 0 ]; then echo "dry run', 'if true; then echo "dry run')]),
+ ("M55", "a dry run merges", [('  if [ $apply = 0 ]; then echo "dry run: scripts/deploy.sh --apply deploys $short"; exit 0; fi\n', "")]),
+ ("M56", "export HEAD", [('git archive "$target"', 'git archive "$head"')]),
+ ("M57", "AT_START without tools/", [(" scripts/strata-wait-ready.sh tools/)", " scripts/strata-wait-ready.sh)")]),
+ ("M58", "AT_START without the preflight", [("AT_START=(scripts/strata-preflight.sh ", "AT_START=(")]),
+ ("M59", "AT_START without wait-ready", [(" scripts/strata-wait-ready.sh tools/)", " tools/)")]),
+ ("M60", "always print the restart hint", [('[ -z "$changed" ] || echo "to run them now', 'echo "to run them now')]),
+ ("M61", "no EXIT trap", [("  trap 'rm -rf -- \"$tmp\"' EXIT\n", "")]),
+ ("M62", "refusals on stdout", [("printf 'not deployed: %s\\n' \"$1\" >&2; exit 1", "printf 'not deployed: %s\\n' \"$1\"; exit 1")]),
+ ("M63", "refusals exit 0", [("printf 'not deployed: %s\\n' \"$1\" >&2; exit 1", "printf 'not deployed: %s\\n' \"$1\" >&2; exit 0")]),
+ ("M64", "unknown arguments mean a dry run", [('*) echo "usage: scripts/deploy.sh [--apply]" >&2; exit 2 ;;', "*) apply=0 ;;")]),
+ ("M65", "git status failure ignored", [('|| refuse "git status failed"', "|| true")]),
+ ("M66", "merge failure ignored", [('|| refuse "git merge --ff-only $short failed"', "|| true")]),
+ ("M67", "export failure ignored", [('|| refuse "cannot export $short"', "|| true")]),
+ ("M68", "keep the caller's git variables", [("  unset $(command git rev-parse --local-env-vars)\n", "")]),
+ ("M69", "no control-character filter", [("printable() {\n  python3", "printable() { cat; }\nunused() {\n  python3")]),
+ ("M70", "lock only before the merge", [(FLOCK, "\n"), ("  git merge -q --ff-only", "  " + FLOCK + "  git merge -q --ff-only")]),
+ ("M71", "service check after the drift check", [(SVC1, ""), (CHANGED, SVC1 + CHANGED)]),
+ ("M72", "manual gate after GitHub", [(MANUALB, ""), (GATE, GATE + MANUALB)]),
+ ("M73", "service check before up-to-date", [(SVC1, ""), (FETCH, SVC1 + FETCH)]),
+ ("M74", "GitHub gate after the checks", [(GATE, ""), (CHANGED, GATE + CHANGED)]),
+ ("M75", "lock fd open in the checks", [('> "$out" 2>&1 < /dev/null 9>&- &', '> "$out" 2>&1 < /dev/null &')]),
+ ("M76", "auto gc allowed", [("GIT_OPTS=(-c gc.auto=0 -c maintenance.auto=false -c core.quotePath=true)", "GIT_OPTS=(-c core.quotePath=true)")]),
+ ("M77", "no trap for Ctrl-C", [("  trap stop INT TERM HUP\n", "")]),
+ ("M78", "the trap leaves the check running", [('[ -z "$child" ] || kill -TERM -- "-$child" "$child" 2> /dev/null; refuse', "refuse")]),
+ ("M79", "checks in the foreground", [(BG, 'else timeout -k 10 "$seconds" "$@" > "$out" 2>&1 < /dev/null 9>&-; return\n  fi')]),
+ ("M80", "checks without -k", [('else timeout -k 10 "$seconds"', 'else timeout "$seconds"')]),
+ ("M81", "no checkout check before the merge", [('  checkout_clean\n  [ "$(git rev-parse HEAD)" = "$head" ]', '  [ "$(git rev-parse HEAD)" = "$head" ]')]),
+ ("M82", "no HEAD check before the merge", [('  [ "$(git rev-parse HEAD)" = "$head" ] || refuse "this checkout moved while the checks ran"\n', "")]),
+ ("M83", "the merge overwrites ignored files", [(" --no-overwrite-ignore", "")]),
+ ("M84", "file names unquoted", [(" -c core.quotePath=true)", ")")]),
+ ("M85", "a grep error reads as no DRIFT lines", [('*) why="its output cannot be read" ;;', "*) return 0 ;;")]),
+ ("M86", "bidi characters printed", [('not in ("Cc", "Cf", "Zl", "Zp")', 'not in ("Cc",)')]),
+ ("M87", "no check that git is installed", [('  command -v git > /dev/null || refuse "git is not installed"\n', "")]),
+ ("M88", "a failed Job query passes", [('job=$(systemctl show -p Job --value "$UNIT") || { echo "in an unknown state"; return 1; }', 'job=$(systemctl show -p Job --value "$UNIT")')]),
+ ("M89", "curl without --max-time", [(" --max-time 30", "")]),
+ ("M90", "no per_page", [("&per_page=100", "")]),
+ ("M91", "check logs printed raw", [("sed 's/^/  /' \"$tmp/test.log\" | printable", "sed 's/^/  /' \"$tmp/test.log\"")]),
+ ("M92", "ssh URLs refused", [("|ssh://git@github\\.com/", "")]),
+ ("M93", "the host is case-sensitive", [("  shopt -s nocasematch\n", "")]),
+ ("M94", "a trailing slash is kept", [(" url=${url%/};", "")]),
+]
+
+def build(mid, reps):
+    text = SRC
+    for old, new in reps:
+        if text.count(old) != 1:
+            return None, f"pattern matches {text.count(old)} times: {old[:60]!r}"
+        text = text.replace(old, new)
+    d = HERE / "m" / mid
+    shutil.rmtree(d, ignore_errors=True); (d / "scripts").mkdir(parents=True); (d / "tests").mkdir()
+    (d / "scripts" / "deploy.sh").write_text(text); (d / "scripts" / "deploy.sh").chmod(0o755)
+    (d / "tests" / "test_deploy.py").write_text(TEST)
+    return d, None
+
+def run(mid, desc, reps):
+    d, err = build(mid, reps)
+    if err:
+        return mid, desc, "INVALID", err, 0.0
+    s = time.monotonic()
+    try:
+        r = subprocess.run(["nice", "-n", "19", "python3", "-B", "-m", "unittest", "discover", "-f", "-s", "tests", "-p", "test_deploy.py"],
+                           cwd=d, capture_output=True, text=True, timeout=600)
+        verdict = "survived" if r.returncode == 0 else "caught"
+        why = "" if r.returncode == 0 else next((l for l in r.stderr.splitlines() if l.startswith(("FAIL:", "ERROR:"))), "")
+    except subprocess.TimeoutExpired:
+        verdict, why = "caught", "timeout"
+    return mid, desc, verdict, why, time.monotonic() - s
+
+base = run("M00", "no change", [])
+print(f"{base[0]} {base[1]}: {base[2]} {base[3]} ({base[4]:.0f} s)", flush=True)
+if base[2] != "survived": sys.exit("the unchanged script fails its tests")
+with cf.ThreadPoolExecutor(WORKERS) as ex:
+    results = list(ex.map(lambda m: run(*m), MUTANTS))
+for mid, desc, verdict, why, secs in results:
+    print(f"{mid} {verdict:8} {desc}{'  -- ' + why if why else ''}")
+c = sum(r[2] == "caught" for r in results); s = sum(r[2] == "survived" for r in results); i = sum(r[2] == "INVALID" for r in results)
+print(f"{len(results)} mutants: {c} caught, {s} survived, {i} invalid")

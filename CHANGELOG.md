@@ -6,9 +6,10 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Added
 
-- CI: `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, in Canonical's Ubuntu Base 22.04.5.
+- CI: `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, in Canonical's Ubuntu Base 22.04.5 ([decision 0003](docs/decisions/0003-ci-on-github-deploy-by-pull.md)).
+- `scripts/deploy.sh` deploys `origin/main` to this checkout when the newest `test` run for its push passed and nothing in the commits applies outside the checkout. Even without `--apply`, it runs the new commit's `test.sh` and `check-drift.sh` here. It never runs sudo or restarts the service ([Deploying a commit from GitHub](docs/runbooks/deploy.md)). `tests/test_deploy.py` has 21 tests for it, which fail on 92 of 94 broken copies of the script (`results/deploy-sh-mutants-20261018.txt`).
 - `scripts/install-system-files.sh`, `scripts/test.sh`, `bench/build-engine.sh`.
-- Decision records: 0001, operations repository separate from Strata; 0002, directory structure.
+- Decision records: 0001, operations repository separate from Strata; 0002, directory structure; 0003, CI on GitHub and deployment pulled by this machine.
 - `results/README.md`: an index of the test results.
 - `results/`: 12 service load times, the raw output of three example requests, the engine lines of the 0.1.44.1 run with the read-ahead hint on, and the output of one `check-drift.sh --full` run. `.gitattributes` keeps the original line endings in `results/`.
 - Unit tests went from 29 to 38. They cover preflight decisions, format differences, backups, concurrent modification and CLI errors.

@@ -15,6 +15,9 @@ at the next start of the service. Other people use the service.
 - `scripts/check-drift.sh`: read-only comparison of the machine with the repository. It ends with `no drift`.
 - `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json --profile deployed --dry-run`: shows what
   the tool would change in the live config without writing it.
+- `scripts/deploy.sh`: whether `origin/main` can be deployed to this checkout. To find out, it runs that commit's
+  `scripts/test.sh` and `scripts/check-drift.sh` here; the checkout stays as it was. `--apply` then deploys it: a
+  fast-forward, with no sudo and no restart.
 
 ## Never, unless the maintainer asks for it in this session
 
@@ -24,6 +27,7 @@ at the next start of the service. Other people use the service.
   and the load tests keep the GPUs busy for up to an hour.
 - Run `sudo`, `scripts/install-system-files.sh`, or anything that writes to `/etc`, `/usr/local/sbin` or `~/dev/strata`.
 - Run `tools/configure_strata_q3.py` on `~/dev/strata/strata-iq3_xxs.json` without `--dry-run`.
+- Run `scripts/deploy.sh --apply`. It changes what the service runs at its next start.
 - Edit a file in `results/`. These are raw measurements; new results come only from new runs.
 - Change a number in the documentation without the raw file in `results/` that supports it.
 - Commit an API key, a password, an email address or the machine's host name. Results write the host name as `<host>`.

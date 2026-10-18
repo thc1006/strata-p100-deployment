@@ -4,6 +4,15 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ## 2026-10-19
 
+### Added
+
+- The engine-experiment tools for the scheduling work, which comes before decision 0004's A/B: each arm is a config of a second Strata tree (0.1.45), run in a transient unit with the deployed unit's limits instead of `strata-q3`.
+  - `bench/ab_engine.sh ARMS.json TAG:ARM ...` gives the running service up to 15 minutes to finish its replies (else it refuses), refuses while a measurement or an evaluation runs, stops `strata-q3`, starts the arm in the unit `strata-ab-engine`, waits for the load and the settle, and reads one fixed ~2K-token warm-up prompt. Then it checks the arm before measuring anything: the engine's environment must hold the arm's values, and its log since its start must match every `must` pattern and no `must_not` pattern. A switch that is set but did not take stops the step. It records the engine's binary, arguments, environment, VmLck, the ARC and the free VRAM, counts the requests against `/metrics` (another client's requests show), records the test unit's journal and kernel lines, and stops the steps if the engine restarted. At the end, also after a failure or an interrupt, it starts `strata-q3` again and waits for it.
+  - `bench/engine_screen.py` sends every arm the same greedy requests: 1.2K, 4K and 16K-token prompts, one user decoding, four users, a 16K prompt joining three decoders (its TTFT, the decoders' longest gap, the makespan), and a two-turn conversation through the conversation cache. Each request is one JSON line with its answer's sha256.
+  - `bench/ab_engine_summary.py` says which runs are usable and why, gives the numbers per arm against the baseline with each run's change, and compares the answers request by request, within an arm and against the baseline.
+  - `bench/make_engine_configs.py` writes an arm's config from the live one, and `bench/arms-group-sort.json` defines the first experiment, `STRATA_MMQ_GROUP_SORT` on 0.1.45.
+  - Tests: `tests/test_engine_screen.py`, `tests/test_ab_engine_summary.py`, and `tests/ab_engine_stubs.sh`, which runs the driver against stub `systemctl`, `systemd-run`, `journalctl`, `sudo`, `nvidia-smi` and `hostname` and fake servers (`tests/fake_strata.py`) on a free port (31 checks; each of 12 planted bugs is caught).
+
 ### Changed
 
 - `bench/run_profile.sh` passes `SERVE_LOAD_NONCE`, when set, to serve_load's `--nonce`: every run then sends the same prompts and decodes the same text. Two runs of one configuration differed by up to 4.8% on 1 client with the default nonce (`results/v441-1-serve_load.json` against `v441-2`), because the 1-client rate follows the drafts the text accepts. `bench/ab_model_run.sh` sets it for decision 0004's A/B.

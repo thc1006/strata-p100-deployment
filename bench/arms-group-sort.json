@@ -1,0 +1,16 @@
+{
+  "tree": "/home/thc1006/dev/strata-0.1.45",
+  "settle_s": 300,
+  "screen_n": 3,
+  "arms": {
+    "C0": {"config": "cfg-gs0.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "0", "STRATA_MMQ_RESIDENT_SORT_NE": "0"},
+           "must": ["session is up \\(engine 0\\.1\\.45\\)"],
+           "must_not": ["prompt MMQ sorts the full expert groups"]},
+    "C1": {"config": "cfg-gs1.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "1", "STRATA_MMQ_RESIDENT_SORT_NE": "0"},
+           "must": ["session is up \\(engine 0\\.1\\.45\\)",
+                    "strata: prompt MMQ sorts the full expert groups \\(STRATA_MMQ_GROUP_SORT=1\\): [1-9][0-9]* of [0-9]+ layers"],
+           "must_not": []}
+  }
+}

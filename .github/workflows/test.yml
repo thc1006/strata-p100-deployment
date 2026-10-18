@@ -1,0 +1,45 @@
+# The repository's checks on GitHub: scripts/test.sh --repo-only, on every push to main and every pull request.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The job needs no token: it fetches the public repository without one and uses no actions.
+permissions: {}
+
+# A new push to a pull request cancels the run for the older one; every commit on main gets its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Fetch the commit
+        run: |
+          git init -q
+          git fetch -q --depth=1 --no-tags "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      # The machine runs Ubuntu 22.04, so the checks run there too (Python 3.10, systemd 249): in Canonical's Ubuntu Base
+      # 22.04.5, the last point release of 22.04, fetched by its SHA256SUMS entry rather than from a container registry,
+      # which can refuse anonymous pulls from the runners' shared addresses.  The repository is mounted read-only, apt
+      # reads only the main component, which has the three packages, and the checks run as nobody, as on the machine.
+      - name: scripts/test.sh --repo-only on Ubuntu 22.04
+        env:
+          BASE: https://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.5-base-amd64.tar.gz
+          BASE_SHA256: 242cd8898b33ea806ef5f13b1076ed7c76f9f989d18384452f7166692438ff1a
+          IN_CONTAINER: |
+            printf 'deb http://archive.ubuntu.com/ubuntu %s main\n' jammy jammy-updates jammy-security > /etc/apt/sources.list
+            apt-get -qq -o Acquire::Languages=none -o Acquire::Retries=3 update
+            DEBIAN_FRONTEND=noninteractive apt-get -qq -o Acquire::Retries=3 install --no-install-recommends \
+              git python3 systemd > /dev/null
+            HOME=/tmp setpriv --reuid=65534 --regid=65534 --clear-groups scripts/test.sh --repo-only
+        run: |
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/base.tar.gz" "$BASE"
+          echo "$BASE_SHA256  $RUNNER_TEMP/base.tar.gz" | sha256sum -c --quiet -
+          docker import "$RUNNER_TEMP/base.tar.gz" ubuntu-base:22.04.5 > /dev/null
+          docker run --rm -v "$PWD:/repo:ro" -w /repo ubuntu-base:22.04.5 bash -euc "$IN_CONTAINER"

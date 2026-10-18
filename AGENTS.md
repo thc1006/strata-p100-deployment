@@ -9,7 +9,8 @@ at the next start of the service. Other people use the service.
 ## Commands
 
 - `scripts/test.sh`: unit tests, `bash -n` on every script, Python syntax, `systemd-analyze verify` and a check that
-  every program the units run exists. It ends with `all checks passed`.
+  every program the units run exists. It ends with `all checks passed`. `--repo-only` skips the programs outside the
+  repository; CI (`.github/workflows/test.yml`) runs that.
 - `python3 -B -m unittest discover -s tests -k <name>`: run one test, for example `-k test_value_bounds`.
 - `scripts/check-drift.sh`: read-only comparison of the machine with the repository. It ends with `no drift`.
 - `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json --profile deployed --dry-run`: shows what
@@ -37,6 +38,7 @@ at the next start of the service. Other people use the service.
 ## Done means
 
 - `scripts/test.sh` passes. Report its last lines.
+- After a push, the `test` workflow passes on GitHub (`gh run list -w test.yml -L 3`).
 - A change to `tools/configure_strata_q3.py` comes with a unit test in `tests/` that fails without the change.
 - `scripts/check-drift.sh` still reports `no drift`, or the drift is the intended change and the repository copy
   changes in the same commit.

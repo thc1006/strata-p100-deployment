@@ -36,6 +36,7 @@ All numbers come from this machine. The [deployment record](docs/deployment-reco
 | `results/` | Raw test results ([index](results/README.md)) |
 | `examples/requests/` | Example API requests |
 | `docs/` | Documentation, listed below |
+| `.github/workflows/` | CI: `test.yml` runs `scripts/test.sh --repo-only` |
 
 ## Install and use
 
@@ -67,7 +68,7 @@ sudo systemctl restart strata-q3   # the service is ready after about 7–9 minu
 ## Changing this repository
 
 1. Change the repository first, then apply the change to the machine. For Strata settings, follow [Changing the configuration](docs/runbooks/change-config.md). For system files, use `scripts/install-system-files.sh`.
-2. Commit only after `scripts/test.sh` and `scripts/check-drift.sh` both pass, and add an entry to `CHANGELOG.md`.
+2. Commit only after `scripts/test.sh` and `scripts/check-drift.sh` both pass, and add an entry to `CHANGELOG.md`. After a push, the `test` workflow on GitHub has to pass as well.
 3. Record each important decision in `docs/decisions/` (template: [adr-template.md](docs/decisions/adr-template.md)).
 4. Keep the checkout at `~/dev/p100-q3-deployment`. `strata-q3.service` calls the scripts in `scripts/` by absolute path.
 

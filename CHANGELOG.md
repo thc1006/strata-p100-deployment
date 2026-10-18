@@ -6,6 +6,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Added
 
+- CI: `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, in Canonical's Ubuntu Base 22.04.5.
 - `scripts/install-system-files.sh`, `scripts/test.sh`, `bench/build-engine.sh`.
 - Decision records: 0001, operations repository separate from Strata; 0002, directory structure.
 - `results/README.md`: an index of the test results.
@@ -17,6 +18,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Changed
 
+- `scripts/test.sh --repo-only` skips the programs outside the repository, which exist only on this machine. `test.sh` now exits with 2 on an unknown argument, fails when `systemd-analyze` is missing or fails (it passed before), and no longer needs `bc`. `CONTRIBUTING.md` now asks contributors to run `--repo-only`.
 - Upstream PR #2918: the commit was amended to `25f40ed`, with the same engine code. Its test now counts the row hints, so it fails when the check is removed. The description is shorter and links to the raw results (`docs/upstream/pr-2918.md`); a comment on the PR says what changed (`docs/upstream/pr-2918-comment.md`).
 - The directories were reorganized by purpose ([decision 0002](docs/decisions/0002-repository-layout.md)). ExecStartPre and ExecStartPost in `strata-q3.service` now use paths under `scripts/`. After reinstalling, one restart verified the change: preflight and wait-ready both worked normally.
 - The deployment record keeps only the basis for each setting, the measurements and the limitations. The operating steps moved to `docs/runbooks/`, and the list of system changes moved to `docs/reference/`.

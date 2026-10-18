@@ -67,6 +67,8 @@ class Screen(unittest.TestCase):
         self.assertEqual(sorted(r["size"] for r in a if r["phase"] == "prefill"), [1200, 4000, 16000])
         adm = [r for r in a if r["phase"] == "admit"]
         for r in adm:
+            self.assertTrue(r["valid"], r)                    # every decoder decoding before and during the read
+            self.assertTrue(all(b < 0 for b in r["decoders_first_token_vs_join_s"]))
             self.assertIsNotNone(r["joiner_ttft_s"])
             self.assertGreaterEqual(r["longest_gap_s"], 0)
             self.assertGreater(r["makespan_s"], 0)
@@ -75,12 +77,21 @@ class Screen(unittest.TestCase):
         self.assertEqual(rc, 0)
         sha = lambda rs: [(r["phase"], r.get("text_sha") or r.get("first_sha")) for r in rs]   # noqa: E731
         self.assertEqual(sha(a), sha(b))
+        self.assertEqual({r["corpus_sha"] for r in a + b}, {ES.sha(TEXT)})
 
     def test_a_cut_off_reply_is_a_failure(self):
         url = self.server({"FAKE_FAIL": "2"})
         rc, recs = self.screen(url, "c", ["--phases", "prefill"])
         self.assertEqual(rc, 1)
         self.assertEqual(sum(1 for r in recs if r.get("error")), 1)
+
+    def test_an_admission_round_with_a_decoder_not_yet_decoding_is_invalid(self):
+        # the joiner sent before any decoder's first token (no delay): the round is marked, not measured
+        url = self.server()
+        out = self.dir / "screen.jsonl"
+        ES.main(["--url", url, "--tag", "z", "--json", str(out), "--n", "1", "--admit-delay", "0", "--phases", "admit"])
+        recs = [json.loads(l) for l in out.read_text().splitlines()]
+        self.assertTrue(recs and all(r["valid"] is False and r["invalid_reason"] for r in recs), recs)
 
     def test_the_warm_up(self):
         url = self.server()

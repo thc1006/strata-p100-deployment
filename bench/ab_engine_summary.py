@@ -5,14 +5,19 @@ run measured what it says, the numbers per arm, and the answers request by reque
   python3 -B bench/ab_engine_summary.py --baseline C0 c0-1 c1-1 c0-2 > results/SCREEN-group-sort.md
 
 Per run (<tag>-arm.txt, <tag>-after.txt, the tag's lines in engine-screen.jsonl): the arm check passed, the same
-engine answered at the end, the service counted exactly the requests the warm-up and the screen sent (more: another
-client's requests were measured), the screen exited 0, no record failed, no error line in the test unit's journal or
-the kernel log.  A run that fails any of these is listed and left out of the numbers.
+engine answered at the end, the service counted, once it served nothing, exactly the requests the warm-up and the
+screen sent (more: another client's requests were measured), the screen exited 0, no record failed, no error line in
+the engine's log after the warm-up, in the test unit's journal or in the kernel log, and both logs were read.  A run
+that fails any of these is listed and left out of the numbers.  All runs must have cut their prompts from the same
+corpus.  An admission round counts only if it ran as designed (every decoder decoding before and while the joiner
+was read); the report gives each run's invalid rounds.
 Numbers per arm: each run's median of a metric's records, then the arms' means of those; the change of each other arm
 against the --baseline arm, of its mean and of each run; the baseline's own runs' spread (the first and the last run
-of the baseline bracket the others: their difference is the drift and the noise a change has to clear).
-Answers: every request's answer sha256 across the runs: within an arm (does the engine repeat itself) and against the
-baseline (does the arm keep its arithmetic).
+of the baseline bracket the others: their difference is the drift and the noise a change has to clear), and a change
+no larger than that spread is marked "within the baseline's spread".
+Answers: every request's answer sha256 across the runs: within an arm (does the engine repeat itself; "n/a" for an
+arm with one run), and against the baseline, counted only on requests where all the baseline's runs agree (a request
+the baseline itself answers in more than one way is counted apart).
 Exit status: 0 the runs are usable, 2 a run is not (the report says which).  The screen decides nothing on its own:
 a candidate goes on to the ABBA confirmation, whose criteria are fixed before it runs.
 """
@@ -34,10 +39,15 @@ METRICS = [
     ("ttft16000", "16K prompt alone: TTFT s", False, lambda r: r.get("ttft_s") if r["phase"] == "prefill" and r["size"] == 16000 else None),
     ("decode1", "1 user: engine decode tok/s", True, lambda r: r.get("engine_decode_tok_s") if r["phase"] == "decode" else None),
     ("four", "4 users: total tok/s", True, lambda r: r.get("total_tok_s") if r["phase"] == "four" else None),
-    ("join_ttft", "16K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if r["phase"] == "admit" else None),
-    ("join_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if r["phase"] == "admit" else None),
-    ("join_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if r["phase"] == "admit" else None),
+    ("join_ttft", "16K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if admit_ok(r) else None),
+    ("join_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if admit_ok(r) else None),
+    ("join_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if admit_ok(r) else None),
 ]
+
+
+def admit_ok(r: dict) -> bool:
+    """An admission round that ran as designed."""
+    return r["phase"] == "admit" and r.get("valid") is True
 
 
 def grep(text: str, pattern: str):
@@ -52,12 +62,16 @@ def run_info(results: Path, tag: str) -> dict:
     b = after.read_text() if after.exists() else ""
     journal = b.split("--- the test unit's journal lines", 1)[-1].split("--- kernel lines", 1)[0] if b else ""
     kernel = b.split("--- kernel lines", 1)[-1] if "--- kernel lines" in b else ""
+    j_lines = [l for l in journal.splitlines() if l.strip()]
+    k_lines = [l for l in kernel.splitlines() if l.strip()]
     return {"arm": grep(a, r"^tag \S+\s+arm (\S+)"), "at": grep(a, r"^tag \S+\s+arm \S+\s+at (\S+ \S+)"),
             "check": grep(a, r"^arm check: (.*)$"), "exe": grep(a, r"^engine pid \S+ exe \S+ sha256 (\w+)"),
             "screen_exit": grep(b, r"engine_screen exit (\d+)"), "same": grep(b, r"^same engine as before: (\w+)"),
             "counted": grep(b, r"^requests counted by /metrics: (\S+)"), "sent": grep(b, r"\bsent: (\d+)"),
-            "journal_lines": [l for l in journal.splitlines() if l.strip()],
-            "kernel_lines": [l for l in kernel.splitlines() if l.strip()], "has_arm": bool(a), "has_after": bool(b)}
+            "idle_end": grep(b, r"^idle before the count: (\w+)"), "engine_errors": grep(b, r"^engine log error lines: (\S+)"),
+            "journal_unreadable": j_lines == ["unreadable"], "kernel_unreadable": k_lines == ["unreadable"],
+            "journal_lines": [] if j_lines == ["unreadable"] else j_lines,
+            "kernel_lines": [] if k_lines == ["unreadable"] else k_lines, "has_arm": bool(a), "has_after": bool(b)}
 
 
 def problems(i: dict, recs: list) -> list:
@@ -70,8 +84,16 @@ def problems(i: dict, recs: list) -> list:
         out.append("the engine restarted")
     if i["screen_exit"] != "0":
         out.append(f"engine_screen exited {i['screen_exit']}")
+    if i["idle_end"] != "yes":
+        out.append("the unit was still serving when the requests were counted")
     if i["counted"] != i["sent"]:
         out.append(f"/metrics counted {i['counted']} requests, the run sent {i['sent']}")
+    if i["engine_errors"] != "0":
+        out.append(f"{i['engine_errors']} engine error lines after the warm-up")
+    if i["journal_unreadable"]:
+        out.append("journal unreadable")
+    if i["kernel_unreadable"]:
+        out.append("kernel log unreadable")
     if i["journal_lines"]:
         out.append(f"{len(i['journal_lines'])} journal lines")
     if i["kernel_lines"]:
@@ -130,7 +152,15 @@ def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
     if baseline not in arms:
         return 2, o + ["", f"Cannot be evaluated: no usable run of the baseline arm {baseline}."]
     exes = {info[t]["exe"] for t in usable}
-    o += ["", f"Engines: {', '.join(sorted(x or '?' for x in exes))}.", "",
+    corpora = {r.get("corpus_sha") for t in usable for r in recs[t]}
+    if len(corpora) != 1 or None in corpora:
+        return 2, o + ["", f"Cannot be evaluated: the usable runs cut their prompts from different corpora ({sorted(map(str, corpora))})."]
+    invalid = {t: sum(1 for r in recs[t] if r["phase"] == "admit" and r.get("valid") is not True) for t in usable}
+    cached = {t: [r.get("second_cached") for r in recs[t] if r["phase"] == "turns"] for t in usable}
+    o += ["", f"Engines: {', '.join(sorted(x or '?' for x in exes))}.  Corpus {corpora.pop()}.",
+          "Admission rounds not as designed (left out of the admission numbers): "
+          + ", ".join(f"{t} {n}" for t, n in invalid.items()) + ".",
+          "Second turns' cached prompt tokens: " + "; ".join(f"{t} {c}" for t, c in cached.items()) + ".", "",
           "## Numbers", "", "Each cell: the arm's mean of its runs' medians (each run's median in brackets); the change "
           "against the baseline's mean, with each run's change in brackets.", "",
           "| metric | " + " | ".join(arms) + " |", "|---|" + "---:|" * len(arms)]
@@ -146,6 +176,7 @@ def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
             per[a] = meds
         base = [m for m in per[baseline] if m is not None]
         bmean = statistics.fmean(base) if base else None
+        bspread = (max(base) - min(base)) / bmean if len(base) > 1 and bmean else None
         cells = []
         for a in arms:
             ms = [m for m in per[a] if m is not None]
@@ -159,7 +190,9 @@ def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
                 cells.append(f"{mean:.2f} ({each}){spread}")
             else:
                 ch = ", ".join(f"{(m - bmean) / bmean:+.1%}" for m in ms)
-                cells.append(f"{mean:.2f} ({each}): {(mean - bmean) / bmean:+.1%} ({ch})")
+                within = (" within the baseline's spread" if bspread is not None and abs(mean - bmean) / bmean <= bspread
+                          else "")
+                cells.append(f"{mean:.2f} ({each}): {(mean - bmean) / bmean:+.1%} ({ch}){within}")
         o.append(f"| {lab} ({'higher' if higher else 'lower'} is better) | " + " | ".join(cells) + " |")
     # answers, request by request
     o += ["", "## Answers", ""]
@@ -169,14 +202,20 @@ def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
             for lb, h in label(r):
                 by_label.setdefault(lb, {})[t] = h
     base_runs = [t for t in usable if info[t]["arm"] == baseline]
+    # requests every baseline run answered, and answered the same way
+    agreed = {lb: hs[base_runs[0]] for lb, hs in by_label.items()
+              if base_runs and all(t in hs for t in base_runs) and len({hs[t] for t in base_runs}) == 1}
     for a in arms:
         runs = [t for t in usable if info[t]["arm"] == a]
-        within = sum(1 for lb, hs in by_label.items() if len({hs.get(t) for t in runs if t in hs}) > 1)
-        line = f"- {a}: {len(by_label)} requests; differ between its own runs: {within}"
+        if len(runs) > 1:
+            within = sum(1 for lb, hs in by_label.items() if len({hs.get(t) for t in runs if t in hs}) > 1)
+            line = f"- {a}: {len(by_label)} requests; differ between its own {len(runs)} runs: {within}"
+        else:
+            line = f"- {a}: {len(by_label)} requests; differ between its own runs: n/a (one run)"
         if a != baseline and base_runs:
-            ref = base_runs[0]
-            vs = sum(1 for lb, hs in by_label.items() if ref in hs and any(t in hs and hs[t] != hs[ref] for t in runs))
-            line += f"; differ from {ref} ({baseline}): {vs}"
+            vs = sum(1 for lb, ref in agreed.items() if any(t in by_label[lb] and by_label[lb][t] != ref for t in runs))
+            line += (f"; differ from the baseline on {vs} of the {len(agreed)} requests all its runs answer alike"
+                     f" ({len(by_label) - len(agreed)} it answers in more than one way)")
         o.append(line)
     if status:
         o += ["", "Not every run is usable: the numbers above use only the usable ones."]

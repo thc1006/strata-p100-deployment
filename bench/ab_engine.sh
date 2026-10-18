@@ -5,22 +5,30 @@
 # ARMS.json: {"tree": "<Strata tree>", "settle_s": 300, "screen_n": 3,
 #             "arms": {"C0": {"config": "<config.json in the tree>", "env": {"STRATA_X": "0"},
 #                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"]}, ...}}
+# Before anything is stopped: strata-q3 must be active and loaded (one still loading is waited for; a failed or
+# stopped one is someone else's state and is refused), the GPUs must hold no process but its engine, no measurement or
+# evaluation may run (it would share the CPUs), and no command line may make strata-preflight.sh refuse the restart.
+# A systemd timer (strata-ab-rescue) is armed before strata-q3 is stopped and re-armed per phase: if this script dies
+# without restoring the service, the timer stops the test unit and starts strata-q3.
 # Per step: the running service is first given up to 15 minutes to finish what it is serving (/metrics idle; else the
 # step refuses, so no one's reply is cut), then strata-q3 and any earlier test unit are stopped (no engine, :8080
 # free, every GPU under 300 MiB); the arm starts in the unit strata-ab-engine; once the model is loaded and SETTLE
-# seconds have passed, one fixed ~2K-token warm-up prompt is read (some switches say what they took only at their
-# first prompt read: the MMQ plan is made there), and the arm is checked before anything is measured: the engine's
-# environment must hold the arm's "env" values, and its log since its "engine started" line must match every "must"
-# and no "must_not" pattern - a switch that is set but did not take is a run that measured nothing, so the step stops
-# there.  No evaluation may run beside it (it would share the CPUs).  Then:
+# seconds have passed and the unit serves nothing, one fixed ~2K-token warm-up prompt is read, and the arm is checked
+# before anything is measured: the engine's environment must hold the arm's "env" values, and its log since its
+# "engine started" line must match every "must" and no "must_not" pattern - a switch that is set but did not take is a
+# run that measured nothing, so the step stops there.  (A start-up line shows what a switch planned, not that a
+# kernel path ran: a switch that changes no answer and no speed needs its own proof that it ran.)  Then:
 #   results/<tag>-arm.txt     the tree's commit and diff, the config's sha256, the engine's exe sha256, args,
 #                             environment, VmLck, start-up lines, /health, /metrics' count, ARC, MemAvailable, VRAM
 #   results/engine-screen.jsonl   bench/engine_screen.py's records, tagged
-#   results/<tag>-after.txt   whether the same engine answered, the screen's exit status, the engine's error lines,
-#                             the test unit's journal lines (sudo) and the kernel's (Xid, OOM) during the step
+#   results/<tag>-after.txt   whether the same engine answered, the screen's exit status, the requests counted once
+#                             the unit served nothing, the engine's error lines after the warm-up, the test unit's
+#                             journal lines and the kernel's (Xid, OOM) during the step ("unreadable" if not read)
 #   results/<tag>-engine-lines.txt   the engine's per-request lines (prompt and decode rates, loans, reads)
-# At the end - also after a failure or an interrupt - the test unit is stopped and strata-q3 started again and
-# waited for.  Every name of this host is written as <host>.  Needs sudo -n (systemd-run, systemctl, journalctl).
+# At the end - also after a failure or an interrupt, and ignoring further signals until it is done - the test unit is
+# stopped (after up to a minute for a reply it serves) and strata-q3 started again and waited for; if something
+# still holds a GPU or makes the preflight refuse, the start is tried anyway and the reason printed.  Every name of
+# this host is written as <host>.  Needs sudo -n (systemd-run, systemctl, journalctl).
 set -u -o pipefail
 SPEC=${1:?ARMS.json}; shift
 [ $# -ge 1 ] || { echo "usage: bench/ab_engine.sh ARMS.json TAG:ARM ..." >&2; exit 2; }
@@ -35,7 +43,6 @@ UNIT=strata-ab-engine
 PORT=${AB_ENGINE_PORT:-8080}                         # the service's port (other clients keep it); tests use another
 URL=http://127.0.0.1:$PORT
 say() { echo "[$(date +%T)] ab_engine: $*"; }
-TMP=$(mktemp -d)
 
 # every name of this host and the first label of each, longest first, in any case (as bench/ab_model_run.sh)
 names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
@@ -54,11 +61,16 @@ tree = s["tree"]
 if what == ["check"]:
     assert os.path.isfile(os.path.join(tree, "engine-cuda12", "strata")), f"no engine in {tree}"
     assert os.path.isfile(os.path.join(tree, "serve", "server.py")), f"no server.py in {tree}"
+    rest = {}
     for name, a in s["arms"].items():
         c = json.load(open(os.path.join(tree, a["config"])))
         assert c["exe"] == os.path.join(tree, "engine-cuda12", "strata"), f"{name}: the config's exe is not the tree's"
         for k, v in a.get("env", {}).items():
             assert str((c.get("env") or {}).get(k)) == str(v), f"{name}: the config's env {k} is not {v}"
+        env = {k: v for k, v in (c.get("env") or {}).items() if k not in a.get("env", {})}
+        rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env")}, "env": env},
+                                sort_keys=True)
+    assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log and the arms' env keys"
     print("ok")
 elif what[0] == "tree":
     print(tree)
@@ -77,8 +89,11 @@ EOF
 }
 ok=$(spec check) && [ "$ok" = ok ] || { say "refusing: the arms file does not check out: $ok"; exit 2; }
 TREE=$(spec tree); SETTLE=$(spec num settle_s); N=$(spec num screen_n)
+seen=" "
 for step in "$@"; do
   tag=${step%%:*}; arm=${step#*:}
+  case "$seen" in *" $tag "*) say "refusing: the tag $tag is given twice"; exit 2 ;; esac
+  seen="$seen$tag "
   spec arm "$arm" config > /dev/null 2>&1 || { say "refusing: no arm $arm in $SPEC"; exit 2; }
   for f in arm.txt after.txt engine-lines.txt; do
     [ -e "$R/$tag-$f" ] && { say "refusing: $R/$tag-$f exists (pick a new tag)"; exit 2; }
@@ -121,6 +136,7 @@ engine_pid() { local m; m=$(systemctl show -p MainPID --value "$1"); [[ "$m" =~ 
 # the service down after this script.  (Test hook: AB_ENGINE_PREFLIGHT_RE replaces the pattern.)
 PREFLIGHT_RE=${AB_ENGINE_PREFLIGHT_RE:-[e]ngine-cuda12/strata --serve}
 STRAY_WAIT_S=${AB_ENGINE_STRAY_WAIT_S:-300}
+FREE_WAIT_S=${AB_ENGINE_FREE_WAIT_S:-180}             # how long a stop may take to free the engine, :8080 and the GPUs
 strays() {        # every process the preflight would take for a second engine, but $1 (the service's own engine)
   local p
   for p in $(pgrep -f -- "$PREFLIGHT_RE"); do
@@ -128,12 +144,16 @@ strays() {        # every process the preflight would take for a second engine, 
     echo "  $p $(tr '\0' ' ' < "/proc/$p/cmdline" 2>/dev/null | cut -c1-160)"
   done
 }
-wait_idle() {     # up to IDLE_WAIT_S for the service to serve nothing; 1 when it does not get there
-  for _ in $(seq 1 $(( (IDLE_WAIT_S + 9) / 10 ))); do
+wait_idle() {     # up to $1 (default IDLE_WAIT_S) seconds for the service to serve nothing; 1 when it does not get there
+  for _ in $(seq 1 $(( (${1:-$IDLE_WAIT_S} + 9) / 10 ))); do
     curl -fsS -m 10 "$URL/metrics" 2>/dev/null | python3 -c 'import json,sys
 l = json.load(sys.stdin)["live"]
 sys.exit(0 if l.get("state") == "idle" and not l.get("running") and not l.get("queued") else 1)' && return 0
-    curl -fsS -m 5 "$URL/health" > /dev/null 2>&1 || return 0          # nothing answers: nothing to wait for
+    # nothing answers: idle only when neither unit runs (a server that is still loading does not listen yet)
+    if ! curl -fsS -m 5 "$URL/health" > /dev/null 2>&1 && ! systemctl is-active -q strata-q3.service &&
+       ! systemctl is-active -q "$UNIT"; then
+      return 0
+    fi
     sleep 10
   done
   return 1
@@ -141,15 +161,25 @@ sys.exit(0 if l.get("state") == "idle" and not l.get("running") and not l.get("q
 stop_all() {
   sudo -n systemctl stop "$UNIT" 2>/dev/null
   sudo -n systemctl stop strata-q3.service
-  for _ in $(seq 1 90); do
-    local busy; busy=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits | awk '$1 > 300' | wc -l)
+  for _ in $(seq 1 $(( (FREE_WAIT_S + 1) / 2 ))); do
+    local used; used=$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null)
+    # four numeric lines, each under 300 MiB: anything else (no answer, an error text) is not free
     if ! pgrep -f "$ENGINE_RE" > /dev/null && ! ss -ltn "( sport = :$PORT )" | grep -q LISTEN &&
-       [ "$busy" -eq 0 ]; then
+       [ "$(grep -c -E '^ *[0-9]+ *$' <<< "$used")" -eq 4 ] && [ "$(awk '$1 > 300' <<< "$used" | wc -l)" -eq 0 ]; then
       return 0
     fi
     sleep 2
   done
-  say "not free after 180 s"; return 1
+  say "not free after $FREE_WAIT_S s: engine $(pgrep -f "$ENGINE_RE" | tr '\n' ' ')  :$PORT $(ss -ltnH "( sport = :$PORT )" | wc -l) listener(s)  GPU MiB used: $(tr '\n' ' ' <<< "$used")"
+  return 1
+}
+# the rescue: a timer that stops the test unit and starts strata-q3 if this script is gone by then (re-armed per
+# phase with that phase's longest time; stopped once strata-q3 is started).  (Test hook: AB_ENGINE_RESCUE_S.)
+rescue() {
+  sudo -n systemctl stop strata-ab-rescue.timer 2>/dev/null
+  sudo -n systemd-run --unit=strata-ab-rescue --collect --on-active="${AB_ENGINE_RESCUE_S:-$1}" \
+    --timer-property=AccuracySec=5s /bin/sh -c "systemctl stop $UNIT; systemctl start strata-q3.service" > /dev/null ||
+    { say "cannot arm the rescue timer"; return 1; }
 }
 wait_loaded() {   # $1 unit: until /health says loaded (at most 30 min), or the unit stops
   for i in $(seq 1 900); do
@@ -161,23 +191,46 @@ wait_loaded() {   # $1 unit: until /health says loaded (at most 30 min), or the 
 }
 finish() {
   rc=$?
-  trap - EXIT INT TERM HUP
+  trap '' INT TERM HUP            # a second signal must not stop the restore halfway (it would leave the service down)
+  trap - EXIT
+  [ -n "$child" ] && kill "$child" 2>/dev/null
   rm -rf "$TMP"
   say "finishing (exit $rc): stopping the test unit, starting strata-q3"
+  if systemctl is-active -q "$UNIT"; then
+    wait_idle 60 || say "the test unit is still serving a reply after 60 s; stopping it"
+  fi
   sudo -n systemctl stop "$UNIT" 2>/dev/null
   if ! systemctl is-active -q strata-q3.service; then
-    if stop_all; then
-      for _ in $(seq 1 $(( (STRAY_WAIT_S + 4) / 5 ))); do [ -z "$(strays)" ] && break; sleep 5; done
-      odd=$(strays)
-      [ -z "$odd" ] || { say "strata-preflight.sh will refuse to start strata-q3 while these run; stop them, then: sudo systemctl start strata-q3.service"; echo "$odd"; }
-      sudo -n systemctl start strata-q3.service && wait_loaded strata-q3.service
-    fi
+    stop_all || say "ERROR: not everything is free (above); starting strata-q3 anyway (its preflight refuses a second engine, and a failed start is retried by the rescue timer and the watchdog)"
+    for _ in $(seq 1 $(( (STRAY_WAIT_S + 4) / 5 ))); do [ -z "$(strays)" ] && break; sleep 5; done
+    odd=$(strays)
+    [ -z "$odd" ] || { say "strata-preflight.sh will refuse to start strata-q3 while these run; stop them, then: sudo systemctl start strata-q3.service"; echo "$odd"; }
+    sudo -n systemctl start strata-q3.service && wait_loaded strata-q3.service
+  fi
+  if systemctl is-active -q strata-q3.service; then
+    sudo -n systemctl stop strata-ab-rescue.timer 2>/dev/null
+  else
+    say "ERROR: strata-q3 is not running; the rescue timer stays armed and tries again"
   fi
   say "strata-q3: $(systemctl is-active strata-q3.service)"
   exit $rc
 }
-odd=$(strays "$(engine_pid strata-q3.service)")
+state=$(systemctl is-active strata-q3.service)
+case "$state" in
+  active) ;;
+  activating) say "strata-q3 is starting: waiting for it"; wait_loaded strata-q3.service || { say "refusing: strata-q3 did not come up"; exit 1; } ;;
+  *) say "refusing: strata-q3 is $state (someone else's state: not touched)"; exit 1 ;;
+esac
+curl -fsS -m 10 "$URL/health" 2>/dev/null | grep -q '"loaded": *true' || { say "refusing: strata-q3 is active but not loaded"; exit 1; }
+prod=$(engine_pid strata-q3.service)
+[ -n "$prod" ] || { say "refusing: no engine under strata-q3"; exit 1; }
+odd=$(strays "$prod")
 [ -z "$odd" ] || { say "refusing: strata-preflight.sh would not start strata-q3 again while these run (it takes any command line with 'engine-cuda12/strata --serve' for a second engine):"; echo "$odd"; exit 1; }
+apps=$(nvidia-smi --query-compute-apps=pid --format=csv,noheader,nounits 2>/dev/null) ||
+  { say "refusing: nvidia-smi cannot list the GPU processes"; exit 1; }
+others=$(grep -v -x -e "$prod" -e '' <<< "$apps" | tr '\n' ' ')
+[ -z "$others" ] || { say "refusing: other processes use the GPUs (they would keep the cards from being free): $others"; exit 1; }
+TMP=$(mktemp -d)
 # a long wait (the settle, the screen) runs in the background and is waited for: a trapped signal ends `wait` at once,
 # while a foreground command would first run to its end
 child=""
@@ -190,7 +243,9 @@ for step in "$@"; do
   LOG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["log"])' "$CFG")
   say "=== $tag ($arm: $CFG)"
   wait_idle || { say "refusing: the service has been busy for $IDLE_WAIT_S s (someone's request is still running)"; exit 1; }
+  rescue 45min || exit 1                    # the stop, the load (at most 30 min) and the settle
   stop_all || exit 1
+  systemctl is-active -q strata-q3.service && { say "strata-q3 is running again (someone started it): stopping here"; exit 1; }
   cur=$(sudo -n journalctl -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p')
   [ -n "$cur" ] || { say "cannot read the journal's cursor"; exit 1; }
   OFF=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
@@ -204,12 +259,18 @@ for step in "$@"; do
   loaded_at=$(date +%s)
   say "settling $SETTLE s"
   sleep "$SETTLE" & child=$!; wait "$child"; child=""
+  rescue 60min || exit 1                    # the warm-up and the screen
   pid=$(engine_pid "$UNIT")
   [ -n "$pid" ] || { say "no engine under $UNIT"; exit 1; }
   ticks0=$(awk '{print $22}' "/proc/$pid/stat")
+  # another client on the port is served by the test unit: wait until it serves nothing, then count from there
+  wait_idle || { say "the test unit has been busy for $IDLE_WAIT_S s (another client's request)"; exit 1; }
   total0=$(curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json,sys; print(json.load(sys.stdin)["totals"]["requests"])') ||
     { say "no /metrics"; exit 1; }
-  python3 "$D/bench/engine_screen.py" --url "$URL" "${SCREEN_ARGS[@]}" --warm-up > "$TMP/warm" 2>&1 || { say "the warm-up read failed: $(tail -1 "$TMP/warm")"; exit 1; }
+  python3 "$D/bench/engine_screen.py" --url "$URL" "${SCREEN_ARGS[@]}" --warm-up > "$TMP/warm" 2>&1 & child=$!
+  wait "$child" || { say "the warm-up read failed: $(tail -1 "$TMP/warm")"; exit 1; }
+  child=""
+  OFF2=$(stat -c %s "$LOG" 2>/dev/null || echo 0)       # the engine's own error lines count from here
   # the engine's lines from its last "engine started" line to now: its start-up and the warm-up read
   start_lines=$(tail -c +$((OFF + 1)) "$LOG" | awk '/^\[strata\] .*engine started: /{buf=""} {buf = buf $0 "\n"} END{printf "%s", buf}')
   # the arm must be what it says: its environment and its start-up lines
@@ -237,6 +298,8 @@ for step in "$@"; do
     echo "VmLck: $(awk '/VmLck/ {print $2, $3}' /proc/$pid/status)"
     echo "health: $(curl -s -m 5 $URL/health)"
     echo "metrics requests before the warm-up: $total0"
+    echo "warm-up: $(head -c 300 "$TMP/warm")"
+    echo "shared settings: $(f="${CFG%.json}.shared-settings.json"; [ -e "$f" ] && sha256sum < "$f" | cut -c1-16 || echo none)  load average: $(cut -d' ' -f1-3 /proc/loadavg)"
     echo "zfs_arc_max $(cat /sys/module/zfs/parameters/zfs_arc_max)  ARC c_max $(awk '$1=="c_max"{printf "%.0f", $3}' /proc/spl/kstat/zfs/arcstats)  MemAvailable $(awk '/MemAvailable/{print $2}' /proc/meminfo) kB"
     echo "gpu free MiB: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | tr '\n' ' ')"
     echo "arm check: ${bad:-ok}"
@@ -249,26 +312,36 @@ for step in "$@"; do
     > "$R/$tag-screen.txt" 2>&1 &
   child=$!; wait "$child"; src=$?; child=""
   # the requests the warm-up and the screen sent (bench/engine_screen.py: 4 n + 20, plus the warm-up), against what
-  # the service counted: more means other clients' requests were in the measurement
+  # the service counted once it serves nothing (a request is counted when it ends): more means other clients' requests
+  # were in the measurement
   sent=$((1 + 4 * N + 20))
+  idle_end=yes; wait_idle || idle_end=NO
   total1=$(curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json,sys; print(json.load(sys.stdin)["totals"]["requests"])' 2>/dev/null)
-  counted=unknown; [[ "${total1:-}" =~ ^[0-9]+$ ]] && counted=$((total1 - total0))
+  counted=unknown; [[ "${total1:-}" =~ ^[0-9]+$ ]] && [ "$idle_end" = yes ] && counted=$((total1 - total0))
   pid2=$(engine_pid "$UNIT")
   same=NO; [ -n "$pid2" ] && [ "$pid2" = "$pid" ] && [ "$(awk '{print $22}' "/proc/$pid2/stat" 2>/dev/null)" = "$ticks0" ] && same=yes
   NOW=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
   {
     echo "tag $tag  ended at $(date '+%F %T')  engine_screen exit $src"
     echo "same engine as before: $same"
+    echo "idle before the count: $idle_end"
     echo "requests counted by /metrics: $counted  sent: $sent"
-    if [ "$NOW" -ge "$OFF" ]; then
-      echo "engine log error lines: $(tail -c +$((OFF + 1)) "$LOG" | grep -a -i -c -E 'error|refused|no progress|watchdog|out of memory|abort|non-?finite|said nothing')"
+    echo "load average: $(cut -d' ' -f1-3 /proc/loadavg)"
+    # after the warm-up; "(upload no error, sync no error)" is the verify line every start prints
+    if [ "$NOW" -ge "$OFF2" ]; then
+      errs=$(tail -c +$((OFF2 + 1)) "$LOG" | grep -a -i -E 'error|refused|no progress|watchdog|out of memory|abort|non-?finite|said nothing' |
+             grep -a -v -F '(upload no error, sync no error)')
+      echo "engine log error lines: $(grep -c . <<< "$errs")"
+      printf '%s\n' "$errs" | grep . | head -20 | sed 's/^/  /'
     else echo "engine log error lines: unknown (the log shrank)"; fi
     echo "--- the test unit's journal lines"
-    sudo -n journalctl -u "$UNIT" --after-cursor "$cur" --no-pager -q 2>/dev/null |
-      grep -a -i -E '\[strata\] [45][0-9]{2}\b|Traceback|ERROR|error:|refused|restart|had stopped|non-?finite|repeated|said nothing|marked busy with no request|cancel=True|Failed with result|Main process exited|code=killed' || true
+    if j=$(sudo -n journalctl -u "$UNIT" --after-cursor "$cur" --no-pager -q 2>/dev/null); then
+      grep -a -i -E '\[strata\] [45][0-9]{2}\b|Traceback|ERROR|error:|refused|restart|had stopped|non-?finite|repeated|said nothing|marked busy with no request|cancel=True|Failed with result|Main process exited|code=killed' <<< "$j" || true
+    else echo "unreadable"; fi
     echo "--- kernel lines"
-    sudo -n journalctl -k --after-cursor "$cur" --no-pager -q 2>/dev/null |
-      grep -a -i -E 'NVRM: Xid|Out of memory|oom-kill|segfault|BUG:|soft lockup|hung_task|blocked for more than' || true
+    if k=$(sudo -n journalctl -k --after-cursor "$cur" --no-pager -q 2>/dev/null); then
+      grep -a -i -E 'NVRM: Xid|Out of memory|oom-kill|segfault|BUG:|soft lockup|hung_task|blocked for more than' <<< "$k" || true
+    else echo "unreadable"; fi
   } | redact > "$R/$tag-after.txt"
   tail -c +$((OFF + 1)) "$LOG" | grep -a -E '^strata serve: (prompt [0-9]+ tokens|lend sizing|  CUDA[0-9] |file tier I/O)|^strata batch|^strata prefill|^strata: prompt MMQ' |
     redact > "$R/$tag-engine-lines.txt"

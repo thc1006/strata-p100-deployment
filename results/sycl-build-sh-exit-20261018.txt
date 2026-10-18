@@ -1,0 +1,29 @@
+# sycl/tools/build.sh of Strata 0.1.45 (477ac13), run on 2026-10-18 to check its exit status.
+# sha256 of the script: a5f95ab736c072b9160d523456454c8689791750cfae91f82f03e2a97374b122
+# This machine has no Intel GPU and no strata-sycl-dev image; /opt/intel/oneapi/setvars.sh does not exist (the
+# script ignores that). cmake 4.4.3 and ninja from the deployed Strata's .venv were on PATH. <work> is a temporary folder.
+
+## 1. Two small CMake projects with one target named strata (Ninja, g++ 11.4), REPO and BUILD_DIR set to each.
+# good/main.cpp: int main() { return 0; }
+# bad/main.cpp:  int main() { return x; }
+$ for kind in good bad; do REPO=<work> BUILD_DIR=<work>/b-$kind bash build.sh strata; echo "### build.sh exit status: $?"; done
+### good build:
+[2/2] Linking CXX executable strata
+BUILD EXIT 0
+errors: 0
+### build.sh exit status: 1
+### bad build:
+FAILED: [code=1] CMakeFiles/strata.dir/main.cpp.o 
+<work>/src-bad/main.cpp:1:21: error: ‘x’ was not declared in this scope
+ninja: build stopped: cannot make progress due to previous errors.
+BUILD EXIT 1
+errors: 1
+main.cpp.o 
+### build.sh exit status: 0
+
+## 2. The SYCL build directory of the PR #2918 worktree (build-sycl: oneAPI DPC++ 2026.1.1, oneMKL 2026.1.0), with
+##    nothing left to build. oneAPI's bin and lib folders were on PATH and LD_LIBRARY_PATH.
+$ bash sycl/tools/build.sh strata; echo "### build.sh exit status: $?"
+BUILD EXIT 0
+errors: 0
+### build.sh exit status: 1

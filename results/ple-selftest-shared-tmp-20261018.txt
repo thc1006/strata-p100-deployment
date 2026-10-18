@@ -1,0 +1,189 @@
+# Two runs of Strata 0.1.45's ple_reader_test --selftest at the same time, 2026-10-18.
+# The test was built for the CPU only from 477ac13's src/kernels/ngram.cpp, src/ngram/ple_reader.cpp,
+# src/platform/direct_file.cpp and src/ngram/ple_reader_test.cpp, with g++ 11.4 -std=c++20 -O2, linked with -pthread.
+# std::filesystem::temp_directory_path() returns $TMPDIR, so TMPDIR stands in for /tmp here. <work> is a temporary folder.
+# The temporary folders were on the root file system: ZFS, OpenZFS 2.2.2 (kernel module 2.2.2-0ubuntu9.4).
+# 'shared': both runs got the same TMPDIR, as two ctest runs on one machine get /tmp. 'control': each got its own.
+# rc 135 is SIGBUS, rc 143 is SIGTERM from reaper.sh (or by hand for the offset 1 run, see the timings below).
+
+## One run alone
+$ /usr/bin/time -f "%e s elapsed" env TMPDIR=<work>/t1 nice -n 19 ./ple_reader_test_477 --selftest
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+13.46 s elapsed
+
+## race.sh
+#!/bin/bash
+# Two --selftest processes of the 0.1.45 ple_reader_test at once, as two ctest runs would start them.
+# shared: both get the same temp directory (TMPDIR, which std::filesystem::temp_directory_path() returns).
+# control: each gets its own directory.
+set -u
+cd "$(dirname "$0")"
+bin=./ple_reader_test_477
+for mode in shared control; do
+  for off in 0 0.3 1 2 4 6; do
+    mkdir -p "r/$mode-$off/a" "r/$mode-$off/b"
+    da=r/$mode-$off/a; db=r/$mode-$off/b; [ $mode = shared ] && db=$da
+    ( TMPDIR=$PWD/$da nice -n 19 $bin --selftest > r/$mode-$off/out_a.txt 2>&1; echo $? > r/$mode-$off/rc_a ) &
+    sleep $off
+    ( TMPDIR=$PWD/$db nice -n 19 $bin --selftest > r/$mode-$off/out_b.txt 2>&1; echo $? > r/$mode-$off/rc_b ) &
+    wait
+    for p in a b; do
+      printf '%-8s offset %-4s %s rc=%-4s %s\n' $mode $off $p "$(cat r/$mode-$off/rc_$p)" "$(grep -m1 -E 'FAIL|cannot|error|differ|Bus|Segm' r/$mode-$off/out_$p.txt | cut -c1-150)"
+    done
+  done
+done
+
+## reaper.sh (started while race.sh ran the offset 2 pair)
+#!/bin/bash
+# Kill a ple_reader_test_477 run that has been alive for more than 180 s (a normal run takes 15-30 s here),
+# after recording its elapsed and CPU time, its threads' wait channels and its open table file.
+set -u
+log="$1"
+while pgrep -f '[r]ace.sh' >/dev/null; do
+  for p in $(pgrep -f '[p]le_reader_test_477 --selftest'); do
+    et=$(ps -o etimes= -p $p 2>/dev/null | tr -d ' '); [ -n "$et" ] || continue
+    if [ "$et" -gt 180 ]; then
+      { echo "$(date +%T) pid $p: $(ps -o etimes=,time=,stat= -p $p) cwd-out=$(readlink /proc/$p/fd/1)";
+        echo "  threads: $(ls /proc/$p/task | wc -l), wchan: $(cat /proc/$p/task/*/wchan 2>/dev/null | sort | uniq -c | tr '\n' ' ')";
+        echo "  fd: $(ls -l /proc/$p/fd 2>/dev/null | grep -o '/[^ ]*gguf.*\|/[^ ]*\.bin.*' | tr '\n' ' ')"; } >> "$log"
+      kill -TERM $p
+    fi
+  done
+  sleep 10
+done
+echo "$(date +%T) race.sh finished" >> "$log"
+
+## The offset 1 run that hung was found by hand: elapsed 764 s, CPU 00:00:01, state SNl, 18 threads all in
+## futex_wait_queue, fd 3 open on <work>/r/shared-1/a/ple_format_selftest.gguf (deleted). It was stopped with SIGTERM.
+
+## Output of race.sh (race_out.txt, from `./race.sh 2>&1 | tee race_out.txt`)
+# The temporary folder is shown as <work>. race.sh cuts its lines at 150 characters, so the shared-4 b line ends
+# inside the folder name; that cut-off name is shown as <work> too. Each "Terminated" line is a run stopped with SIGTERM.
+./race.sh: line 12: 1137776 Bus error               (core dumped) TMPDIR=$PWD/$da nice -n 19 $bin --selftest > r/$mode-$off/out_a.txt 2>&1
+shared   offset 0    a rc=135  
+shared   offset 0    b rc=0    
+./race.sh: line 12: 1139162 Bus error               (core dumped) TMPDIR=$PWD/$da nice -n 19 $bin --selftest > r/$mode-$off/out_a.txt 2>&1
+shared   offset 0.3  a rc=135  
+shared   offset 0.3  b rc=0    
+Terminated
+shared   offset 1    a rc=143  FAIL src477/src/ngram/ple_reader_test.cpp:178: Q5_1: direct: row 908 differs from the format's own dequantizer
+shared   offset 1    b rc=0    
+Terminated
+shared   offset 2    a rc=143  FAIL src477/src/ngram/ple_reader_test.cpp:65: decode: collect failed: PleReader: short read inside the table
+shared   offset 2    b rc=0    
+Terminated
+shared   offset 4    a rc=143  FAIL src477/src/ngram/ple_reader_test.cpp:65: straddle: collect failed: PleReader: short read inside the table
+shared   offset 4    b rc=1    FAIL src477/src/ngram/ple_reader_test.cpp:356: open: DirectFile: cannot open <work>
+shared   offset 6    a rc=0    
+shared   offset 6    b rc=0    
+control  offset 0    a rc=0    
+control  offset 0    b rc=0    
+control  offset 0.3  a rc=0    
+control  offset 0.3  b rc=0    
+control  offset 1    a rc=0    
+control  offset 1    b rc=0    
+control  offset 2    a rc=0    
+control  offset 2    b rc=0    
+control  offset 4    a rc=0    
+control  offset 4    b rc=0    
+control  offset 6    a rc=0    
+control  offset 6    b rc=0    
+
+## reaper.log (the wchan files end without a newline, so the threads' values run together: all of them are futex_wait_queue)
+07:41:36 pid 1146753:     286 00:00:05 SNl cwd-out=<work>/r/shared-2/out_a.txt
+  threads: 18, wchan:       1 futex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queue 
+  fd: <work>/r/shared-2/a/ple_reader_selftest_90.bin (deleted) 
+07:44:39 pid 1151028:     182 00:00:10 SNl cwd-out=<work>/r/shared-4/out_a.txt
+  threads: 17, wchan:       1 futex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queue 
+  fd: <work>/r/shared-4/a/ple_reader_selftest_110.bin (deleted) 
+07:46:41 race.sh finished
+
+## The first three lines and the line count of each run's output
+### control-0 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-0 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-0.3 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-0.3 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-1 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-1 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-2 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-2 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-4 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-4 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-6 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### control-6 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-0 a: rc=135, 0 lines
+### shared-0 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-0.3 a: rc=135, 0 lines
+### shared-0.3 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-1 a: rc=143, 1 lines
+FAIL src477/src/ngram/ple_reader_test.cpp:178: Q5_1: direct: row 908 differs from the format's own dequantizer
+### shared-1 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-2 a: rc=143, 1 lines
+FAIL src477/src/ngram/ple_reader_test.cpp:65: decode: collect failed: PleReader: short read inside the table
+### shared-2 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-4 a: rc=143, 2 lines
+FAIL src477/src/ngram/ple_reader_test.cpp:65: straddle: collect failed: PleReader: short read inside the table
+FAIL src477/src/ngram/ple_reader_test.cpp:65: dedup/edges: collect failed: PleReader: short read inside the table
+### shared-4 b: rc=1, 1913 lines
+FAIL src477/src/ngram/ple_reader_test.cpp:356: open: DirectFile: cannot open <work>/r/shared-4/a/ple_reader_selftest_90.bin
+FAIL src477/src/ngram/ple_reader_test.cpp:71: decode: row 395233 (index 0) differs
+FAIL src477/src/ngram/ple_reader_test.cpp:71: decode: row 361032 (index 0) differs
+### shared-6 a: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK
+### shared-6 b: rc=0, 4 lines
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16: OK
+ple_reader selftest (row_bytes=90): OK

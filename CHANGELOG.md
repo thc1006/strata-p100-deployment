@@ -8,6 +8,8 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 - `bench/run_profile.sh` passes `SERVE_LOAD_NONCE`, when set, to serve_load's `--nonce`: every run then sends the same prompts and decodes the same text. Two runs of one configuration differed by up to 4.8% on 1 client with the default nonce (`results/v441-1-serve_load.json` against `v441-2`), because the 1-client rate follows the drafts the text accepts. `bench/ab_model_run.sh` sets it for decision 0004's A/B.
 
+- Decision 0004's quality criterion, before any quality run: only items both arms completed are compared, and a failed sample is generated again instead of being scored wrong. Multiple choice reads the last answer marker with a lone A-D, with simple-evals' first-match extraction as the sensitivity check (it read "Answer: because ..." as B). Math accepts digit groups and rejects relations. LiveCodeBench code is graded under the official limits, both arms back to back on an idle service. The intervals use t, and the en/zh long-context pairs count as one unit.
+
 ### Fixed
 
 - The IQ3_XXS / IQ3_S A/B tools, after a third adversarial review and before any IQ3_S run (decision 0004 amended):

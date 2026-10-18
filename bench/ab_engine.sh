@@ -24,11 +24,15 @@
 # kernel path ran: a switch that changes no answer and no speed needs its own proof that it ran.)  Then:
 #   results/<tag>-arm.txt     the tree's commit and diff, the config's sha256, the engine's exe sha256, args,
 #                             environment, VmLck, start-up lines, /health, /metrics' count, ARC, MemAvailable, VRAM
-#   results/engine-screen.jsonl   bench/engine_screen.py's records, tagged
+#   results/engine-screen.jsonl   bench/engine_screen.py's records, tagged (ENGINE_SCREEN_PHASES, when set, chooses its
+#                             phases for every step of the call)
 #   results/<tag>-after.txt   whether the same engine answered, the screen's exit status, the requests counted once
 #                             the unit served nothing, the engine's error lines after the warm-up, the test unit's
 #                             journal lines and the kernel's (Xid, OOM) during the step ("unreadable" if not read)
 #   results/<tag>-engine-lines.txt   the engine's per-request lines (prompt and decode rates, loans, reads)
+#   results/<tag>-texts.jsonl   every answer's text (the screen's --texts), to see where two arms' answers part
+#   results/<tag>-gpu.txt     each GPU's SM and memory use once a second during the screen (nvidia-smi dmon, the same
+#                             for every arm), to see which stage is busy in which phase
 # At the end - also after a failure or an interrupt, and ignoring further signals until it is done - the test unit is
 # stopped (after up to a minute for a reply it serves) and strata-q3 started again and waited for; if something
 # still holds a GPU or makes the preflight refuse, the start is tried anyway and the reason printed.  Every name of
@@ -223,6 +227,7 @@ finish() {
   trap '' INT TERM HUP            # a second signal must not stop the restore halfway (it would leave the service down)
   trap - EXIT
   [ -n "$child" ] && kill "$child" 2>/dev/null
+  [ -n "$dmon" ] && kill "$dmon" 2>/dev/null
   rm -rf "$TMP"
   say "finishing (exit $rc): stopping the test unit, starting strata-q3"
   if systemctl is-active -q "$UNIT"; then
@@ -262,7 +267,7 @@ others=$(grep -v -x -e "$prod" -e '' <<< "$apps" | tr '\n' ' ')
 TMP=$(mktemp -d)
 # a long wait (the settle, the screen) runs in the background and is waited for: a trapped signal ends `wait` at once,
 # while a foreground command would first run to its end
-child=""
+child=""; dmon=""
 trap finish EXIT
 trap 'say "interrupted"; [ -n "$child" ] && kill "$child" 2>/dev/null; exit 130' INT TERM HUP
 
@@ -328,6 +333,7 @@ for step in "$@"; do
     echo "health: $(curl -s -m 5 $URL/health)"
     echo "metrics requests before the warm-up: $total0"
     echo "warm-up: $(head -c 300 "$TMP/warm")"
+    echo "screen phases: ${ENGINE_SCREEN_PHASES:-default}"
     echo "shared settings: $(f="${CFG%.json}.shared-settings.json"; [ -e "$f" ] && sha256sum < "$f" | cut -c1-16 || echo none)  load average: $(cut -d' ' -f1-3 /proc/loadavg)"
     echo "beside: $(pgrep -f 'driver2[.]py --endpoint remote' > /dev/null && echo "the remote evaluation, on CPU $(taskset -cp "$(pgrep -f 'driver2[.]py --endpoint remote' | head -1)" 2>/dev/null | sed 's/.*: //')" || echo nothing)"
     echo "beside CPU-s before the screen: $(beside_cpu)"
@@ -339,13 +345,16 @@ for step in "$@"; do
   } | redact > "$R/$tag-arm.txt"
   [ -z "$bad" ] || { say "STOP: $tag is not the arm $arm${bad}"; exit 1; }
   say "measuring $tag"
+  nvidia-smi dmon -s um -d 1 -o T > "$R/$tag-gpu.txt" 2>&1 & dmon=$!
   python3 "$D/bench/engine_screen.py" --url "$URL" "${SCREEN_ARGS[@]}" --tag "$tag" --json "$R/engine-screen.jsonl" --n "$N" \
-    > "$R/$tag-screen.txt" 2>&1 &
+    --texts "$R/$tag-texts.jsonl" > "$R/$tag-screen.txt" 2>&1 &
   child=$!; wait "$child"; src=$?; child=""
-  # the requests the warm-up and the screen sent (bench/engine_screen.py: 4 n + 20, plus the warm-up), against what
-  # the service counted once it serves nothing (a request is counted when it ends): more means other clients' requests
-  # were in the measurement
-  sent=$((1 + 4 * N + 20))
+  kill "$dmon" 2>/dev/null; wait "$dmon" 2>/dev/null; dmon=""
+  # the requests the warm-up and the screen sent (the screen's last line says how many it sent), against what the
+  # service counted once it serves nothing (a request is counted when it ends): more means other clients' requests
+  # were in the measurement; a screen that did not say is "unknown", which no count matches
+  n_screen=$(sed -n 's/^engine_screen: requests sent: \([0-9][0-9]*\)$/\1/p' "$R/$tag-screen.txt" | tail -1)
+  sent=unknown; [ -n "$n_screen" ] && sent=$((1 + n_screen))
   idle_end=yes; wait_idle || idle_end=NO
   total1=$(curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json,sys; print(json.load(sys.stdin)["totals"]["requests"])' 2>/dev/null)
   counted=unknown; [[ "${total1:-}" =~ ^[0-9]+$ ]] && [ "$idle_end" = yes ] && counted=$((total1 - total0))

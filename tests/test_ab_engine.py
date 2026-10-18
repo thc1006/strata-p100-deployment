@@ -17,7 +17,7 @@ class Driver(unittest.TestCase):
                            text=True, timeout=900)
         failed = [line for line in r.stdout.splitlines() if not line.startswith("PASS")]
         self.assertEqual(r.returncode, 0, "\n".join(failed) + r.stderr[-2000:])
-        self.assertGreaterEqual(sum(line.startswith("PASS") for line in r.stdout.splitlines()), 48)
+        self.assertGreaterEqual(sum(line.startswith("PASS") for line in r.stdout.splitlines()), 52)
 
 
 if __name__ == "__main__":

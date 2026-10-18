@@ -1,0 +1,23 @@
+{
+  "tree": "/home/thc1006/dev/strata-0.1.45",
+  "settle_s": 300,
+  "screen_n": 3,
+  "arms": {
+    "K0": {"config": "cfg-gs0.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "0", "STRATA_MMQ_RESIDENT_SORT_NE": "0"},
+           "must": ["session is up \\(engine 0\\.1\\.45\\)"],
+           "must_not": ["prompt MMQ sorts the full expert groups"],
+           "never": ["on a thread of its own"]},
+    "K1": {"config": "cfg-gs1-pc1.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "1", "STRATA_MMQ_RESIDENT_SORT_NE": "0", "STRATA_PIPED_CONCURRENT": "1"},
+           "must": ["session is up \\(engine 0\\.1\\.45\\)",
+                    "strata: prompt MMQ sorts the full expert groups \\(STRATA_MMQ_GROUP_SORT=1\\): [1-9][0-9]* of [0-9]+ layers"],
+           "engaged": ["^strata batch: read [0-9]+ tokens on a thread of its own"],
+           "never": ["STRATA_PIPED_CONCURRENT is off beside"]},
+    "K2": {"config": "cfg-gs1.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "1", "STRATA_MMQ_RESIDENT_SORT_NE": "0"},
+           "must": ["session is up \\(engine 0\\.1\\.45\\)",
+                    "strata: prompt MMQ sorts the full expert groups \\(STRATA_MMQ_GROUP_SORT=1\\): [1-9][0-9]* of [0-9]+ layers"],
+           "never": ["on a thread of its own"]}
+  }
+}

@@ -2,6 +2,8 @@
 a cut-off reply counted as a failure.  No GPU, no service; the corpus is a fixed text of this test."""
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -54,7 +56,7 @@ class Screen(unittest.TestCase):
 
     def screen(self, url, tag, extra=()):
         out = self.dir / "screen.jsonl"
-        rc = ES.main(["--url", url, "--tag", tag, "--json", str(out), "--n", "1", "--admit-delay", "0.2", *extra])
+        rc = ES.main(["--url", url, "--tag", tag, "--json", str(out), "--n", "1", "--admit-delay", "0.8", *extra])
         recs = [json.loads(l) for l in out.read_text().splitlines() if l.strip()] if out.exists() else []
         return rc, [r for r in recs if r["tag"] == tag]
 
@@ -92,6 +94,31 @@ class Screen(unittest.TestCase):
         ES.main(["--url", url, "--tag", "z", "--json", str(out), "--n", "1", "--admit-delay", "0", "--phases", "admit"])
         recs = [json.loads(l) for l in out.read_text().splitlines()]
         self.assertTrue(recs and all(r["valid"] is False and r["invalid_reason"] for r in recs), recs)
+
+    def test_the_opt_in_phases(self):
+        url = self.server()
+        out = self.dir / "screen.jsonl"
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = ES.main(["--url", url, "--tag", "x", "--json", str(out), "--n", "1", "--admit-delay", "0.8",
+                          "--phases", "decode4,eval4,admit28"])
+        self.assertEqual(rc, 0)
+        recs = [json.loads(l) for l in out.read_text().splitlines()]
+        self.assertEqual([r["phase"] for r in recs], ["decode4", "decode4", "eval4", "admit28", "admit28"])
+        for r in recs:
+            self.assertEqual(r["phases"], "decode4,eval4,admit28")
+        for r in recs[:3]:
+            self.assertEqual(len(r["requests"]), 4)
+            self.assertIsNotNone(r["sum_engine_decode_tok_s"])
+        self.assertTrue(all(r["valid"] for r in recs[3:]))
+        self.assertIn("engine_screen: requests sent: 20", buf.getvalue())       # 8 + 4 + 8
+
+    def test_the_default_screen_counts_its_requests(self):
+        url = self.server()
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            ES.main(["--url", url, "--tag", "y", "--json", str(self.dir / "s.jsonl"), "--n", "1", "--admit-delay", "0.8"])
+        self.assertIn("engine_screen: requests sent: 24", buf.getvalue())       # 4 n + 20 with n = 1
 
     def test_the_warm_up(self):
         url = self.server()

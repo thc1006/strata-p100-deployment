@@ -77,3 +77,51 @@ sorts the full expert groups (STRATA_MMQ_GROUP_SORT=1): 48 of 48 layers" at star
 By the criteria above, C1 goes on to the confirmation (embedded in screen 2). The deployment record's admission test
 (section 3.2: 3 decoders, a 16K prompt joining; `results/SUMMARY.md`) gave a 23.2 s TTFT with the decoders stopped
 for the whole read on 0.1.43.1; on 0.1.45 C0 it is 22.5 s with a 22.7 s gap, so the stall is still the whole read.
+
+### Screen 2: C1 again, C2, C3 (2026-10-19 05:36-07:30)
+
+Runs c0-3, c1-2, c2-1, c3-1, c1-3, c0-4, in that order, each a fresh engine start, all usable. The remote evaluation
+ran on CPU 7 at nice 19 during all six (about 1 CPU-second per screen, `results/<tag>-*.txt`). Source:
+`results/SCREEN-sched.md`.
+
+| Metric (0.1.45, deployed configuration) | C0 (c0-3, c0-4) | C1 (c1-2, c1-3) | C2 (c2-1) | C3 (c3-1) |
+|---|---:|---:|---:|---:|
+| 1.2K prompt: engine read tok/s | 205.00 | +18.0% | +9.2% | +0.4% |
+| 4K prompt: engine read tok/s | 390.75 | +10.6% | +10.8% | +0.2% |
+| 16K prompt: engine read tok/s | 694.70 | +8.9% | +0.2% | +0.4% |
+| 1 user: engine decode tok/s | 39.50 | +0.8% | -1.8% | 0.0% |
+| 4 users: total tok/s (prompts' reading included) | 30.63 | +10.2% | +16.0% | -5.2% |
+| 16K joining 3 decoders: the joiner's TTFT s | 22.51 | -8.9% | -0.1% | +11.0% |
+| ... the decoders' longest gap s | 22.69 | -8.8% | -0.1% | -97.8% (0.49 s) |
+| ... the four requests' makespan s | 61.88 | -3.2% | -0.7% | -4.5% |
+
+Each arm showed its switch at work: C1's plan line "48 of 48 layers"; C2's "N tokens in 768-token chunks over 4 stages
+(--prefill-pipe 768: b/a)" for the 1.1K-1.5K prompts (none for 16K: the pipe found no split 3% better there); C3's
+"read 15972 tokens on a thread of its own in 24674 ms (concurrent ...); the slots decoded 516 rows meanwhile" and no
+"is off beside" (`results/<tag>-engine-lines.txt`).
+
+**A race in the screen, not in the switches.** The three admission decoders were sent in the same instant. Which one
+the engine took first (it runs a lone request on the solo path, with MTP drafts, and the others in slots) varied: in
+round 0 of c1-3 and of c0-4 decoder 1 got the solo path, in the other runs decoder 2, and the greedy answers differ
+between the two paths (1,228 / 1,180 tokens against 1,226 / 1,260). C0 and C1 show the same two outcomes, with the
+same texts in each (`results/engine-screen.jsonl`, admission records). From screen 3 on, requests "sent at once" go out
+0.3 s apart, so the order is fixed.
+
+**C1 (`STRATA_MMQ_GROUP_SORT=1`) is confirmed** by the criteria fixed at 05:05: at every prompt size both C1 runs of
+screen 2 read faster than both C0 runs (1.2K: 241.7, 242.0 against 205.8, 204.2; 4K: 431.5, 432.6 against 390.9,
+390.6; 16K: 756.6, 756.5 against 694.3, 695.1), the mean gain over the three sizes is 12.5% (also above the
+maintainer's 10%), its answers equal C0's on all 30 requests C0 answers alike (the 2 others are the race above, in both
+arms), and no other metric is worse. Screen 1 agrees (+17.2 / +10.4 / +8.7%).
+
+**C2 (`--prefill-pipe 768` with the 2048 cap)** passes the screen on the 4K prompts (+10.8%; +9.2% at 1.2K) but does
+nothing for 16K, so its mean over the three sizes, 6.7%, is under its 10% rule as a lone switch. It changes the
+prompts' rounding: 18 of the 30 requests got other answers. Not adopted alone; it may be tried on top of C1.
+
+**C3 (`STRATA_PIPED_CONCURRENT=1`)** removes the stall of the admission test: the decoders' longest gap while a 16K
+prompt is read falls from 22.69 s to 0.49 s, and the four requests finish 4.5% sooner. The joining prompt pays for it:
+its TTFT rises 11.0% (24.99 s), and four prompts sent at once read 5.2% slower in total. While a prompt is read the
+slots compute the experts the read borrowed on the CPU, so answers decoded during a read differ (11 of 30 requests,
+all in the four-user and admission phases). Its own criterion (gap shorter, makespan at most 5% longer) holds; the
+general screen rule (no other metric more than 5% worse) does not, because of the joiner's TTFT. The trade-off is
+the maintainer's to decide.
+

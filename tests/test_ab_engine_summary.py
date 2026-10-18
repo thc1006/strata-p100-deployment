@@ -111,6 +111,20 @@ class Summary(unittest.TestCase):
         self.assertIn("Admission rounds not as designed (left out of the admission numbers): c0-1 0, c1-1 1, c0-2 0.", out)
         self.assertNotIn("99.00", out)                       # the invalid round's TTFT is not in any number
 
+    def test_runs_of_different_screens_are_not_compared(self):
+        def b(r):
+            three(r)
+            lines = (r / "engine-screen.jsonl").read_text().splitlines()
+            out = []
+            for l in lines:
+                x = json.loads(l)
+                x["phases"] = "prefill,decode,four,admit,turns,decode4" if x["tag"] == "c1-1" else "prefill,decode,four,admit,turns"
+                out.append(json.dumps(x))
+            (r / "engine-screen.jsonl").write_text("\n".join(out) + "\n")
+        status, out = run(b)
+        self.assertEqual(status, 2)
+        self.assertIn("different screens", out)
+
     def test_runs_from_different_corpora_are_not_compared(self):
         status, out = run(lambda r: three(r, corpus="other"))
         self.assertEqual(status, 2)

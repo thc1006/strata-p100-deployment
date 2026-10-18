@@ -17,9 +17,23 @@ baseline does.  The phases, in this order, with nothing else in flight:
            joiner got its first token (a decoder still reading its prompt would make the joiner queue behind it)
   turns    a two-turn conversation, twice: the second turn continues the first through the conversation cache, so a
            change to the state the cache keeps shows in its answer
+Opt-in phases (--phases, or ENGINE_SCREEN_PHASES for a run of bench/ab_engine.sh), for what the default ones do not
+show apart:
+  decode4  four users decoding at once from short Traditional Chinese prompts, 1,024 tokens each, twice: the slots'
+           steady decode, with no long prompt read in the measured time (the summed engine decode rate)
+  eval4    four users in the evaluation's mode at once: thinking on (effort high), temperature 1.0, top_p 0.95,
+           top_k 20, a fixed seed per request, 1,536 tokens each, once: sampled decoding of reasoning text, which
+           keeps fewer drafts than greedy decoding
+  admit28  admit with a 28K-token joiner: a heavier read beside the decoders (the slots the read borrows, the
+           decoders' CPU fallback)
+Requests "sent at once" (four users, the admission's decoders, decode4, eval4) go out STAGGER seconds apart: sent in
+the same instant, which one the engine takes first (the solo path, with its MTP drafts) varied from run to run, and a
+greedy answer differs between the solo path and a slot (2026-10-19, c1-3), so the order is fixed.  --texts PATH also
+writes every answer's text there, to find where two arms' answers part.
 One JSON line per request (per admission, per conversation) to --json, each with the tag, the phase, the answer's
-sha256 and the corpus's sha256 (the prompts are cut from it).  Exit status 1 when a request failed (the lines still
-say which).
+sha256, the corpus's sha256 (the prompts are cut from it) and the phases of the screen.  The last line of the
+output is "engine_screen: requests sent: N" (bench/ab_engine.sh counts against it).  Exit status 1 when a request
+failed (the lines still say which).
 Usage: bench/engine_screen.py --tag T --json OUT [--n 3] [--seed engine-screen-1]
        bench/engine_screen.py --warm-up      one fixed ~2K-token prompt (the prefill path, not the short read), 8 out
 """
@@ -28,6 +42,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import threading
 import time
@@ -42,6 +57,30 @@ TRANSLATE = "Translate the following text into Traditional Chinese. Output only 
 ESSAY = "Write a clear, well organised essay of about 900 words on {}. Use plain prose, no lists."
 TOPICS = ["how a mechanical watch keeps time", "the history of lighthouses and their lenses",
           "why bridges are built as arches", "the life of a honey bee colony through one year"]
+DEFAULT_PHASES = "prefill,decode,four,admit,turns"
+ZH_ESSAY = "請用繁體中文寫一篇約一千字的文章，主題是{}。只寫文章本身，不要列點，不要標題。"
+ZH_TOPICS = ["機械錶如何計時", "燈塔與它們的透鏡的歷史", "為什麼橋常建成拱形", "一年之中蜂群的生活",
+             "台灣的梅雨季", "活字印刷如何改變了書", "城市裡的行道樹", "冰箱是怎麼保持低溫的"]
+# the evaluation's thinking-mode sampling (~/dev/p100-q3-eval/driver2.py), every field sent
+SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0,
+            "frequency_penalty": 0.0, "repetition_penalty": 1.0}
+# four questions of the evaluation's kinds, written for this screen (not from a benchmark)
+EVAL_QUESTIONS = [
+    "A train leaves a station at 09:40 and reaches the next city at 13:05, covering 287 km with one 15-minute stop. "
+    "What was its average speed while moving, in km/h? Think it through, then end with a line 'Answer: <number>'.",
+    "Which statement about a ball thrown straight up (no air resistance) is correct?\n\nA) Its acceleration is zero at "
+    "the top.\nB) Its velocity and acceleration both point up on the way up.\nC) Its acceleration is the same at every "
+    "point of the flight.\nD) It takes longer to come down than to go up.\n\nThe last line of your answer must be "
+    "'Answer: X' with X one of A, B, C, D.",
+    "請回答以下單選題，最後一行只寫「答案：X」，X 為 A、B、C、D 其中之一。請先逐步思考再作答。\n\n某公司以 120 萬元購入設備，"
+    "估計耐用年限 5 年、殘值 20 萬元，採直線法提列折舊。第三年底該設備的帳面價值為多少？\n\nA) 60 萬元\nB) 72 萬元\n"
+    "C) 80 萬元\nD) 100 萬元",
+    "一個水池有甲、乙兩個進水管與一個排水管。甲管單獨注滿要 6 小時，乙管單獨注滿要 9 小時，排水管單獨排空滿池要 12 小時。"
+    "三管同時打開，從空池開始幾小時可以注滿？請逐步推理，最後一行只寫「最終答案：」加上數字。"]
+SENT = [0]          # requests this screen sent
+SCREEN = "2026-10-19b"                  # the screen's version (staggered sends); the summary compares only one
+STAGGER = 0.3
+TEXTS: list = []    # (label, text) of every answer when --texts is given
 FOLLOW_UP = "Now list, in one sentence each, the three most important points of your answer."
 
 
@@ -54,10 +93,60 @@ def offset(seed: str, phase: str, i: int, n: int) -> int:
     return int(hashlib.sha256(f"{seed}|{phase}|{i}".encode()).hexdigest(), 16) % n
 
 
-def ask(seed: str, label: str, body: str, max_tokens: int) -> dict:
+def ask(seed: str, label: str, body: str, max_tokens: int, delay: float = 0.0) -> dict:
+    if delay:
+        time.sleep(delay)
+    SENT[0] += 1
     r = SM.chat(f"[nonce {seed}-{label}]\n" + body, max_tokens=max_tokens, nonce=False)
+    TEXTS.append((label, r.get("text", "")))
     return {**SM.brief(r), "text_sha": sha(r.get("text", "")), "chunks": r["chunks"], "sent": r["sent"],
             "done": r["done"]}
+
+
+def ask_sampled(seed: str, label: str, body: str, max_tokens: int, draw_seed: int, effort: str = "high",
+                delay: float = 0.0) -> dict:
+    """One streamed request in the evaluation's mode (stress_matrix.chat is greedy only): the same record."""
+    if delay:
+        time.sleep(delay)
+    SENT[0] += 1
+    req = {"model": "strata", "stream": True, "max_tokens": max_tokens, "reasoning_effort": effort,
+           "reasoning_budget_tokens": 0, "seed": draw_seed, "stream_options": {"include_usage": True},
+           "messages": [{"role": "user", "content": f"[nonce {seed}-{label}]\n" + body}], **SAMPLING}
+    out: dict = {"sent": time.monotonic(), "chunks": [], "content_first": None, "reasoning_chunks": 0, "status": None}
+    text = []
+    try:
+        with SM.urllib.request.urlopen(SM._req("/v1/chat/completions", req), timeout=3600) as r:
+            out["status"] = r.status
+            for raw in r:
+                line = raw.decode(errors="replace").strip()
+                if not line.startswith("data: ") or line == "data: [DONE]":
+                    continue
+                ev = json.loads(line[6:])
+                if ev.get("error"):
+                    out["error"] = json.dumps(ev["error"], ensure_ascii=False)[:400]
+                for ch in ev.get("choices") or []:
+                    d = ch.get("delta") or {}
+                    for k in ("reasoning_content", "content"):
+                        if d.get(k):
+                            out["chunks"].append(time.monotonic())
+                            text.append(d[k])
+                            if k == "reasoning_content":
+                                out["reasoning_chunks"] += 1
+                            elif out["content_first"] is None:
+                                out["content_first"] = out["chunks"][-1]
+                    if ch.get("finish_reason"):
+                        out["finish"] = ch["finish_reason"]
+                out["usage"] = ev.get("usage") or out.get("usage")
+                out["timings"] = ev.get("timings") or out.get("timings")
+    except Exception as e:                                   # noqa: BLE001 - recorded, the record fails
+        out["error"] = f"{type(e).__name__}: {e}"[:400]
+    if out["status"] == 200 and not out.get("error") and (not out.get("finish") or not out.get("usage")):
+        out["error"] = "stream ended without finish_reason/usage (cut off)"
+    out["done"] = time.monotonic()
+    out["text"] = "".join(text)
+    TEXTS.append((label, out["text"]))
+    return {**SM.brief(out), "text_sha": sha(out["text"]), "chunks": out["chunks"], "sent": out["sent"],
+            "done": out["done"]}
 
 
 def lean(r: dict) -> dict:
@@ -86,7 +175,7 @@ def phase_four(seed, text, out):
             off = offset(seed, f"four{rd}", j, len(text))
             bodies.append((f"f{rd}{j}-{off}", TRANSLATE + SM.sized(text, 1500, off)))
         t0 = time.monotonic()
-        rs = SM.parallel([lambda b=b: ask(seed, b[0], b[1], 512) for b in bodies])
+        rs = SM.parallel([lambda b=b, j=j: ask(seed, b[0], b[1], 512, STAGGER * j) for j, b in enumerate(bodies)])
         wall = time.monotonic() - t0
         tokens = sum(SM.streamed_tokens({"usage": {"completion_tokens": r.get("completion_tokens")},
                                          "finish": r.get("finish")}) or 0 for r in rs)
@@ -94,15 +183,38 @@ def phase_four(seed, text, out):
              "requests": [lean(r) for r in rs], "error": next((r.get("error") for r in rs if r.get("error")), None)})
 
 
-def phase_admit(seed, text, out, delay=20.0):
+def phase_concurrent(name, rounds, fns, out):
+    """Requests sent at once per round; the summed engine decode rate (they decode side by side) and the tokens."""
+    for rd in range(rounds):
+        t0 = time.monotonic()
+        rs = SM.parallel(fns(rd))
+        wall = time.monotonic() - t0
+        rates = [r.get("engine_decode_tok_s") for r in rs]
+        out({"phase": name, "round": rd, "wall_s": round(wall, 2),
+             "sum_engine_decode_tok_s": round(sum(rates), 2) if all(isinstance(x, (int, float)) for x in rates) else None,
+             "tokens": sum(r.get("completion_tokens") or 0 for r in rs), "requests": [lean(r) for r in rs],
+             "error": next((r.get("error") for r in rs if r.get("error")), None)})
+
+
+def phase_decode4(seed, out):
+    phase_concurrent("decode4", 2, lambda rd: [lambda j=j: ask(seed, f"z{rd}{j}", ZH_ESSAY.format(ZH_TOPICS[4 * rd + j]), 1024,
+                                                               STAGGER * j) for j in range(4)], out)
+
+
+def phase_eval4(seed, out):
+    phase_concurrent("eval4", 1, lambda rd: [lambda j=j: ask_sampled(seed, f"e{rd}{j}", EVAL_QUESTIONS[j], 1536, 1000 * j + 7,
+                                                                     delay=STAGGER * j) for j in range(4)], out)
+
+
+def phase_admit(seed, text, out, delay=20.0, size=16000, name="admit"):
     for rd in range(2):
         dec = [(f"a{rd}{j}", ESSAY.format(TOPICS[(rd + j) % len(TOPICS)])) for j in range(3)]
-        joff = offset(seed, f"join{rd}", 0, len(text))
-        joiner = (f"j{rd}-{joff}", SM.sized(text, 16000, joff))
+        joff = offset(seed, f"join{rd}" if size == 16000 else f"join{size}-{rd}", 0, len(text))
+        joiner = (f"j{rd}-{joff}" if size == 16000 else f"j{size}-{rd}-{joff}", SM.sized(text, size, joff))
         res: dict = {}
         t0 = time.monotonic()
-        threads = [threading.Thread(target=lambda b=b, j=j: res.__setitem__(j, ask(seed, b[0], b[1], 2048)), daemon=True)
-                   for j, b in enumerate(dec)]
+        threads = [threading.Thread(target=lambda b=b, j=j: res.__setitem__(j, ask(seed, b[0], b[1], 2048, STAGGER * j)),
+                                    daemon=True) for j, b in enumerate(dec)]
         for t in threads:
             t.start()
         time.sleep(delay)
@@ -123,7 +235,7 @@ def phase_admit(seed, text, out, delay=20.0):
         ended = [round(r["chunks"][-1] - first, 2) if r["chunks"] else None for r in rs]
         why = ("a decoder had no token before the joiner was sent" if any(b is None or b >= 0 for b in began) else
                "a decoder stopped before the joiner's first token" if any(e is None or e < 0 for e in ended) else None)
-        out({"phase": "admit", "round": rd, "joiner": lean(jr), "decoders": [lean(r) for r in rs],
+        out({"phase": name, "round": rd, "joiner": lean(jr), "decoders": [lean(r) for r in rs],
              "joiner_ttft_s": jr.get("ttft_s"), "longest_gap_s": round(max(gaps), 2), "decoder_chunks_during": during,
              "makespan_s": round(max([jr["done"]] + [r["done"] for r in rs]) - t0, 2),
              "decoders_first_token_vs_join_s": began, "decoders_last_token_vs_joiner_first_s": ended,
@@ -132,13 +244,16 @@ def phase_admit(seed, text, out, delay=20.0):
 
 
 def phase_turns(seed, text, out):
+    global TEXTS
     for i in range(2):
         off = offset(seed, "turns", i, len(text))
         first = f"[nonce {seed}-t{i}-{off}]\n" + SM.sized(text, 2000, off)
         h = [{"role": "user", "content": first}]
+        SENT[0] += 2
         a = SM.converse([], first, 128)
         a_text = a.get("text", "")
         b = SM.converse(h + [{"role": "assistant", "content": a_text}], FOLLOW_UP, 128)
+        TEXTS += [(f"t{i}-first", a_text), (f"t{i}-second", b.get("text", ""))]
         out({"phase": "turns", "i": i, "first_sha": sha(a_text), "second_sha": sha(b.get("text", "")),
              "second_cached": ((b.get("usage") or {}).get("prompt_tokens_details") or {}).get("cached_tokens"),
              "second_prompt_tokens": (b.get("usage") or {}).get("prompt_tokens"),
@@ -154,9 +269,12 @@ def main(argv=None) -> int:
     ap.add_argument("--json")
     ap.add_argument("--n", type=int, default=3)
     ap.add_argument("--seed", default="engine-screen-1")
-    ap.add_argument("--phases", default="prefill,decode,four,admit,turns")
+    ap.add_argument("--phases", default=os.environ.get("ENGINE_SCREEN_PHASES") or DEFAULT_PHASES)
     ap.add_argument("--admit-delay", type=float, default=20.0, help="seconds between the decoders and the joiner")
+    ap.add_argument("--texts", help="also write every answer's text here (one JSON line per answer)")
     a = ap.parse_args(argv)
+    SENT[0] = 0
+    TEXTS.clear()
     SM.URL = a.url.rstrip("/")
     text = Path(a.corpus).read_text() if a.corpus else SM.docs_corpus()
     corpus_sha = sha(text)
@@ -169,7 +287,8 @@ def main(argv=None) -> int:
     failed = []
 
     def out(rec):
-        rec = {"tag": a.tag, "seed": a.seed, "corpus_sha": corpus_sha, "at": time.strftime("%Y-%m-%d %H:%M:%S"), **rec}
+        rec = {"tag": a.tag, "seed": a.seed, "corpus_sha": corpus_sha, "phases": a.phases, "screen": SCREEN,
+               "at": time.strftime("%Y-%m-%d %H:%M:%S"), **rec}
         if rec.get("error"):
             failed.append(rec["phase"])
         with open(a.json, "a", encoding="utf-8") as f:
@@ -177,10 +296,21 @@ def main(argv=None) -> int:
         print(json.dumps({k: v for k, v in rec.items() if k not in ("requests", "decoders", "joiner")},
                          ensure_ascii=False)[:300], flush=True)
 
+    phases = {"prefill": lambda: phase_prefill(a.seed, text, a.n, out), "decode": lambda: phase_decode(a.seed, text, a.n, out),
+              "four": lambda: phase_four(a.seed, text, out), "admit": lambda: phase_admit(a.seed, text, out, a.admit_delay),
+              "turns": lambda: phase_turns(a.seed, text, out), "decode4": lambda: phase_decode4(a.seed, out),
+              "eval4": lambda: phase_eval4(a.seed, out),
+              "admit28": lambda: phase_admit(a.seed, text, out, a.admit_delay, 28000, "admit28")}
+    unknown = [ph for ph in a.phases.split(",") if ph not in phases]
+    if unknown:
+        ap.error(f"unknown phases: {unknown}")
     for ph in a.phases.split(","):
-        {"prefill": lambda: phase_prefill(a.seed, text, a.n, out), "decode": lambda: phase_decode(a.seed, text, a.n, out),
-         "four": lambda: phase_four(a.seed, text, out), "admit": lambda: phase_admit(a.seed, text, out, a.admit_delay),
-         "turns": lambda: phase_turns(a.seed, text, out)}[ph]()
+        phases[ph]()
+    if a.texts:
+        with open(a.texts, "w", encoding="utf-8") as f:
+            for lb, tx in TEXTS:
+                f.write(json.dumps({"label": lb, "sha": sha(tx), "text": tx}, ensure_ascii=False) + "\n")
+    print(f"engine_screen: requests sent: {SENT[0]}", flush=True)
     if failed:
         print(f"engine_screen: {len(failed)} failed records ({', '.join(sorted(set(failed)))})", file=sys.stderr)
     return 1 if failed else 0

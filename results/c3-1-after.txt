@@ -1,0 +1,9 @@
+tag c3-1  ended at 2026-10-19 06:52:10  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 33  sent: 33
+load average: 3.83 3.02 2.07
+beside CPU-s after the screen: 49
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

@@ -119,6 +119,7 @@ case "$*" in
   *compute-apps*) pgrep -f "^$SB/(tree|prod)/engine-cuda12/strata --serve"; cat "$SB/gpu_other" 2>/dev/null; exit 0 ;;
   *memory.used*) for i in 0 1 2 3; do if [ "$i" = 0 ] && [ -e "$SB/gpu_stuck" ]; then echo 500; else echo $used; fi; done ;;
   *memory.free*) for i in 0 1 2 3; do echo 900; done ;;
+  *dmon*) echo "#Time gpu sm mem"; while :; do for i in 0 1 2 3; do echo "$(date +%T) $i 50 10"; done; sleep 1; done ;;
 esac
 EOF
 printf '#!/bin/bash\ncase "$*" in "") echo testhost-machine ;; -f) echo testhost-machine ;; -A) echo "nbname.netbird.cloud " ;; esac\n' > "$SB/bin/hostname"
@@ -130,7 +131,7 @@ up() { PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service || prod_up;
 drive() {   # drive <name> <arms> <steps...>: the driver in the sandbox, output in $SB/<name>.out
   local name=$1 arms=$2; shift 2
   env PATH="$SB/bin:$PATH" AB_ENGINE_PORT="$PORT" AB_ENGINE_PY=python3 AB_ENGINE_PROD_TREE="$SB/prod" \
-      AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.2 AB_ENGINE_IDLE_WAIT_S=${IDLE:-20} \
+      AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.8 AB_ENGINE_IDLE_WAIT_S=${IDLE:-20} \
       AB_ENGINE_BUSY_UNDER="$SB" AB_ENGINE_PREFLIGHT_RE="^$SB/[^ ]*engine-cuda12/strata --serve" \
       AB_ENGINE_STRAY_WAIT_S=${STRAY_WAIT:-20} AB_ENGINE_FREE_WAIT_S=${FREE_WAIT:-20} \
       ${RESCUE:+AB_ENGINE_RESCUE_S=$RESCUE} bash "$SB/repo/bench/ab_engine.sh" "$arms" "$@" > "$SB/$name.out" 2>&1
@@ -152,6 +153,9 @@ grep -q "prompt MMQ sorts the full expert groups" "$R/c1-1-arm.txt" && pass "C1'
   fail "C1's group-sort line is missing from its record"
 ! grep -q "prompt MMQ sorts the full expert groups" "$R/c0-1-arm.txt" && pass "C0 has no group-sort line" || fail "C0 has a group-sort line"
 grep -q "STRATA_MMQ_GROUP_SORT=1" "$R/c1-1-arm.txt" && pass "C1's engine environment recorded" || fail "C1's environment not recorded"
+[ "$(grep -c '"text"' "$R/c0-1-texts.jsonl" 2>/dev/null)" = 24 ] && pass "every answer's text is recorded" || fail "texts: $(wc -l < "$R/c0-1-texts.jsonl" 2>/dev/null)"
+[ "$(grep -c ' 0 50 10$' "$R/c0-1-gpu.txt" 2>/dev/null)" -ge 1 ] && ! pgrep -f "$SB/bin/nvidia-smi dmon" > /dev/null 2>&1 &&
+  pass "each GPU's use is recorded during the screen, and the recorder is stopped" || fail "no GPU record, or the recorder still runs"
 [ "$(grep -c '"tag": "c0-1"' "$R/engine-screen.jsonl")" -gt 5 ] && pass "c0-1's screen records" || fail "c0-1 has no screen records"
 PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service && pass "strata-q3 runs again at the end" || fail "strata-q3 is not running at the end"
 PATH="$SB/bin:$PATH" systemctl is-active -q strata-ab-engine && fail "the test unit still runs" || pass "the test unit is stopped"
@@ -211,6 +215,7 @@ else
   wait "$wpid"; rc=$?
 fi
 [ "$rc" = 130 ] && pass "an interrupt exits 130" || fail "an interrupt exits $rc: $(tail -2 "$SB/int.out")"
+sleep 1; ! pgrep -f "$SB/bin/nvidia-smi dmon" > /dev/null 2>&1 && pass "... the GPU recorder is stopped" || fail "the GPU recorder runs after an interrupt"
 PATH="$SB/bin:$PATH" systemctl is-active -q strata-ab-engine && fail "the test unit runs after an interrupt" || pass "... the test unit is stopped"
 PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service && pass "... and strata-q3 runs again" || fail "strata-q3 not restored after an interrupt"
 
@@ -354,7 +359,7 @@ up
 
 # 21. a second signal while the restore runs: ignored, and strata-q3 runs at the end
 env PATH="$SB/bin:$PATH" AB_ENGINE_PORT="$PORT" AB_ENGINE_PY=python3 AB_ENGINE_PROD_TREE="$SB/prod" \
-    AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.2 AB_ENGINE_IDLE_WAIT_S=20 AB_ENGINE_BUSY_UNDER="$SB" \
+    AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.8 AB_ENGINE_IDLE_WAIT_S=20 AB_ENGINE_BUSY_UNDER="$SB" \
     AB_ENGINE_PREFLIGHT_RE="^$SB/[^ ]*engine-cuda12/strata --serve" AB_ENGINE_STRAY_WAIT_S=30 AB_ENGINE_FREE_WAIT_S=20 \
     bash "$SB/repo/bench/ab_engine.sh" "$SB/arms.json" c0-20:C0 > "$SB/twosig.out" 2>&1 &
 wpid=$!
@@ -369,7 +374,7 @@ up
 
 # 22. the driver killed outright during the measurement: the rescue timer stops the test unit and starts strata-q3
 env PATH="$SB/bin:$PATH" AB_ENGINE_PORT="$PORT" AB_ENGINE_PY=python3 AB_ENGINE_PROD_TREE="$SB/prod" \
-    AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.2 AB_ENGINE_IDLE_WAIT_S=20 AB_ENGINE_BUSY_UNDER="$SB" \
+    AB_ENGINE_CORPUS="$SB/corpus.txt" AB_ENGINE_ADMIT_DELAY=0.8 AB_ENGINE_IDLE_WAIT_S=20 AB_ENGINE_BUSY_UNDER="$SB" \
     AB_ENGINE_PREFLIGHT_RE="^$SB/[^ ]*engine-cuda12/strata --serve" AB_ENGINE_RESCUE_S=8 \
     bash "$SB/repo/bench/ab_engine.sh" "$SB/arms.json" c0-21:C0 > "$SB/killed.out" 2>&1 &
 wpid=$!
@@ -405,6 +410,14 @@ drive unpinned "$SB/arms.json" c0-24:C0; rc=$?
 kill "$rpid" 2>/dev/null; wait "$rpid" 2>/dev/null
 [ $rc = 1 ] && grep -q "a measurement or an evaluation is running" "$SB/unpinned.out" &&
   pass "an unpinned remote evaluation is refused" || fail "unpinned remote: exit $rc, $(tail -2 "$SB/unpinned.out")"
+up
+
+# 25. a screen with the opt-in phases: the driver counts what the screen says it sent, the summary takes the runs
+ENGINE_SCREEN_PHASES=prefill,decode,four,admit,turns,decode4,eval4,admit28 drive extphases "$SB/arms.json" c0-25:C0 c1-25:C1; rc=$?
+python3 -B "$SB/repo/bench/ab_engine_summary.py" --results "$R" --baseline C0 c0-25 c1-25 > "$SB/sum-ext.out"; src=$?
+[ $rc = 0 ] && grep -qE "^requests counted by /metrics: 45  sent: 45$" "$R/c0-25-after.txt" && grep -q "^screen phases: prefill,decode,four,admit,turns,decode4,eval4,admit28" "$R/c0-25-arm.txt" &&
+  [ $src = 0 ] && grep -q "4 users decoding, short prompts" "$SB/sum-ext.out" && pass "a screen with the opt-in phases is counted and summarized" ||
+  fail "opt-in phases: exit $rc, summary $src, $(grep 'requests counted' "$R/c0-25-after.txt" 2>/dev/null)"
 up
 
 echo "$fails failed"

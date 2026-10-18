@@ -45,12 +45,19 @@ METRICS = [
     ("join_ttft", "16K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if admit_ok(r) else None),
     ("join_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if admit_ok(r) else None),
     ("join_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if admit_ok(r) else None),
+    ("decode4", "4 users decoding, short prompts: summed engine decode tok/s", True,
+     lambda r: r.get("sum_engine_decode_tok_s") if r["phase"] == "decode4" else None),
+    ("eval4", "4 users, thinking, sampled: summed engine decode tok/s", True,
+     lambda r: r.get("sum_engine_decode_tok_s") if r["phase"] == "eval4" else None),
+    ("join28_ttft", "28K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if admit_ok(r, "admit28") else None),
+    ("join28_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if admit_ok(r, "admit28") else None),
+    ("join28_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if admit_ok(r, "admit28") else None),
 ]
 
 
-def admit_ok(r: dict) -> bool:
+def admit_ok(r: dict, phase: str = "admit") -> bool:
     """An admission round that ran as designed."""
-    return r["phase"] == "admit" and r.get("valid") is True
+    return r["phase"] == phase and r.get("valid") is True
 
 
 def grep(text: str, pattern: str):
@@ -131,11 +138,11 @@ def label(r: dict) -> list:
         return [(f"prefill {r['size']} #{r['i']}", r.get("text_sha"))]
     if p == "decode":
         return [(f"decode #{r['i']}", r.get("text_sha"))]
-    if p == "four":
-        return [(f"four r{r['round']} #{j}", x.get("text_sha")) for j, x in enumerate(r.get("requests") or [])]
-    if p == "admit":
-        return ([(f"admit r{r['round']} joiner", (r.get("joiner") or {}).get("text_sha"))]
-                + [(f"admit r{r['round']} decoder {j}", x.get("text_sha")) for j, x in enumerate(r.get("decoders") or [])])
+    if p in ("four", "decode4", "eval4"):
+        return [(f"{p} r{r['round']} #{j}", x.get("text_sha")) for j, x in enumerate(r.get("requests") or [])]
+    if p in ("admit", "admit28"):
+        return ([(f"{p} r{r['round']} joiner", (r.get("joiner") or {}).get("text_sha"))]
+                + [(f"{p} r{r['round']} decoder {j}", x.get("text_sha")) for j, x in enumerate(r.get("decoders") or [])])
     if p == "turns":
         return [(f"turns #{r['i']} first", r.get("first_sha")), (f"turns #{r['i']} second", r.get("second_sha"))]
     return []
@@ -176,7 +183,11 @@ def evaluate(tags: list, baseline: str, results: Path, arms: dict | None = None)
     corpora = {r.get("corpus_sha") for t in usable for r in recs[t]}
     if len(corpora) != 1 or None in corpora:
         return 2, o + ["", f"Cannot be evaluated: the usable runs cut their prompts from different corpora ({sorted(map(str, corpora))})."]
-    invalid = {t: sum(1 for r in recs[t] if r["phase"] == "admit" and r.get("valid") is not True) for t in usable}
+    screens = {(r.get("phases"), r.get("screen")) for t in usable for r in recs[t]}
+    if len(screens) > 1:
+        return 2, o + ["", f"Cannot be evaluated: the usable runs ran different screens ({sorted(map(str, screens))})."]
+    invalid = {t: sum(1 for r in recs[t] if r["phase"] in ("admit", "admit28") and r.get("valid") is not True)
+               for t in usable}
     cached = {t: [r.get("second_cached") for r in recs[t] if r["phase"] == "turns"] for t in usable}
     o += ["", f"Engines: {', '.join(sorted(x or '?' for x in exes))}.  Corpus {corpora.pop()}.",
           "Admission rounds not as designed (left out of the admission numbers): "

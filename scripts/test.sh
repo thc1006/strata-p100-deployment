@@ -20,7 +20,7 @@ step "unit tests (tests/)"
 python3 -B -m unittest discover -s tests -q || fail=1
 
 step "shell syntax"
-sh_files=(scripts/*.sh bench/*.sh)
+sh_files=(scripts/*.sh bench/*.sh tests/*.sh)
 for f in "${sh_files[@]}"; do bash -n "$f" || { echo "syntax error: $f"; fail=1; }; done
 echo "checked ${#sh_files[@]} files"
 

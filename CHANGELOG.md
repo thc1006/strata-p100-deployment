@@ -8,6 +8,18 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 - `bench/run_profile.sh` passes `SERVE_LOAD_NONCE`, when set, to serve_load's `--nonce`: every run then sends the same prompts and decodes the same text. Two runs of one configuration differed by up to 4.8% on 1 client with the default nonce (`results/v441-1-serve_load.json` against `v441-2`), because the 1-client rate follows the drafts the text accepts. `bench/ab_model_run.sh` sets it for decision 0004's A/B.
 
+### Fixed
+
+- The IQ3_XXS / IQ3_S A/B tools, after a third adversarial review and before any IQ3_S run (decision 0004 amended):
+  - A request waiting 90 s for a slot counted as an error line; the Poisson phase causes such waits on purpose. The leaked-slot message (`marked busy with no request`) was not captured; it now counts as a fault.
+  - Other clients' traffic, an interrupted run, a perf set that refused to start and an OOM kill inside another process's cgroup counted as an IQ3_S failure (exit 3); they now make the run impossible to judge (exit 2), and so does a dirty baseline next to a dirty candidate. The wrapper captures the lines wide and the summary sorts them into faults, other traffic and unclear lines.
+  - The 300 s settle was counted from the engine's start, which comes before the 7-9 minute load; it now counts from the unit becoming active, and the summary checks it.
+  - The values step 1 deploys (ARC cap, both RAM floors, each model's layer cuts, the PLE shard) were compared between runs but never checked. The summary now reads them from this repository and checks each run. It also checks `profile.conf` and the host units.
+  - The deployment commit refused every A/B, since the model switch edits `profile.conf`. The runs are now compared by the sha256 of the service's code and of the perf set, with `profile.conf` left out, and by the config without the model's fields.
+  - The journal and kernel windows are now exact (journal cursors). `/metrics` gives the exact request count, and the service must be idle at the end. Load placement lines are recorded, and so are the host names' first labels in any case, which are redacted.
+  - An interrupt between the start of the perf set and the trap ended the wrapper without an after record. The trap is now set before the arm record.
+  - Tests: `tests/test_ab_model_summary.py` (12 tests, which catch each of 59 planted bugs) and `tests/ab_model_run_stubs.sh`, which runs the wrapper against stub `systemctl`, `journalctl`, `sudo`, `curl`, `nvidia-smi` and `hostname` and a stub engine process (49 checks, which catch each of 18 planted bugs).
+
 ## 2026-10-18
 
 ### Added

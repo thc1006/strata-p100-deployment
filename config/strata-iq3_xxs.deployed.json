@@ -38,7 +38,7 @@
     "--conversation-cache-min-tokens",
     "1024",
     "--conversation-cache-min-free-mib",
-    "8192",
+    "6144",
     "--resident-experts",
     "--trim-stage-weights",
     "--no-kv-grow",
@@ -76,7 +76,7 @@
   "fit_max_tokens": false,
   "reasoning_close_retry": true,
   "env": {
-    "STRATA_RESIDENT_HEADROOM_GIB": "8",
+    "STRATA_RESIDENT_HEADROOM_GIB": "6",
     "STRATA_ROUTE_TAIL_SKIP": "0",
     "STRATA_BATCH_MTP": "0",
     "STRATA_BATCH_MTP_SERIAL": "0",

@@ -1,40 +1,64 @@
 #!/usr/bin/env python3
 """The IQ3_XXS / IQ3_S A/B (docs/decisions/0004-iq3-s.md) from the raw result files: whether the runs follow the
-protocol, whether each run was clean, and the speed criterion.  Every number is read from results/.
+protocol, whether each run was clean, the speed criterion and the robustness run's floors.  Every number is read from
+results/.
 
   python3 -B bench/ab_model_summary.py ab-iq3xxs-1 ab-iq3s-1 ab-iq3s-2 ab-iq3xxs-2 > results/AB-iq3s.md
+  python3 -B bench/ab_model_summary.py ab-iq3xxs-1 ab-iq3s-1b ab-iq3s-2 ab-iq3xxs-2 --remeasured ab-iq3s-1=ab-iq3s-1b \\
+      --robustness ab-iq3s-robust > results/AB-iq3s.md
 
 The runs come from bench/ab_model_run.sh (<tag>-arm.txt before, <tag>-after.txt after, and the captured lines of the
-engine log, the service journal and the kernel log) around bench/run_profile.sh.  Evaluated in this order:
+engine log, the service journal and the kernel log) around bench/run_profile.sh; the robustness run comes from the
+same wrapper around bench/run_robustness.sh (bench/ab_model_run.sh <tag> B robustness).  Evaluated in this order:
   1. The protocol: no tag twice; an arm record for every run, whose model name is the model in its --native shard, its
      --ple-gguf shard, its --pack and its profile.conf; two models, the baseline's name ending in -iq3_xxs;
-     RUNS_PER_ARM runs of each, in the order ORDER (A the baseline); a separate engine start for every run, measured
-     SETTLE_S or more after the service became ready; what step 1 deploys, read from this repository (the ZFS ARC
-     cap, both RAM floors, each model's layer cuts), and the host units as configured; the runs the same in everything
-     but the model (the engine's other arguments and its STRATA_/CUDA_ environment, the engine, server.py and
-     serve_load.py, the config without the model's fields, the shared settings, the service's code, the perf set,
-     serve_load's fixed prompts); no other arm record measured between the first and the last.
+     RUNS_PER_ARM runs of each, in the order ORDER (A the baseline), each of bench/run_profile.sh; a separate engine
+     start for every run, measured SETTLE_S or more after the service became ready; what step 1 deploys, read from
+     this repository (the ZFS ARC cap, both RAM floors, each model's layer cuts), and the host units as configured; the
+     runs the same in everything but the model (the engine's other arguments and its STRATA_/CUDA_ environment, the
+     engine, server.py and serve_load.py, the config without the model's fields, the shared settings, the service's
+     code, the perf set, serve_load's fixed prompts); no other arm record measured between the first and the last but
+     the runs measured again and the robustness run.
+     A run measured again: --remeasured OLD=NEW says that NEW measured OLD again (NEW is one of the runs given, or was
+     itself measured again).  OLD needs an arm record of NEW's model, measured before NEW.  The replacement is accepted
+     only when this summary rates OLD "cannot tell" with no fault (an OLD that breaks the protocol above counts as
+     "cannot tell").  A clean OLD is not replaced: the runs cannot be evaluated.  An OLD with a fault is not replaced
+     either: it is judged with the runs given, so its fault counts.  The report lists every replacement.
   2. Each run.  Not clean (a fault): the engine restarted; a line of the engine log; a service journal line that tells
      of a fault (systemd's own lines included); an NVIDIA Xid or an OOM kill of the service or of the whole host;
      fewer requests completed than the perf set sent; a completed request cancelled or ending other than stop /
      length; a failed request in the perf set's own records (an HTTP status other than 200, an error field, a finish
-     other than stop / length; serve_load by its error count); an uncorrected ECC error.
+     other than stop / length; serve_load by its error count); an uncorrected ECC error, on the cards that report ECC
+     counters (these P100s run with ECC disabled and nvidia-smi gives [N/A]: the report then says that this check
+     cannot fire).
      Cannot tell (the run must be measured again): the perf set did not run to its end (interrupted, a non-zero exit,
      a client Traceback, a scenario record missing or twice); other traffic (more requests completed than sent, a
-     request refused with a 4xx, requests in flight at the end); a kernel problem that names no process of the
-     service; a record that is missing or unreadable.  Lost requests and odd finishes are a fault only when the perf
-     set ran to its end and there was no other traffic.
+     request refused with a 4xx, for its Host header or from another site's web page, requests in flight at the end);
+     a kernel problem that names no process of the service; a record that is missing or unreadable.  Lost requests
+     and odd finishes are a fault only when the perf set ran to its end and there was no other traffic.
   3. Speed: the two baseline runs agree within AA_LIMIT on every criterion metric; then on 1, 2 and 4 clients and the
      4.4K and 32K prompts the candidate may be at most 10% lower, and on the time to first token of a 16K prompt
      joining three decoders at most 15% higher, in its mean and in each of its runs (faster never fails).
+  4. The robustness run (--robustness TAG), measured on the candidate after the last of the four runs: every card's
+     least free VRAM at least ROBUST_FREE_VRAM_MIB MiB and the least MemAvailable at least ROBUST_MEM_AVAIL_GIB GiB
+     (its monitor, <TAG>-robust-monitor-all.json).  It cannot be judged when it breaks the protocol of 1. (with
+     bench/run_robustness.sh), differs from the four runs in anything but the model, or did not run to its end; nor,
+     when it kept the floors, when its engine restarted or the kernel logged an Xid or an OOM kill of the service or
+     the host (decision 0004 names only the floors for this run: the maintainer decides).
+Reported, not judged: the requests other clients completed between each run's restart and its start, and the
+conversations parked then (flagged when the runs differ by more than OTHER_REQUESTS_FLAG requests or in the parked
+conversations); each engine's placement at its load, with the expert complement page-locked in RAM.
 Metrics: "1 / 2 / 4 clients" is serve_load's total tok/s, the median over its 3 rounds of the tokens a round
 received divided by the round's wall time (time to first token included); the prompt rates are the engine's, the
 median of the 3 replicate runs.  A value that is not a finite number counts as missing.
-Exit status: 0 the protocol holds, every run is clean and the speed criterion holds; 1 only the speed criterion fails
-(the decision record leaves that to the maintainer); 3 a candidate run is not clean while both baseline runs are (the
-stability criterion fails); 2 it cannot be evaluated (the protocol is not followed, a baseline run is not clean, a run
-cannot be told, the baseline runs disagree, or a number is missing).  Not evaluated here: the robustness run's floors
-and the quality subset.
+Exit status: 0 the protocol holds, every run is clean and the speed criterion holds (with --robustness, the robustness
+run holds too); 1 only the speed criterion fails (the decision record leaves that to the maintainer); 3 the stability
+criterion fails: a candidate run has a fault and no reason to be measured again while no baseline run has a fault or
+a reason to be measured again, or the robustness run breaks a floor; 2 it cannot be evaluated (the protocol is not
+followed, a baseline run is not clean, a run cannot be told, a candidate run with a fault has a reason to be measured
+again too, the baseline runs disagree, a number is missing, or the robustness run cannot be judged).  Without
+--robustness, 0 covers the four runs only: decision 0004 keeps IQ3_S when the summary with --robustness exits 0.
+Criterion 3 rests on published measurements and is not evaluated here.
 """
 from __future__ import annotations
 
@@ -60,6 +84,10 @@ CRITERIA = [("decode_1", "1 client total tok/s", True, 0.10), ("decode_2", "2 cl
             ("decode_4", "4 clients total tok/s", True, 0.10), ("prompt_4k", "4.4K prompt tok/s", True, 0.10),
             ("prompt_32k", "32K prompt tok/s", True, 0.10),
             ("join16_ttft", "16K prompt joining 3 decoders: TTFT s", False, 0.15)]
+PERF_SET, ROBUSTNESS_SET = "run_profile.sh", "run_robustness.sh"     # what bench/ab_model_run.sh ran, in bench/
+ROBUST_FREE_VRAM_MIB = 700          # criterion 1: during the robustness run every card keeps this much VRAM free,
+ROBUST_MEM_AVAIL_GIB = 6.0          # and MemAvailable stays at or above the 6 GiB floor
+OTHER_REQUESTS_FLAG = 10            # other clients' requests before the runs: a larger spread is flagged (a tenth of 98)
 MODEL_ARGS = {"--pack", "--native", "--ple-gguf", "--layer-split"}     # the engine arguments the model sets
 REPLICATE = ("reasoning-v1", "code-v1", "docs-4.4k", "docs-32k")
 STRESS = ("replicate", "think4", "worst")
@@ -67,14 +95,22 @@ LATENCY = ("coldjoin", "preempt", "poisson")
 FOUR_USER = (("burst", 8192), ("burst", 16384), ("admit", 16384))
 CLIENTS = (1, 2, 4)
 GSQ_NATIVE = re.compile(r"/Qwen3\.8-Flash-Next-GSQ-RCO-(IQ3_XXS|IQ3_S)-00001-of-00002\.gguf$")
+# what must be the same in every run (arm record key, label)
+SAME = (("other_args", "the engine's other arguments"), ("env", "the engine's environment"), ("exe_sha", "the engine"),
+        ("engine", "the engine version"), ("server_sha", "server.py"), ("serve_load_sha", "serve_load.py"),
+        ("shared_sha", "the shared settings"), ("config_model_free", "the config without the model's fields"),
+        ("code_sha", "the service's code"), ("perf_sha", "the perf set"), ("nonce", "serve_load's prompts (nonce)"),
+        ("arc", "the ZFS ARC cap"))
 
 # The captured lines (bench/ab_model_run.sh greps them wide) by kind.  Journal: a "[strata] done:" line is judged by
 # its finish (the after record); a slot wait is queueing, not a fault (the leak it may come before is "marked busy
-# with no request", a fault); a 4xx is a request the server refused, another client's (one of the perf set's would
-# be a failed record too); the traceback of a malformed request cannot be told from a fault of the server.
+# with no request", a fault); a refused request is another client's: a 4xx (one of the perf set's would be a failed
+# record too), or a 403 that server.py logs without its status, for the request's Host header (DNS rebinding
+# protection) or for another site's web page; the traceback of a malformed request cannot be told from a fault of the
+# server.
 J_DONE = re.compile(r"\[strata\] done: ")
 J_WAITED = re.compile(r"\[strata\] parallel: a request has waited \d+ s for a free slot")
-J_REFUSED = re.compile(r"\[strata\] 4\d\d\b")
+J_REFUSED = re.compile(r"\[strata\] (?:4\d\d\b|refused a request for Host |refused an API request from the web page )")
 J_MALFORMED = re.compile(r"\[strata\] 400 malformed request")
 J_TRACE = re.compile(r"Traceback \(most recent call last\)|\b\w*(Error|Exception): ")
 # Kernel: an Xid (only the engine uses the GPUs) or an OOM kill of the service or of the whole host is a fault; an OOM
@@ -176,7 +212,9 @@ def arm_info(results: Path, tag: str) -> dict:
     env_line = grep(t, r"^engine env: (.*)$")
     load = re.findall(r"^load: (.*)$", t, re.M)
     profile = (grep(t, r"^profile\.conf: (.*)$") or "").split()
+    complement = re.search(r"cache complement ready: resident ([\d.]+) GiB, pinned ([\d.]+) GiB", "\n".join(load))
     return {"at": grep(t, r"^tag \S+\s+arm \S+\s+at (.+)$"), "model": grep(t, r'"model": "([^"]+)"'),
+            "set": grep(t, r"^set: bench/(\S+)$"),
             "loaded": native.group(1).lower() if native else None, "pack": Path(flags.get("--pack", "")).name or None,
             "native": flags.get("--native"), "ple": flags.get("--ple-gguf"), "split": flags.get("--layer-split"),
             "park_mib": flags.get("--conversation-cache-min-free-mib"),
@@ -196,7 +234,10 @@ def arm_info(results: Path, tag: str) -> dict:
             "engine_age": num(grep(t, r"^engine start ticks \d+\s+engine age (\d+) s")),
             "ready": num(grep(t, r"^service ready for (\d+) s")), "host_units": grep(t, r"^host units: (\w+)"),
             "started": grep(t, r"^engine started: (.+)$"), "load": load,
+            "other_requests": num(grep(t, r"^metrics requests before the run: (\S+)")),
+            "parked": num(grep(t, r"^conversation cache before the run: parked (\S+)")),
             "resident": grep("\n".join(load), r"([\d.]+)% of the experts resident"),
+            "complement": f"{complement.group(1)} / {complement.group(2)}" if complement else None,
             "slots": "/".join(re.findall(r"^strata generate: (?:expert cache|layer split: CUDA\d runs layers \S+ expert cache) "
                                          r"(\d+) slots", "\n".join(load), re.M)) or None,
             "pcie": "/".join(re.findall(r"pcie_frac (\d\.\d+)", "\n".join(load))) or None,
@@ -215,7 +256,7 @@ def after_info(results: Path, tag: str) -> dict:
     finishes = {name: int(n) for name, n in re.findall(r"([a-z_]+,cancel=\w+) (\d+)",
                                                        grep(t, r"^journal done lines during the run: \S+ \((.*)\)$") or "")}
     lines = lambda count, kind: read_lines(results / f"{tag}-{kind}-errors.txt") if num(count) is not None else None  # noqa: E731
-    return {"rc": num(grep(t, r"\brun_profile exit (\d+)")), "interrupted": grep(t, r"\binterrupted (\w+)\s*$"),
+    return {"rc": num(grep(t, r"\brun_(?:profile|robustness) exit (\d+)")), "interrupted": grep(t, r"\binterrupted (\w+)\s*$"),
             "same_engine": grep(t, r"^same engine as before: (\w+)"), "idle_end": grep(t, r"^idle at the end: (\w+)"),
             "counted": num(grep(t, r"^metrics requests during the run: (\S+)")),
             "journal": grep(t, r"^journal: (\w+);"),
@@ -304,43 +345,60 @@ def run_records(results: Path, tag: str, stress: list, lat: list) -> dict:
             "min_avail": finite((mon.get("host") or {}).get("min_mem_avail_gib"))}
 
 
-def protocol(tags: list, info: dict, results: Path, want: dict) -> list:
-    """The ways the runs do not follow the protocol (empty when they do)."""
+def run_protocol(t: str, i: dict, want: dict, set_name: str) -> list:
+    """The ways one run's arm record breaks what every run needs (empty when it does not)."""
+    if not i["loaded"] or not i["model"].endswith("-" + i["loaded"]):
+        return [f"{t} answered as {i['model']} but loaded {i['loaded'] or 'an unknown file'}"]
+    q, bad = i["loaded"], []
+    if i["set"] != set_name:
+        bad.append(f"{t} ran bench/{i['set'] or '(not recorded)'}, not bench/{set_name}")
+    if i["pack"] != q:
+        bad.append(f"{t} loaded the {q} shard with the pack {i['pack']}")
+    if i["ple"] != i["native"].replace("-00001-of-00002.gguf", "-00002-of-00002.gguf"):
+        bad.append(f"{t}'s --ple-gguf is not shard 2 of its --native ({i['ple']})")
+    if i["split"] != want["cuts"].get(q):
+        bad.append(f"{t} ran the layer split {i['split']}, the tool's cuts for {q} are {want['cuts'].get(q)}")
+    if i["profile_models"] != [q]:
+        bad.append(f"{t}'s profile.conf ({i['profile']}) does not name --model {q} once")
+    if i["ready"] is None or i["ready"] < SETTLE_S:
+        bad.append(f"{t} started {i['ready']} s after the service became ready, the protocol {SETTLE_S} s")
+    if i["engine_age"] is None or i["ready"] is None or i["engine_age"] + 5 < i["ready"]:
+        bad.append(f"{t}'s engine ({i['engine_age']} s) is younger than the service's ready time ({i['ready']} s)")
+    if i["arc"] != want["arc"]:
+        bad.append(f"{t} ran with the ZFS ARC cap {i['arc']}, step 1 deploys {want['arc']}")
+    if i["env_vars"].get("STRATA_RESIDENT_HEADROOM_GIB") != want["headroom"]:
+        bad.append(f"{t} ran with STRATA_RESIDENT_HEADROOM_GIB {i['env_vars'].get('STRATA_RESIDENT_HEADROOM_GIB')}, "
+                   f"step 1 deploys {want['headroom']}")
+    if i["park_mib"] != want["park_mib"]:
+        bad.append(f"{t} ran with --conversation-cache-min-free-mib {i['park_mib']}, step 1 deploys {want['park_mib']}")
+    if i["host_units"] != "ok":
+        bad.append(f"{t}: the host units were not as configured ({i['host_units']})")
+    if not i["load"]:
+        bad.append(f"{t} has no placement lines of its engine's load")
+    return bad
+
+
+def differences(tags: list, info: dict) -> list:
+    """What is unknown for a run, or differs between the runs, of what must be the same in all of them."""
     bad = []
+    for key, label in SAME:
+        values = [info[t].get(key) for t in tags]
+        if any(v in (None, "unknown") for v in values):
+            bad.append(f"{label} is unknown for " + ", ".join(t for t, v in zip(tags, values) if v in (None, "unknown")))
+        elif len(set(values)) != 1:
+            bad.append(f"the runs differ in {label}: " + "; ".join(f"{t} {v}" for t, v in zip(tags, values)))
+    return bad
+
+
+def protocol(tags: list, info: dict, results: Path, want: dict, exempt: tuple = ()) -> list:
+    """The ways the runs do not follow the protocol (empty when they do).  exempt: the arm records that may lie between
+    the first and the last run (the runs measured again, the robustness run)."""
     if len(set(tags)) != len(tags):
         return [f"a tag is given more than once ({' '.join(tags)})"]
     missing = [t for t in tags if not info[t].get("model") or not info[t].get("at")]
     if missing:
         return [f"no arm record (or no model or measured-from time in it) for {', '.join(missing)}"]
-    for t in tags:
-        i = info[t]
-        if not i["loaded"] or not i["model"].endswith("-" + i["loaded"]):
-            bad.append(f"{t} answered as {i['model']} but loaded {i['loaded'] or 'an unknown file'}")
-            continue
-        q = i["loaded"]
-        if i["pack"] != q:
-            bad.append(f"{t} loaded the {q} shard with the pack {i['pack']}")
-        if i["ple"] != i["native"].replace("-00001-of-00002.gguf", "-00002-of-00002.gguf"):
-            bad.append(f"{t}'s --ple-gguf is not shard 2 of its --native ({i['ple']})")
-        if i["split"] != want["cuts"].get(q):
-            bad.append(f"{t} ran the layer split {i['split']}, the tool's cuts for {q} are {want['cuts'].get(q)}")
-        if i["profile_models"] != [q]:
-            bad.append(f"{t}'s profile.conf ({i['profile']}) does not name --model {q} once")
-        if i["ready"] is None or i["ready"] < SETTLE_S:
-            bad.append(f"{t} started {i['ready']} s after the service became ready, the protocol {SETTLE_S} s")
-        if i["engine_age"] is None or i["ready"] is None or i["engine_age"] + 5 < i["ready"]:
-            bad.append(f"{t}'s engine ({i['engine_age']} s) is younger than the service's ready time ({i['ready']} s)")
-        if i["arc"] != want["arc"]:
-            bad.append(f"{t} ran with the ZFS ARC cap {i['arc']}, step 1 deploys {want['arc']}")
-        if i["env_vars"].get("STRATA_RESIDENT_HEADROOM_GIB") != want["headroom"]:
-            bad.append(f"{t} ran with STRATA_RESIDENT_HEADROOM_GIB {i['env_vars'].get('STRATA_RESIDENT_HEADROOM_GIB')}, "
-                       f"step 1 deploys {want['headroom']}")
-        if i["park_mib"] != want["park_mib"]:
-            bad.append(f"{t} ran with --conversation-cache-min-free-mib {i['park_mib']}, step 1 deploys {want['park_mib']}")
-        if i["host_units"] != "ok":
-            bad.append(f"{t}: the host units were not as configured ({i['host_units']})")
-        if not i["load"]:
-            bad.append(f"{t} has no placement lines of its engine's load")
+    bad = [x for t in tags for x in run_protocol(t, info[t], want, PERF_SET)]
     models = sorted({info[t]["model"] for t in tags})
     base = [m for m in models if m.endswith(BASELINE_SUFFIX)]
     if len(models) != 2 or len(base) != 1:
@@ -355,23 +413,55 @@ def protocol(tags: list, info: dict, results: Path, want: dict) -> list:
     starts = [info[t]["ticks"] for t in tags]
     if None in starts or len(set(starts)) != len(starts):
         bad.append("the runs do not each have an engine start of their own (start ticks " + ", ".join(map(str, starts)) + ")")
-    for key, label in (("other_args", "the engine's other arguments"), ("env", "the engine's environment"),
-                       ("exe_sha", "the engine"), ("engine", "the engine version"), ("server_sha", "server.py"),
-                       ("serve_load_sha", "serve_load.py"), ("shared_sha", "the shared settings"),
-                       ("config_model_free", "the config without the model's fields"),
-                       ("code_sha", "the service's code"), ("perf_sha", "the perf set"),
-                       ("nonce", "serve_load's prompts (nonce)"), ("arc", "the ZFS ARC cap")):
-        values = [info[t].get(key) for t in tags]
-        if any(v in (None, "unknown") for v in values):
-            bad.append(f"{label} is unknown for " + ", ".join(t for t, v in zip(tags, values) if v in (None, "unknown")))
-        elif len(set(values)) != 1:
-            bad.append(f"the runs differ in {label}: " + "; ".join(f"{t} {v}" for t, v in zip(tags, values)))
+    bad += differences(tags, info)
     first, last = info[tags[0]]["at"], info[tags[-1]]["at"]
-    others = sorted(p.name[:-len("-arm.txt")] for p in results.glob("*-arm.txt") if p.name[:-len("-arm.txt")] not in tags
+    others = sorted(p.name[:-len("-arm.txt")] for p in results.glob("*-arm.txt")
+                    if p.name[:-len("-arm.txt")] not in tags and p.name[:-len("-arm.txt")] not in exempt
                     and first <= (grep(p.read_text(), r"^tag \S+\s+arm \S+\s+at (.+)$") or "") <= last)
     if others:
         bad.append(f"other runs were measured between the first and the last and are not included: {', '.join(others)}")
     return bad
+
+
+def replacements(args: list, tags: list) -> tuple[dict, list]:
+    """{replaced run: the run that measured it again} from the --remeasured OLD=NEW arguments, and their problems."""
+    pairs, bad = {}, []
+    for a in args:
+        m = re.fullmatch(r"([^=\s]+)=([^=\s]+)", a)
+        if not m:
+            bad.append(f"--remeasured {a!r} is not OLD=NEW")
+            continue
+        old, new = m.groups()
+        if old == new:
+            bad.append(f"--remeasured {a}: a run cannot measure itself again")
+        elif old in tags:
+            bad.append(f"--remeasured {a}: {old} is given as a run too")
+        elif old in pairs:
+            bad.append(f"--remeasured {a}: {old} is said to be measured again twice ({pairs[old]}, {new})")
+        elif new in pairs.values():
+            bad.append(f"--remeasured {a}: {new} is said to measure two runs again")
+        else:
+            pairs[old] = new
+    for old in pairs:
+        seen, t = {old}, pairs[old]
+        while t in pairs and t not in seen:
+            seen.add(t)
+            t = pairs[t]
+        if t not in tags:
+            bad.append(f"--remeasured {old}={pairs[old]}: {t} is not one of the runs given")
+    return pairs, bad
+
+
+def other_work_flag(tags: list, info: dict) -> str | None:
+    """The flag when the runs began after very different amounts of other clients' work since their restart."""
+    req = {t: info[t].get("other_requests") for t in tags}
+    parked = {t: info[t].get("parked") for t in tags}
+    known = [v for v in req.values() if v is not None]
+    if (known and max(known) - min(known) > OTHER_REQUESTS_FLAG) or len({v for v in parked.values() if v is not None}) > 1:
+        return ("Flag (reported, not judged by decision 0004): the runs began after different amounts of other clients' "
+                "work since their restart: requests completed " + ", ".join(f"{t} {fmt(req[t])}" for t in tags)
+                + "; conversations parked " + ", ".join(f"{t} {fmt(parked[t])}" for t in tags) + ".")
+    return None
 
 
 def stability(after: dict, rec: dict, arm: dict) -> tuple[list, list, list]:
@@ -410,7 +500,7 @@ def stability(after: dict, rec: dict, arm: dict) -> tuple[list, list, list]:
         if jk["unclear"]:
             unknown.append(f"{len(jk['unclear'])} journal lines of a malformed request's traceback or a fault")
         if jk["other"]:
-            other_traffic.append(f"{len(jk['other'])} requests refused (4xx)")
+            other_traffic.append(f"{len(jk['other'])} requests refused (a 4xx, or for their Host or web page)")
     if a.get("kernel_lines") is None:
         unknown.append("the kernel log lines are unknown")
     else:
@@ -449,23 +539,87 @@ def stability(after: dict, rec: dict, arm: dict) -> tuple[list, list, list]:
     return dirty, unknown, notes
 
 
+def judge_robustness(rt: str, info: dict, a: dict, mon, mon_damaged: str | None, want: dict, runs: list,
+                     cand: str) -> tuple[list, float | None, list, list, list]:
+    """The robustness run: (each card's least free VRAM, the least MemAvailable, the floors it broke, why it cannot be
+    judged, the faults seen)."""
+    i, invalid, faults, broken = info[rt], [], [], []
+    if not i.get("model") or not i.get("at"):
+        invalid.append("no arm record (or no model or measured-from time in it)")
+    else:
+        invalid += run_protocol(rt, i, want, ROBUSTNESS_SET)
+        if i["model"] != cand:
+            invalid.append(f"it ran {i['model']}, not the candidate {cand}")
+        if not i["at"] > info[runs[-1]]["at"]:
+            invalid.append(f"it was measured before the last of the four runs ({runs[-1]})")
+        invalid += differences([*runs, rt], info)
+    if not a:
+        invalid.append("no after record")
+    else:
+        if a.get("interrupted") != "no":
+            invalid.append("the run was interrupted" if a.get("interrupted") == "yes" else "no interrupted line")
+        if a.get("rc") != 0:
+            invalid.append(f"run_robustness.sh exited {a.get('rc')}" if a.get("rc") is not None else "no run_robustness exit status")
+        if a.get("same_engine") != "yes":
+            (faults if a.get("same_engine") == "NO" else invalid).append(
+                "the engine restarted" if a.get("same_engine") == "NO" else "no same-engine line")
+        kfault = kernel_kinds(a["kernel_lines"])["fault"] if a.get("kernel_lines") is not None else None
+        if kfault is None:
+            invalid.append("the kernel log lines are unknown")
+        elif kfault:
+            faults.append(f"{len(kfault)} kernel fault lines (Xid, or an OOM kill of the service or the host)")
+    gpus = [finite(((mon or {}).get(f"gpu{g}") or {}).get("min_free_mib")) for g in range(4)]
+    avail = finite(((mon or {}).get("host") or {}).get("min_mem_avail_gib"))
+    if mon_damaged:
+        invalid.append(mon_damaged)
+    elif mon is None:
+        invalid.append(f"no {rt}-robust-monitor-all.json")
+    elif None in gpus or avail is None:
+        invalid.append("its monitor lacks a card's least free VRAM or the least MemAvailable")
+    else:
+        broken += [f"GPU {g} kept {v} MiB free (at least {ROBUST_FREE_VRAM_MIB})" for g, v in enumerate(gpus)
+                   if v < ROBUST_FREE_VRAM_MIB]
+        if avail < ROBUST_MEM_AVAIL_GIB:
+            broken.append(f"MemAvailable fell to {avail} GiB (at least {ROBUST_MEM_AVAIL_GIB:g})")
+    return gpus, avail, broken, invalid, faults
+
+
 def fmt(v, nd=1) -> str:
     return "-" if v is None else (f"{v:.{nd}f}" if isinstance(v, float) else str(v))
 
 
-def evaluate(tags: list, results: Path) -> tuple[int, list]:
-    info = {t: arm_info(results, t) for t in tags}
+def evaluate(tags: list, results: Path, remeasured: list | None = None, robust: str | None = None) -> tuple[int, list]:
+    pairs, pair_bad = replacements(list(remeasured or []), tags)
+    olds = list(pairs)
+    if robust is not None and (robust in tags or robust in pairs or robust in pairs.values()):
+        pair_bad.append(f"the robustness run {robust} is given as one of the four runs or as measured again too")
+    extra = [t for t in dict.fromkeys([*olds, *([robust] if robust else [])]) if t not in tags]
+    info = {t: arm_info(results, t) for t in [*tags, *extra]}
     try:
         stress, lat = read_jsonl(results / "stress.jsonl"), read_jsonl(results / "latency.jsonl")
-        recs = {t: run_records(results, t, stress, lat) for t in tags}
+        recs = {t: run_records(results, t, stress, lat) for t in [*tags, *olds]}
     except Damaged as e:
         return 2, [f"Cannot be evaluated: {e}."]
-    after = {t: after_info(results, t) for t in tags}
-    chrono = sorted(tags, key=lambda t: (info[t].get("at") is None, info[t].get("at") or ""))
+    mon, mon_damaged = None, None
+    if robust:
+        try:
+            mon = read_json(results / f"{robust}-robust-monitor-all.json")
+        except Damaged as e:
+            mon_damaged = str(e)
+    after = {t: after_info(results, t) for t in [*tags, *extra]}
+    at = lambda t: (info[t].get("at") is None, info[t].get("at") or "")     # noqa: E731
+    chrono = sorted(tags, key=at)
+    shown = sorted(dict.fromkeys([*tags, *extra]), key=at)
+    role = {**{t: f" (measured again as {n})" for t, n in pairs.items()}, **({robust: " (robustness)"} if robust else {})}
     o = ["# GSQ-RCO IQ3_XXS vs IQ3_S on this box (generated by bench/ab_model_summary.py)", "",
          "Runs in the order they were measured: " + " -> ".join(chrono) + ".  The perf set is bench/run_profile.sh.", ""]
     if chrono != tags:
         o += [f"Note: the arguments were in another order ({' '.join(tags)}); the tables keep the measured order.", ""]
+    if pairs:
+        o += ["Measured again (--remeasured): " + ", ".join(f"{t} as {n}" for t, n in pairs.items())
+              + "; each replaced run's rating is in the table of each run.", ""]
+    if robust:
+        o += [f"The robustness run: {robust} (bench/run_robustness.sh).", ""]
     o += ["| run | model | 1 / 2 / 4 clients total tok/s | 4.4K prompt tok/s | 32K prompt tok/s | 4 users thinking: per-user "
           "tok/s | 4x16K burst: last TTFT s | 16K joins 3 decoders: TTFT s | one-liner during a 28K read: TTFT s | "
           "failed requests (records checked) | min free VRAM MiB | min MemAvailable GiB |",
@@ -478,36 +632,84 @@ def evaluate(tags: list, results: Path) -> tuple[int, list]:
                  f"{fmt(x['min_free_vram'])} | {fmt(x['min_avail'])} |")
     o += ["", "## Where each run came from", "",
           "| run | measured from | model | loaded / pack | engine started (ticks) | ready s | engine | exe sha256 | "
-          "config sha256 (without the model) | service code / perf set sha256 | commit | ARC cap |",
-          "|---|---|---|---|---|---:|---|---|---|---|---|---:|"]
-    for t in chrono:
+          "config sha256 (without the model) | service code / perf set sha256 | commit | ARC cap | other clients' requests "
+          "since the restart (conversations parked) |",
+          "|---|---|---|---|---|---:|---|---|---|---|---|---:|---:|"]
+    for t in shown:
         i = info[t]
-        o.append(f"| {t} | {i.get('at') or '?'} | {i.get('model') or '?'} | {i.get('loaded') or '?'} / {i.get('pack') or '?'} | "
-                 f"{i.get('started') or '?'} ({i.get('ticks') or '?'}) | {fmt(i.get('ready'))} | {i.get('engine') or '?'} | "
-                 f"{i.get('exe_sha') or '?'} | {i.get('config_sha') or '?'} ({i.get('config_model_free') or '?'}) | "
-                 f"{i.get('code_sha') or '?'} / {i.get('perf_sha') or '?'} | {(i.get('commit') or '?')[:12]} | {i.get('arc') or '?'} |")
+        o.append(f"| {t}{role.get(t, '')} | {i.get('at') or '?'} | {i.get('model') or '?'} | {i.get('loaded') or '?'} / "
+                 f"{i.get('pack') or '?'} | {i.get('started') or '?'} ({i.get('ticks') or '?'}) | {fmt(i.get('ready'))} | "
+                 f"{i.get('engine') or '?'} | {i.get('exe_sha') or '?'} | {i.get('config_sha') or '?'} "
+                 f"({i.get('config_model_free') or '?'}) | {i.get('code_sha') or '?'} / {i.get('perf_sha') or '?'} | "
+                 f"{(i.get('commit') or '?')[:12]} | {i.get('arc') or '?'} | {fmt(i.get('other_requests'))} "
+                 f"({fmt(i.get('parked'))}) |")
+    flag = other_work_flag(chrono, info)
+    if flag:
+        o += ["", flag]
     o += ["", "Placement at each engine's load (its log): the experts resident, the expert cache slots per card, the PCIe "
-          "fraction per card.", "", "| run | resident | slots | pcie_frac |", "|---|---:|---|---|"]
-    for t in chrono:
+          "fraction per card, and the experts no card holds, page-locked in RAM (the cache complement: resident / "
+          "pinned GiB).", "", "| run | resident | slots | pcie_frac | complement in RAM GiB |", "|---|---:|---|---|---:|"]
+    for t in shown:
         i = info[t]
-        o.append(f"| {t} | {i.get('resident') or '?'}% | {i.get('slots') or '?'} | {i.get('pcie') or '?'} |")
+        o.append(f"| {t} | {i.get('resident') or '?'}% | {i.get('slots') or '?'} | {i.get('pcie') or '?'} | "
+                 f"{i.get('complement') or '?'} |")
     try:
         want = deployed()
     except Exception as e:                           # noqa: BLE001 - any failure to read it is "cannot be evaluated"
         return 2, o + ["", f"Cannot be evaluated: cannot read what step 1 deploys from this repository ({type(e).__name__}: {e})."]
-    bad = protocol(chrono, info, results, want)
+    bad = pair_bad + protocol(chrono, info, results, want, tuple(extra))
+    for old, new in pairs.items():
+        i, j = info[old], info.get(new, {})
+        if not i.get("model") or not i.get("at"):
+            bad.append(f"no arm record (or no model or measured-from time in it) for {old}, said to be measured again as {new}")
+        elif j.get("model") and i["model"] != j["model"]:
+            bad.append(f"{old} ({i['model']}) is said to be measured again as {new} ({j['model']}): another model")
+        elif j.get("at") and not i["at"] < j["at"]:
+            bad.append(f"{new} was measured before {old}, which it is said to measure again")
     if bad:
         return 2, o + ["", "Cannot be evaluated: the runs do not follow the protocol: " + "; ".join(bad) + "."]
     base = next(info[t]["model"] for t in chrono if info[t]["model"].endswith(BASELINE_SUFFIX))
     cand = next(info[t]["model"] for t in chrono if info[t]["model"] != base)
+    rated = {t: stability(after[t], recs[t], info[t]) for t in chrono}
+    for old in olds:                                 # a run that broke the protocol must be measured again: "cannot tell"
+        dirty, unknown, notes = stability(after[old], recs[old], info[old])
+        rated[old] = (dirty, run_protocol(old, info[old], want, PERF_SET) + differences([*chrono, old], info) + unknown, notes)
+    clean_olds = [t for t in olds if not rated[t][0] and not rated[t][1]]
+    if clean_olds:
+        return 2, o + ["", "Cannot be evaluated: " + "; ".join(f"{t} is said to be measured again as {pairs[t]}, but this "
+                                                            "summary rates it clean: a clean run is not measured again"
+                                                            for t in clean_olds) + "."]
+    accepted = {t: pairs[t] for t in olds if not rated[t][0]}          # cannot tell, no fault: replaced
+    kept = [t for t in olds if rated[t][0]]                             # a fault is never replaced: judged with the rest
+    judged = sorted([*chrono, *kept], key=at)
     o += ["", "## Each run", "", "| run | model | clean | not clean | cannot tell | notes |", "|---|---|---|---|---|---|"]
-    unknown_any, cand_dirty, base_dirty = [], [], []
-    for t in chrono:
-        dirty, unknown, notes = stability(after[t], recs[t], info[t])
-        o.append(f"| {t} | {info[t]['model']} | {'yes' if not dirty and not unknown else 'no'} | {'; '.join(dirty) or '-'} | "
-                 f"{'; '.join(unknown) or '-'} | {'; '.join(notes) or '-'} |")
+    for t in sorted([*chrono, *olds], key=at):
+        dirty, unknown, notes = rated[t]
+        if t in accepted:
+            clean = f"measured again as {accepted[t]}"
+        elif t in kept:
+            clean = f"no (measured again as {pairs[t]}, but a run with a fault is not replaced: its fault counts)"
+        else:
+            clean = "yes" if not dirty and not unknown else "no"
+        o.append(f"| {t} | {info[t]['model']} | {clean} | {'; '.join(dirty) or '-'} | {'; '.join(unknown) or '-'} | "
+                 f"{'; '.join(notes) or '-'} |")
+    if not any(info[t].get("ecc") or after[t].get("ecc") for t in judged):
+        o += ["", "ECC: no card gave ECC error counters in any run (nvidia-smi printed [N/A], as it does with ECC disabled, "
+              "the setting of these P100s), so the uncorrected-ECC fault check cannot fire here."]
+    # a candidate's fault fails the criterion only when it is the model's: the run has no reason to be measured again
+    # and no baseline run has a fault or such a reason (decision 0004)
+    unknown_any, cand_dirty, cand_judged, cand_reasons, base_dirty, base_unknown = [], [], [], [], [], []
+    for t in judged:
+        dirty, unknown, _ = rated[t]
+        is_cand = info[t]["model"] == cand
         if dirty:
-            (cand_dirty if info[t]["model"] == cand else base_dirty).append(f"{t}: {'; '.join(dirty)}")
+            (cand_dirty if is_cand else base_dirty).append(f"{t}: {'; '.join(dirty)}")
+            if is_cand and not unknown:
+                cand_judged.append(f"{t}: {'; '.join(dirty)}")
+            elif is_cand:
+                cand_reasons.append(f"{t}: {'; '.join(unknown)}")
+        if unknown and not is_cand:
+            base_unknown.append(f"{t}: {'; '.join(unknown)}")
         unknown_any += [f"{t}: {u}" for u in unknown]
     unknown_any += [f"the baseline run {d} (the A/B cannot be judged when the baseline is not clean)" for d in base_dirty]
     per = {m: [t for t in chrono if info[t]["model"] == m] for m in (base, cand)}
@@ -531,24 +733,63 @@ def evaluate(tags: list, results: Path) -> tuple[int, list]:
         o.append(f"| {label} | {', '.join(fmt(v, 2) for v in va)} | {'yes' if aa else 'NO'} | {', '.join(fmt(v, 2) for v in vb)} | "
                  f"{changes[0]:+.2%} ({', '.join(f'{c:+.2%}' for c in changes[1:])}) | {'-' if higher else '+'}{limit:.0%} | "
                  f"{'yes' if holds else 'NO'} |")
+    robust_fail, robust_unknown = False, False
+    if robust:
+        gpus, avail, broken, invalid, faults = judge_robustness(robust, info, after.get(robust, {}), mon, mon_damaged, want,
+                                                                chrono, cand)
+        holds = not invalid and not broken and not faults
+        o += ["", f"## The robustness run (criterion 1): {robust}", "",
+              f"| run | model | least free VRAM MiB (GPU 0 / 1 / 2 / 3; at least {ROBUST_FREE_VRAM_MIB}) | least MemAvailable "
+              f"GiB (at least {ROBUST_MEM_AVAIL_GIB:g}) | other clients' requests since the restart (conversations parked) "
+              "| holds |", "|---|---|---:|---:|---:|---|",
+              f"| {robust} | {info[robust].get('model') or '?'} | {' / '.join(fmt(g) for g in gpus)} | {fmt(avail, 2)} | "
+              f"{fmt(info[robust].get('other_requests'))} ({fmt(info[robust].get('parked'))}) | "
+              f"{'yes' if holds else ('NO' if broken and not invalid else '-')} |", ""]
+        if invalid:
+            robust_unknown = True
+            o.append("Stability criterion (robustness run): cannot be judged: " + "; ".join(invalid)
+                     + (" (the floors it broke: " + "; ".join(broken) + ")" if broken else "") + ".")
+        elif broken:
+            robust_fail = True
+            o.append("Stability criterion (robustness run): does NOT hold: " + "; ".join(broken) + ".")
+        elif faults:
+            robust_unknown = True
+            o.append("Stability criterion (robustness run): cannot be judged: it kept the floors, but " + "; ".join(faults)
+                     + " (decision 0004 names only the floors for this run: whether this fails criterion 1 is the "
+                     "maintainer's decision).")
+        else:
+            o.append(f"Stability criterion (robustness run): holds: every card kept at least {ROBUST_FREE_VRAM_MIB} MiB of "
+                     f"VRAM free and MemAvailable stayed at or above {ROBUST_MEM_AVAIL_GIB:g} GiB.")
     o.append("")
     status = 0
-    if cand_dirty and not base_dirty:
-        o.append("Stability criterion (perf runs): does NOT hold: " + "; ".join(cand_dirty) + ".")
+    if cand_judged and not base_dirty and not base_unknown:
+        o.append("Stability criterion (perf runs): does NOT hold: " + "; ".join(cand_judged) + ".")
         status = 3
     elif cand_dirty:
+        why = (["neither is a baseline run"] if base_dirty else []) + \
+              ([f"a baseline run must be measured again ({'; '.join(base_unknown)})"] if base_unknown else []) + \
+              ([f"each candidate run with a fault has a reason to be measured again too ({'; '.join(cand_reasons)})"]
+               if not cand_judged else [])
         o.append("Stability criterion (perf runs): cannot be judged: candidate runs are not clean (" + "; ".join(cand_dirty)
-                 + "), and neither is a baseline run.")
-    if unknown_any or speed_unknown:
-        o.append("Cannot be evaluated: " + "; ".join(unknown_any + [f"no usable value for {u}" for u in speed_unknown]) + ".")
+                 + "), and " + ", and ".join(why) + ".")
+    if robust_fail:
+        status = 3
+    if unknown_any or speed_unknown or robust_unknown:
+        o.append("Cannot be evaluated: " + "; ".join(unknown_any + [f"no usable value for {u}" for u in speed_unknown]
+                                                     + (["the robustness run cannot be judged (above)"] if robust_unknown else []))
+                 + ".")
         status = status or 2
     if not cand_dirty and not unknown_any:
-        o.append("Stability criterion (perf runs): holds: every run clean.")
+        o.append("Stability criterion (perf runs): holds: every run clean"
+                 + (f" ({', '.join(f'{t} measured again as {n}' for t, n in accepted.items())})" if accepted else "") + ".")
     if not speed_unknown:
         o.append(f"Speed criterion: {'holds' if speed_ok else 'does NOT hold'} (the mean and each {cand} run).")
         if not speed_ok and status == 0:
             status = 1
-    o.append("Not evaluated here (decision record 0004): the robustness run's floors and the quality subset.")
+    o.append("Not evaluated here (decision record 0004): " + (
+        "criterion 3, which rests on published measurements." if robust else
+        "the robustness run of criterion 1 (give its tag with --robustness: IQ3_S is kept only when it holds too), and "
+        "criterion 3, which rests on published measurements."))
     return status, o
 
 
@@ -556,9 +797,12 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("tags", nargs="+")
     ap.add_argument("--results", type=Path, default=RESULTS, help="the raw results (default: the repository's results/)")
-    a = ap.parse_args(argv)
+    ap.add_argument("--remeasured", action="append", default=[], metavar="OLD=NEW",
+                    help="the run OLD was measured again as NEW (1. above); repeat it for each such run")
+    ap.add_argument("--robustness", metavar="TAG", help="the robustness run on the candidate (4. above)")
+    a = ap.parse_intermixed_args(argv)
     try:
-        status, lines = evaluate(a.tags, a.results)
+        status, lines = evaluate(a.tags, a.results, a.remeasured, a.robustness)
     except Exception as e:                           # a crash is "cannot be evaluated", never a verdict
         status, lines = 2, [f"Cannot be evaluated: {type(e).__name__}: {e}"]
     print("\n".join(lines))

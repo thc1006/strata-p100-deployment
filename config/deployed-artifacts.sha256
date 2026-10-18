@@ -1,7 +1,7 @@
 # Deployed artifacts, 2026-10-16 13:59 CST - sha256
 # strata source pin: a0116b2782a5b82622358c04a06496485d12b2d6, engine strata 0.1.43.1, build src hash 7089bf002d14a0e3
 8045e78b9e0b39d2819f898c8dd1e917c754fb00afb57824e3f4a2f035021533  strata/engine-cuda12/strata
-9d77453598d5e9d944f3331f02c76e3f232b6173e2624f9546b3fc10b1e38553  strata/strata-iq3_xxs.json
+5a491003a3e1fdb849bf3e499d4f04b7988a84f5413217e422d5934fb4b57362  strata/strata-iq3_xxs.json
 8f59b4aa8873209dff11c11e37bcda9529a1335b724a1afeea37bf6388975baf  strata/data/expert-profile.bin
 c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a  Strata-data/mtp/rt/dense.bin
 b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91  Strata-data/mtp/rt/draft_vocab.bin

@@ -1,0 +1,39 @@
+# bench/model_memory_budget.py, rerun 2026-10-19 (the 2026-10-18 run's output was not kept); every model at a pinned revision:
+#   local GSQ-RCO IQ3_XXS and IQ3_S shards (sizes in iq3s-model-files-20261019.txt); unsloth/Qwen3.8-Flash-Next-GGUF @38bb39ee97821de2c9009abb7e93950eec396e66 (UD-IQ4_XS, UD-Q4_K_XL); bartowski/Qwen3.8-Flash-Next-GGUF @928589fdb66c6ff07f22ac561e3fbce76553548f (Q4_0, IQ4_XS, Q4_K_M)
+#   --base iq3_xxs --capacity 10.495,10.658,11.840,9.473 --split 13,26,38 --reserve 1536,1280,1024 --profile ~/dev/strata/data/expert-profile.bin
+capacity at 1536 MiB: 10.495 / 10.658 / 11.840 / 9.473 GiB (42.47); base iq3_xxs, cuts 13,26,38; profile 301,977,600 routing events
+
+iq3_xxs: routed experts 39.97 GiB (9.41 / 9.88 / 11.43 / 9.25 at 13,26,38), PLE 26.82 GiB (IQ4_NL), dense 3.16 + head 0.42 + other 0.25 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 100.000% of the routing (0.0 of 480 expert products per token from RAM; 0.00 GiB of experts in RAM); best cuts 12,26,38: 100.000% (0.0; 0.00 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 100.000% of the routing (0.0 of 480 expert products per token from RAM; 0.00 GiB of experts in RAM); best cuts 12,26,38: 100.000% (0.0; 0.00 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 100.000% of the routing (0.0 of 480 expert products per token from RAM; 0.00 GiB of experts in RAM); best cuts 11,25,38: 100.000% (0.0; 0.00 GiB)
+
+iq3_s: routed experts 46.84 GiB (11.63 / 12.56 / 11.91 / 10.73 at 13,26,38), PLE 26.82 GiB (IQ4_NL), dense 3.39 + head 0.50 + other 0.31 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 98.668% of the routing (6.4 of 480 expert products per token from RAM; 4.69 GiB of experts in RAM); best cuts 13,25,38: 98.971% (4.9; 4.69 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 99.052% of the routing (4.6 of 480 expert products per token from RAM; 3.81 GiB of experts in RAM); best cuts 13,25,38: 99.343% (3.2; 3.69 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 99.366% of the routing (3.0 of 480 expert products per token from RAM; 3.06 GiB of experts in RAM); best cuts 13,25,38: 99.631% (1.8; 2.68 GiB)
+
+ud_iq4_xs: routed experts 55.43 GiB (15.38 / 14.44 / 13.72 / 11.89 at 13,26,38), PLE 26.82 GiB (IQ4_NL), dense 3.86 + head 0.49 + other 0.63 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 93.529% of the routing (31.1 of 480 expert products per token from RAM; 13.75 GiB of experts in RAM); best cuts 12,25,38: 93.797% (29.8; 13.75 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 94.350% of the routing (27.1 of 480 expert products per token from RAM; 12.74 GiB of experts in RAM); best cuts 12,25,38: 94.650% (25.7; 12.75 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 95.099% of the routing (23.5 of 480 expert products per token from RAM; 11.75 GiB of experts in RAM); best cuts 12,25,38: 95.430% (21.9; 11.75 GiB)
+
+ud_q4_k_xl: routed experts 71.73 GiB (19.73 / 19.04 / 17.82 / 15.14 at 13,26,38), PLE 26.82 GiB (IQ4_NL), dense 3.86 + head 0.64 + other 0.63 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 82.082% of the routing (86.0 of 480 expert products per token from RAM; 30.19 GiB of experts in RAM); best cuts 13,25,38: 82.253% (85.2; 30.19 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 83.243% of the routing (80.4 of 480 expert products per token from RAM; 29.19 GiB of experts in RAM); best cuts 13,25,38: 83.406% (79.6; 29.19 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 84.362% of the routing (75.1 of 480 expert products per token from RAM; 28.18 GiB of experts in RAM); best cuts 13,25,38: 84.512% (74.3; 28.19 GiB)
+
+bartowski_q4_0: routed experts 63.57 GiB (17.43 / 17.14 / 15.82 / 13.18 at 13,26,38), PLE 26.82 GiB (Q4_0), dense 2.45 + head 0.50 + other 0.33 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 89.442% of the routing (50.7 of 480 expert products per token from RAM; 20.48 GiB of experts in RAM); best cuts 13,25,38: 89.599% (49.9; 20.48 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 90.423% of the routing (46.0 of 480 expert products per token from RAM; 19.48 GiB of experts in RAM); best cuts 13,25,38: 90.590% (45.2; 19.48 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 91.337% of the routing (41.6 of 480 expert products per token from RAM; 18.49 GiB of experts in RAM); best cuts 13,25,38: 91.515% (40.7; 18.49 GiB)
+
+bartowski_iq4_xs: routed experts 60.94 GiB (16.50 / 16.50 / 15.23 / 12.70 at 13,26,38), PLE 26.82 GiB (IQ4_NL), dense 2.39 + head 0.50 + other 0.31 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 91.272% of the routing (41.9 of 480 expert products per token from RAM; 17.78 GiB of experts in RAM); best cuts 13,25,38: 91.454% (41.0; 17.79 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 92.173% of the routing (37.6 of 480 expert products per token from RAM; 16.79 GiB of experts in RAM); best cuts 13,25,38: 92.368% (36.6; 16.79 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 93.014% of the routing (33.5 of 480 expert products per token from RAM; 15.79 GiB of experts in RAM); best cuts 13,25,38: 93.222% (32.5; 15.79 GiB)
+
+bartowski_q4_k_m: routed experts 75.00 GiB (20.75 / 19.58 / 18.16 / 16.50 at 13,26,38), PLE 32.78 GiB (Q5_0), dense 2.76 + head 0.50 + other 0.33 GiB
+  reserve 1536 MiB: at 13,26,38 the cards hold 81.325% of the routing (89.6 of 480 expert products per token from RAM; 32.22 GiB of experts in RAM); best cuts 13,25,39: 81.489% (88.9; 32.22 GiB)
+  reserve 1280 MiB: at 13,26,38 the cards hold 82.455% of the routing (84.2 of 480 expert products per token from RAM; 31.22 GiB of experts in RAM); best cuts 13,25,39: 82.617% (83.4; 31.22 GiB)
+  reserve 1024 MiB: at 13,26,38 the cards hold 83.553% of the routing (78.9 of 480 expert products per token from RAM; 30.22 GiB of experts in RAM); best cuts 12,24,38: 83.699% (78.2; 30.22 GiB)

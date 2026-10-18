@@ -2,26 +2,38 @@
 # One run of the IQ3_XXS / IQ3_S A/B (docs/decisions/0004-iq3-s.md): the standard perf set (bench/run_profile.sh)
 # with serve_load's prompts fixed, so that every run decodes the same text, and a record of what the service ran
 # before and after it and of every line that may tell of a fault during it.  bench/ab_model_summary.py judges them.
+# With "robustness" it runs the robustness set (bench/run_robustness.sh) instead: the robustness run of criterion 1.
 # It starts and stops nothing: the restarts between runs are done by hand, in the decision record's order.
 # It refuses to measure when it could not record the run completely, when the service became ready (the model
-# loaded) less than SETTLE_S (default 300) seconds ago, or when a request is in flight.
+# loaded) less than SETTLE_S (default 300) seconds ago, when a request is in flight, or when what protocol step 1
+# deploys is not in place, as the summary would find afterwards: the ZFS ARC cap of systemd/zfs-arc-max.service, the
+# two RAM floors of tools/configure_strata_q3.py in the engine's environment and arguments (both read from this
+# repository, as the summary reads them), and the host units of config/host-units.conf.
 #   <tag>-arm.txt     before: the checkout the service runs from (its commit, the sha256 of its code and of this perf
-#                     set), profile.conf, the config's sha256 (whole, and without the model's own fields), the shared
-#                     settings, server.py and serve_load.py, serve_load's nonce, the engine's pid, start time, exe,
-#                     args, environment and placement lines at its load, how long the service has been ready,
-#                     /health, the requests /metrics has counted, the ZFS ARC cap, MemAvailable, the host units check
-#                     and every GPU's ECC error counters
-#   <tag>-after.txt   after: run_profile.sh's exit status, whether it was interrupted, whether the same engine
-#                     answered, whether the service was idle at the end, the requests /metrics counted during the run
+#                     set), the set that runs, profile.conf, the config's sha256 (whole, and without the model's own
+#                     fields), the shared settings, server.py and serve_load.py, serve_load's nonce, the engine's pid,
+#                     start time, exe, args, environment and placement lines at its load (the expert complement
+#                     page-locked in RAM included), how long the service has been ready, /health, the requests
+#                     /metrics has counted since the service started and the conversations parked (other clients'
+#                     work before the run), the ZFS ARC cap, MemAvailable, the host units check and every GPU's ECC
+#                     error counters
+#   <tag>-after.txt   after: the set's exit status, whether it was interrupted, whether the same engine answered,
+#                     whether the service was idle at the end, the requests /metrics counted during the run
 #                     (run_profile.sh sends 98), the journal's "[strata] done:" lines by finish, the number of lines in
-#                     each file below, the perf log's Traceback lines, the ECC counters
+#                     each file below, the set's log's Traceback lines, the ECC counters
 #   <tag>-engine-errors.txt, <tag>-journal-errors.txt, <tag>-kernel-errors.txt   the lines of the engine log, of the
 #                     service journal (systemd's own lines included) and of the kernel log that may tell of a fault,
 #                     from exactly the run (journal cursors); the summary sorts them into faults and other traffic
 # Every name of this host (hostname, -f, -A and the first label of each), in any case, is written as <host>.
-# Usage: bench/ab_model_run.sh <tag> <arm letter>
+# Usage: bench/ab_model_run.sh <tag> <arm letter> [robustness]
+# (Test hook: AB_ARC_FILE replaces /sys/module/zfs/parameters/zfs_arc_max.)
 set -u -o pipefail
 TAG=${1:?tag}; ARM=${2:?arm letter}
+case "${3:-}" in
+  '') SET=run_profile.sh; SETLOG=perf.log ;;
+  robustness) SET=run_robustness.sh; SETLOG=robustness.log ;;
+  *) echo "ab_model_run: usage: bench/ab_model_run.sh <tag> <arm letter> [robustness]" >&2; exit 2 ;;
+esac
 D=$(cd "$(dirname "$0")/.." && pwd)
 R=$D/results
 URL=http://127.0.0.1:8080
@@ -30,15 +42,16 @@ STRATA=${STRATA_DIR:-$HOME/dev/strata}
 CFG=$STRATA/strata-iq3_xxs.json
 SHARED=$STRATA/strata-iq3_xxs.shared-settings.json
 SETTLE_S=${SETTLE_S:-300}
+ARC_FILE=${AB_ARC_FILE:-/sys/module/zfs/parameters/zfs_arc_max}
 export SERVE_LOAD_NONCE=${SERVE_LOAD_NONCE:-ab-0004}   # run_profile.sh passes it to serve_load: the same prompts in every run
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT        # raw journal copies never go near results/
 say() { echo "ab_model_run: $*"; }
 refuse() { say "refusing: $*"; exit 1; }
 for f in arm.txt after.txt engine-errors.txt journal-errors.txt kernel-errors.txt perf.log monitor.csv serve_load.json \
-         four_user.jsonl; do
+         four_user.jsonl robustness.log robust-monitor.csv robust-monitor-all.json overload.json needles.json; do
   [ -e "$R/$TAG-$f" ] && { say "refusing: $R/$TAG-$f exists (pick a new tag)"; exit 2; }
 done
-# the perf set appends its records to stress.jsonl and latency.jsonl: the tag must not be there yet
+# the sets append their records to stress.jsonl and latency.jsonl: the tag must not be there yet
 python3 - "$R" "$TAG" <<'EOF' || { say "refusing: the tag $TAG is in results/stress.jsonl or latency.jsonl, or they cannot be read"; exit 2; }
 import json, sys
 from pathlib import Path
@@ -110,25 +123,45 @@ EOF
 }
 sha() { if [ -e "$1" ]; then sha256sum < "$1" | cut -c1-16; else echo absent; fi; }
 ecc() { nvidia-smi --query-gpu=index,ecc.errors.corrected.volatile.total,ecc.errors.uncorrected.volatile.total --format=csv,noheader | tr '\n' ';'; }
-# "<state> <running> <queued> <requests counted since the start>" from /metrics
+# "<state> <running> <queued> <requests counted since the start> <conversations parked> <their bytes>" from /metrics
 metrics() {
   curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json, sys
-d = json.load(sys.stdin); l = d["live"]
-print(l.get("state"), l.get("running"), l.get("queued"), d["totals"]["requests"])'
+d = json.load(sys.stdin); l = d["live"]; c = d.get("conversation_cache") or {}
+print(l.get("state"), l.get("running"), l.get("queued"), d["totals"]["requests"], c.get("parked", "unknown"), c.get("bytes", "unknown"))'
 }
 cursor() { sudo -n journalctl -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p'; }
 
 health=$(curl -fsS -m 10 "$URL/health") || refuse "/health does not answer"
 grep -q '"loaded": true' <<< "$health" || refuse "the model is not loaded"
-read -r state0 running0 queued0 total0 <<< "$(metrics)"
+read -r state0 running0 queued0 total0 parked0 pbytes0 <<< "$(metrics)"
 [ "${state0:-}" = idle ] && [ "${running0:-}" = 0 ] && [ "${queued0:-}" = 0 ] && [[ "${total0:-}" =~ ^[0-9]+$ ]] ||
   refuse "the service is not idle, or /metrics does not say (${state0:-no answer} ${running0:-} ${queued0:-} ${total0:-})"
 sudo -n journalctl -n 1 --no-pager -q > /dev/null 2>&1 || refuse "the system journal needs sudo -n"
-hu=drift; "$CHECKOUT/scripts/host-units.sh" check > /dev/null 2>&1 && hu=ok
+# what protocol step 1 deploys, as the summary checks it afterwards: a run without it would be measured for nothing
+"$CHECKOUT/scripts/host-units.sh" check > /dev/null 2>&1 ||
+  refuse "the host units are not as config/host-units.conf sets them ($CHECKOUT/scripts/host-units.sh check; its user units need this user's session bus, XDG_RUNTIME_DIR)"
+hu=ok
+arc_want=$(grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' "$D/systemd/zfs-arc-max.service" 2>/dev/null | cut -d' ' -f2)
+arc_have=$(cat "$ARC_FILE" 2>/dev/null)
+[[ "$arc_want" =~ ^[0-9]+$ ]] && [ "$arc_have" = "$arc_want" ] ||
+  refuse "the ZFS ARC cap is ${arc_have:-unreadable}, $D/systemd/zfs-arc-max.service writes ${arc_want:-?}"
+floors=$(python3 -B - "$D/tools/configure_strata_q3.py" 2>/dev/null <<'EOF'
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location("configure_strata_q3", sys.argv[1])
+tool = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(tool)
+print(tool.ENV_DEFAULTS["STRATA_RESIDENT_HEADROOM_GIB"], tool.PARK_MIN_FREE_MIB)
+EOF
+)
+read -r head_want park_want <<< "$floors"
+head_have=$(tr '\0' '\n' 2>/dev/null < "/proc/$pid/environ" | sed -n 's/^STRATA_RESIDENT_HEADROOM_GIB=//p' | head -1)
+park_have=$(tr '\0' '\n' 2>/dev/null < "/proc/$pid/cmdline" | sed -n '/^--conversation-cache-min-free-mib$/{n;p;q}')
+[ -n "${head_want:-}" ] && [ -n "${park_want:-}" ] && [ "$head_have" = "$head_want" ] && [ "$park_have" = "$park_want" ] ||
+  refuse "the engine runs with STRATA_RESIDENT_HEADROOM_GIB ${head_have:-unset} and --conversation-cache-min-free-mib ${park_have:-unset}, $D/tools/configure_strata_q3.py sets ${head_want:-?} and ${park_want:-?}"
 # the engine's placement decisions at this start: from its "engine started" line to the first request
 placement=$(awk '/^\[strata\] .*engine started: / { k = 0; stop = 0; on = 1; next }
                  on && /^strata serve: prompt [0-9]+ tokens/ { stop = 1 }
-                 on && !stop && /memory guard|pcie_frac|expert cache .*slots|experts resident|runs layers|session is up/ { keep[k++] = $0 }
+                 on && !stop && /memory guard|pcie_frac|expert cache .*slots|experts resident|runs layers|session is up|resident RAM mode|cache complement ready/ { keep[k++] = $0 }
                  END { for (i = 0; i < k; i++) print keep[i] }' "$LOG")
 [ -n "$placement" ] || refuse "no placement lines for this start in $LOG"
 commit=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null) || commit=unknown
@@ -137,7 +170,7 @@ profile=$(grep -v '^[[:space:]]*#' "$CHECKOUT/config/profile.conf" 2>/dev/null |
 cur=$(cursor)
 [ -n "$cur" ] || refuse "cannot read the journal's cursor"
 
-# from the arm record on, an interrupt (INT, TERM, HUP) no longer ends this script: it stops the perf set (or keeps it
+# from the arm record on, an interrupt (INT, TERM, HUP) no longer ends this script: it stops the set (or keeps it
 # from starting), and the after record is still written
 stop_perf_set() { [ -n "$child" ] && kill -TERM -- -"$child" 2>/dev/null; }
 interrupted=no; child=
@@ -150,6 +183,7 @@ ecc0=$(ecc)
   echo "service checkout $CHECKOUT  commit $commit  tracked files changed: ${changed:-none}"
   echo "deployment code sha256 $(code_sha "$CHECKOUT" scripts tools systemd bench config)  (scripts tools systemd bench config, profile.conf aside)"
   echo "perf set sha256 $(code_sha "$D" bench)  ($D/bench)"
+  echo "set: bench/$SET"
   echo "profile.conf: ${profile:-unreadable}"
   echo "config $CFG sha256 $(sha "$CFG")  without the model's fields $(cfg_sha "$CFG")"
   echo "shared settings $SHARED sha256 $(sha "$SHARED")"
@@ -165,20 +199,21 @@ ecc0=$(ecc)
   printf '%s\n' "$placement" | sed 's/^/load: /'
   echo "health: $health"
   echo "metrics requests before the run: $total0"
+  echo "conversation cache before the run: parked ${parked0:-unknown} bytes ${pbytes0:-unknown}"
   echo "version line: $(grep -a -o 'session is up (engine [0-9.]*)' "$LOG" | tail -1)"
-  echo "zfs_arc_max $(cat /sys/module/zfs/parameters/zfs_arc_max)  MemAvailable $(awk '/MemAvailable/{print $2}' /proc/meminfo) kB"
+  echo "zfs_arc_max $arc_have  MemAvailable $(awk '/MemAvailable/{print $2}' /proc/meminfo) kB"
   echo "host units: $hu"
   echo "gpu ecc (index, corrected, uncorrected): $ecc0"
 } | redact > "$R/$TAG-arm.txt"
-for want in '^tag ' '^deployment code sha256 ' '^perf set sha256 ' '^engine args: ' '^health: ' '^engine start ticks ' \
+for want in '^tag ' '^deployment code sha256 ' '^perf set sha256 ' '^set: ' '^engine args: ' '^health: ' '^engine start ticks ' \
             '^service ready for ' '^serve_load nonce ' '^metrics requests before the run: ' '^load: ' '^gpu ecc '; do
   grep -q "$want" "$R/$TAG-arm.txt" || refuse "the arm record lacks ${want#^}"
 done
 
-# the perf set in a process group of its own, so that an interrupt stops all of it
+# the set in a process group of its own, so that an interrupt stops all of it
 rc=none
 if [ $interrupted = no ]; then
-  setsid "$D/bench/run_profile.sh" "$TAG" &
+  setsid "$D/bench/$SET" "$TAG" &
   child=$!
   [ $interrupted = yes ] && stop_perf_set        # an interrupt that came before $! was known
   while kill -0 "$child" 2>/dev/null; do wait "$child"; done
@@ -187,7 +222,7 @@ fi
 trap - INT TERM HUP
 
 # what happened during the run.  /metrics first: its count is exact in time, the journal's window ends a moment later
-read -r state1 running1 queued1 total1 <<< "$(metrics)"
+read -r state1 running1 queued1 total1 _ <<< "$(metrics)"
 if [ -z "${state1:-}" ]; then idle_end=unknown
 elif [ "$state1" = idle ] && [ "${running1:-}" = 0 ] && [ "${queued1:-}" = 0 ]; then idle_end=yes
 else idle_end=no; fi
@@ -220,7 +255,7 @@ fi
 pid2=$(engine "$(systemctl show -p MainPID --value $UNIT)")
 same=NO; [ -n "$pid2" ] && [ "$pid2" = "$pid" ] && [ "$(start_ticks "$pid2")" = "$ticks0" ] && same=yes
 {
-  echo "tag $TAG  ended at $(date '+%F %T')  run_profile exit $rc  interrupted $interrupted"
+  echo "tag $TAG  ended at $(date '+%F %T')  ${SET%.sh} exit $rc  interrupted $interrupted"
   echo "engine pid ${pid2:-none}  start ticks ${pid2:+$(start_ticks "$pid2")}"
   echo "same engine as before: $same"
   echo "idle at the end: $idle_end"
@@ -230,8 +265,8 @@ same=NO; [ -n "$pid2" ] && [ "$pid2" = "$pid" ] && [ "$(start_ticks "$pid2")" = 
   echo "journal done lines during the run: $done_lines (${done_finish})"
   echo "kernel lines during the run: $kernel_errors"
   # grep -c prints the count and exits 1 when it is 0: read the count, not the status
-  if [ -r "$R/$TAG-perf.log" ]; then echo "perf log Traceback lines: $(grep -c 'Traceback' "$R/$TAG-perf.log")"
-  else echo "perf log Traceback lines: unknown (no perf log)"; fi
+  if [ -r "$R/$TAG-$SETLOG" ]; then echo "perf log Traceback lines: $(grep -c 'Traceback' "$R/$TAG-$SETLOG")"
+  else echo "perf log Traceback lines: unknown (no $TAG-$SETLOG)"; fi
   echo "gpu ecc (index, corrected, uncorrected): $(ecc)"
 } | redact > "$R/$TAG-after.txt"
 cat "$R/$TAG-after.txt"

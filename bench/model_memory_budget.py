@@ -124,9 +124,16 @@ def tensors(where: str) -> list[dict]:
     return out
 
 
+# ggml's type ids (ggml.h) for the names the report gives the PLE table's quantization
+GGML_TYPES = {0: "F32", 1: "F16", 2: "Q4_0", 3: "Q4_1", 6: "Q5_0", 7: "Q5_1", 8: "Q8_0", 10: "Q2_K", 11: "Q3_K",
+              12: "Q4_K", 13: "Q5_K", 14: "Q6_K", 16: "IQ2_XXS", 17: "IQ2_XS", 18: "IQ3_XXS", 19: "IQ1_S", 20: "IQ4_NL",
+              21: "IQ3_S", 22: "IQ2_S", 23: "IQ4_XS", 29: "IQ1_M", 30: "BF16"}
+
+
 def parts(shards: list[str]) -> dict:
-    """GiB per layer of routed experts and of dense weights, the output head, the PLE table and the rest."""
-    exp, dense, head, ple, other = [0.0] * 48, [0.0] * 48, 0.0, 0.0, 0.0
+    """GiB per layer of routed experts and of dense weights, the output head, the PLE table (and its types) and the
+    rest."""
+    exp, dense, head, ple, other, ple_types = [0.0] * 48, [0.0] * 48, 0.0, 0.0, 0.0, set()
     for s in shards:
         for t in tensors(os.path.expanduser(s)):
             m = re.match(r"blk\.(\d+)\.", t["name"])
@@ -135,13 +142,14 @@ def parts(shards: list[str]) -> dict:
                 exp[int(m.group(1))] += g
             elif t["name"].startswith("per_layer_token_embd"):
                 ple += g
+                ple_types.add(GGML_TYPES.get(t["type"], f"type {t['type']}"))
             elif m:
                 dense[int(m.group(1))] += g
             elif t["name"].startswith("output"):
                 head += g
             else:
                 other += g
-    return {"experts": exp, "dense": dense, "head": head, "ple": ple, "other": other}
+    return {"experts": exp, "dense": dense, "head": head, "ple": ple, "other": other, "ple_types": sorted(ple_types)}
 
 
 def read_profile(path: str) -> list[list[int]]:
@@ -221,7 +229,7 @@ def main() -> int:
     for name, m in models.items():
         per_card = [sum(m["experts"][x:y]) for x, y in zip((0,) + base_cuts, base_cuts + (48,))]
         print(f"\n{name}: routed experts {sum(m['experts']):.2f} GiB ({' / '.join(f'{v:.2f}' for v in per_card)} at "
-              f"{a.split}), PLE {m['ple']:.2f} GiB, dense {sum(m['dense']):.2f} + head {m['head']:.2f} + other "
+              f"{a.split}), PLE {m['ple']:.2f} GiB ({', '.join(m['ple_types'])}), dense {sum(m['dense']):.2f} + head {m['head']:.2f} + other "
               f"{m['other']:.2f} GiB")
         for reserve in reserves:
             here, best = results[(name, reserve)]

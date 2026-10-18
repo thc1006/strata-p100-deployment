@@ -17,7 +17,8 @@ class Wrapper(unittest.TestCase):
                            text=True, timeout=600)
         failed = [line for line in r.stdout.splitlines() if not line.startswith("PASS")]
         self.assertEqual(r.returncode, 0, "\n".join(failed) + r.stderr)
-        self.assertGreaterEqual(sum(line.startswith("PASS") for line in r.stdout.splitlines()), 45)
+        # every check of the harness: a harness that stops early passes fewer
+        self.assertGreaterEqual(sum(line.startswith("PASS") for line in r.stdout.splitlines()), 64)
 
 
 if __name__ == "__main__":

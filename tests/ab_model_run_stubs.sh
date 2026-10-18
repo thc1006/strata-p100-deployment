@@ -7,6 +7,7 @@
 set -u
 W=${1:-$(cd "$(dirname "$0")/.." && pwd)}
 export SB; SB=$(mktemp -d "${TMPDIR:-/tmp}/abwrap.XXXXXX")
+export AB_ARC_FILE=$SB/zfs_arc_max            # the wrapper's ZFS ARC cap, instead of /sys/module/zfs/parameters
 fails=0
 pass() { echo "PASS $*"; }
 fail() { echo "FAIL $*"; fails=$((fails + 1)); }
@@ -25,14 +26,24 @@ set -u
 TAG=$1; R=$(cd "$(dirname "$0")/.." && pwd)/results
 echo "serve_load nonce ${SERVE_LOAD_NONCE:-unset}" > "$R/$TAG-perf.log"
 sleep "${STUB_SLEEP:-0}"
+[ -n "${STUB_RESTART:-}" ] && "$SB/start_service.sh"      # the engine started again during the run
 echo "strata serve: engine error: CUDA error on TESTHOST-MACHINE" >> "$STUB_LOG"
 python3 -c 'import json, os, sys; p = sys.argv[1]; d = json.load(open(p)); d["totals"]["requests"] += int(os.environ.get("STUB_REQUESTS", "98"))
 if os.environ.get("STUB_END_STATE"): d["live"].update(state=os.environ["STUB_END_STATE"], running=1)
 json.dump(d, open(p, "w"))' "$SB/metrics"
 echo "finished $TAG"
 EOF
+cat > "$SB/repo/bench/run_robustness.sh" <<'EOF'
+#!/usr/bin/env bash
+set -u
+TAG=$1; R=$(cd "$(dirname "$0")/.." && pwd)/results
+{ echo "robustness set ran for $TAG"; echo "Traceback (most recent call last):"; } > "$R/$TAG-robustness.log"
+python3 -c 'import json, sys; p = sys.argv[1]; d = json.load(open(p)); d["totals"]["requests"] += 50
+json.dump(d, open(p, "w"))' "$SB/metrics"
+echo "finished $TAG robustness"
+EOF
 printf '#!/bin/bash\nexit "$(cat "$SB/hostunits_rc" 2>/dev/null || echo 0)"\n' > "$SB/repo/scripts/host-units.sh"
-chmod +x "$SB/repo/bench/run_profile.sh" "$SB/repo/scripts/host-units.sh"
+chmod +x "$SB/repo/bench/run_profile.sh" "$SB/repo/bench/run_robustness.sh" "$SB/repo/scripts/host-units.sh"
 (cd "$SB/repo" && git init -q && git add -A && git -c user.name=t -c user.email=t@t.invalid commit -qm sandbox) || exit 1
 printf '# comment\n--profile deployed --model iq3_xxs\n' > "$SB/repo/config/profile.conf"   # changed, as a switch leaves it
 
@@ -79,9 +90,12 @@ cfg() {  # the config, its model fields for $1
 {"exe": "$SB/strata/engine-cuda12/strata", "args": ["--pack", "/d/packs/$q", "--native", "/d/models/$Q/Qwen3.8-Flash-Next-GSQ-RCO-$Q-00001-of-00002.gguf", "--ple-gguf", "/d/models/$Q/Qwen3.8-Flash-Next-GSQ-RCO-$Q-00002-of-00002.gguf", "--conversation-cache-min-free-mib", "6144", "--layer-split", "$2", "--batch", "4"], "tokenizer": "/d/packs/$q/tokenizer", "model_name": "qwen3.8-flash-next-$q", "layer_split": [$2], "parallel": 4, "reasoning_close_retry": true}
 EOF
 }
-start_service() {  # a fake server.py (a bash) with the engine as its child, the engine's stderr the log
-  [ -f "$SB/server.pid" ] && kill -- -"$(cat "$SB/server.pid")" 2>/dev/null
-  cat > "$STUB_LOG" <<'EOF'
+# a fake server.py (a bash) with the engine as its child, the engine's stderr the log, in a session of its own (the
+# one before it ended): start_service.sh [resident headroom GiB] [parking floor MiB]; the stub perf set runs it too
+cat > "$SB/start_service.sh" <<'EOF'
+#!/bin/bash
+[ -f "$SB/server.pid" ] && kill -- -"$(cat "$SB/server.pid")" 2>/dev/null
+cat > "$STUB_LOG" <<'LOG'
 strata serve: prompt 15 tokens = 8 reused + 7 read in 112 ms (62.2 tok/s), of an older engine
 [strata] 2026-10-19 00:50:00 engine started: /x/engine-cuda12/strata --serve --pack /d/packs/iq3_xxs
 strata generate: memory guard: limit 62.8 GiB (source: meminfo), current 11.3 GiB; available 51.5 GiB (MemAvailable 51.5 GiB), floor 6144 MiB
@@ -90,19 +104,28 @@ strata generate: expert cache 6656 slots, 9.41 GiB of VRAM; policy is
 strata generate: layer split: CUDA1 runs layers 13-25, expert cache 6656 slots (9.88 GiB), 6656 of its 6656 profiled pairs; slot 0 verified
 strata generate: session is up (engine 0.1.43.1)
 strata serve: layer split: 100% of the experts resident, the prompt path's streamed ring 96 slots
+FileExpertSource: allocating 1.12 GiB page-locked cache complement
+FileExpertSource: mapped pinned cache complement ready: resident 1.12 GiB, pinned 1.12 GiB in 6 s; 1.12 GiB page-locked after taking the pages in steps;
+strata generate: resident RAM mode: 1.12 GiB of experts in RAM (page-locked), 6656 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)
 strata serve: prompt 15 tokens = 8 reused + 7 read in 112 ms (62.2 tok/s), the warm-up
 strata generate: expert cache 9999 slots, a line after the first request
+LOG
+setsid bash -c 'exec 2>>"$STUB_LOG"; env -i STRATA_RESIDENT_HEADROOM_GIB="$1" CUDA_VISIBLE_DEVICES=0,1,2,3 OTHER=1 \
+  "$SB/strata/engine-cuda12/strata" --serve --pack /d/packs/iq3_xxs \
+  --native /d/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --layer-split 13,26,38 \
+  --conversation-cache-min-free-mib "$2" & wait' _ "${1:-6}" "${2:-6144}" > /dev/null &
+echo $! > "$SB/server.pid"
+sleep 0.5
 EOF
-  setsid bash -c 'exec 2>>"$STUB_LOG"; env -i STRATA_RESIDENT_HEADROOM_GIB=6 CUDA_VISIBLE_DEVICES=0,1,2,3 OTHER=1 \
-    "$SB/strata/engine-cuda12/strata" --serve --pack /d/packs/iq3_xxs \
-    --native /d/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --layer-split 13,26,38 & wait' > /dev/null &
-  echo $! > "$SB/server.pid"
-  sleep 0.5
-}
+chmod +x "$SB/start_service.sh"
+start_service() { "$SB/start_service.sh" "$@"; }
 reset() {  # a clean state: the service idle, the journal and kernel log of a clean run
   echo '{"status": "ok", "model": "qwen3.8-flash-next-iq3_xxs", "loaded": true}' > "$SB/health"
-  echo '{"live": {"state": "idle", "running": 0, "queued": 0}, "totals": {"requests": 142}}' > "$SB/metrics"
+  echo '{"live": {"state": "idle", "running": 0, "queued": 0}, "totals": {"requests": 142},
+         "conversation_cache": {"enabled": true, "parked": 2, "bytes": 1048576}}' > "$SB/metrics"
   echo 1 > "$SB/ready_s"; rm -f "$SB/hostunits_rc"
+  # the ARC cap the sandbox's systemd/zfs-arc-max.service writes, as protocol step 1 deploys it
+  grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' "$SB/repo/systemd/zfs-arc-max.service" | cut -d' ' -f2 > "$AB_ARC_FILE"
   { echo " 十  19 01:00:01 testhost-machine python[1]: [strata] parallel: a request has waited 104 s for a free slot (busy: [0, 1, 2, 3], in use: [0, 1, 2, 3], ending: []) (issue #1603)"
     for i in $(seq 54); do echo " 十  19 01:00:02 testhost-machine python[1]: [strata] done: 100 tokens in 5 s (20.0 tok/s) (stop, cancel=False)"; done
     for i in $(seq 44); do echo " 十  19 01:00:02 testhost-machine python[1]: [strata] done: 512 tokens in 15 s (34.0 tok/s) (length, cancel=False)"; done
@@ -112,9 +135,10 @@ reset() {  # a clean state: the service idle, the journal and kernel log of a cl
                 " 十  19 01:00:05 testhost-machine kernel: usb 1-1: new high-speed USB device" > "$SB/kernel.txt"
   cfg iq3_xxs 13,26,38
 }
-wrap() {  # run the wrapper in the sandbox: wrap <tag> [env ...]
+wrap() {  # run the wrapper in the sandbox: [MODE=robustness] wrap <tag> [env ...]
   local tag=$1; shift
-  env PATH="$SB/bin:$PATH" STRATA_DIR="$SB/strata" SETTLE_S=0 "$@" bash "$SB/repo/bench/ab_model_run.sh" "$tag" A > "$SB/$tag.out" 2>&1
+  env PATH="$SB/bin:$PATH" STRATA_DIR="$SB/strata" SETTLE_S=0 "$@" bash "$SB/repo/bench/ab_model_run.sh" "$tag" A ${MODE:+"$MODE"} \
+    > "$SB/$tag.out" 2>&1
 }
 R=$SB/repo/results
 NAP="29.$$"          # the stub perf set's sleep: its command line is this run's own, never a leftover's
@@ -128,7 +152,10 @@ for want in "service ready for 1 s" "deployment code sha256 [0-9a-f]{16} " "perf
             "serve_load nonce ab-0004" "engine env: CUDA_VISIBLE_DEVICES=0,1,2,3 STRATA_RESIDENT_HEADROOM_GIB=6 \$" \
             "tracked files changed: config/profile.conf" "metrics requests before the run: 142" "host units: ok" \
             "load: strata generate: expert cache 6656 slots" "load: strata serve: layer split: 100% of the experts resident" \
-            "load: strata generate: session is up"; do
+            "load: strata generate: session is up" "^set: bench/run_profile.sh$" \
+            "^conversation cache before the run: parked 2 bytes 1048576$" \
+            "load: FileExpertSource: mapped pinned cache complement ready: resident 1.12 GiB, pinned 1.12 GiB" \
+            "load: strata generate: resident RAM mode: 1.12 GiB of experts in RAM"; do
   grep -Eq -- "$want" "$R/t-clean-arm.txt" && pass "arm record: $want" || fail "arm record lacks: $want"
 done
 grep -q -e "prompt 15 tokens" -e "9999 slots" "$R/t-clean-arm.txt" && fail "arm record: a line after the first request taken as placement" ||
@@ -191,8 +218,13 @@ check_refusal t-busy 1 "the service is not idle"
 reset; echo '{"live": {"state": "idle", "running": 0, "queued": 0}}' > "$SB/metrics"; check_refusal t-nototal 1 "the service is not idle"
 reset; touch "$R/t-leftover-perf.log"; check_refusal t-leftover 2 "t-leftover-perf.log exists"
 reset; echo '{"tag": "t-used", "scenario": "worst"}' >> "$R/stress.jsonl"; check_refusal t-used 2 "is in results/stress.jsonl"
-reset; echo 1 > "$SB/hostunits_rc"; wrap t-units
-grep -q "host units: drift" "$R/t-units-arm.txt" && pass "host units drift is recorded" || fail "host units drift not recorded"
+# what protocol step 1 deploys, not in place: refused before the run (the summary would reject the run afterwards)
+reset; echo 1 > "$SB/hostunits_rc"; check_refusal t-units 1 "the host units are not as config/host-units.conf sets them"
+reset; echo 8589934592 > "$AB_ARC_FILE"; check_refusal t-arc 1 "the ZFS ARC cap is 8589934592"
+start_service 8 6144; reset; check_refusal t-headroom 1 "STRATA_RESIDENT_HEADROOM_GIB 8 and"
+start_service 6 8192; reset; check_refusal t-park 1 "conversation-cache-min-free-mib 8192,"
+start_service
+reset; MODE=bogus check_refusal t-mode 2 "usage: bench/ab_model_run.sh"
 
 # 5. other traffic: more requests counted, a request in flight at the end
 reset; wrap t-traffic STUB_REQUESTS=99
@@ -227,6 +259,24 @@ sleep 0.5
 pgrep -fx "sleep $NAP" > /dev/null && fail "an early interrupt left the perf set running" || pass "an early interrupt leaves nothing running"
 grep -q "interrupted yes" "$R/t-int2-after.txt" 2>/dev/null && pass "an early interrupt writes the after record" ||
   fail "an early interrupt wrote no after record"
+
+# 8. the robustness run: bench/run_robustness.sh instead of the perf set, with the same records; Tracebacks of its log
+reset; MODE=robustness wrap t-robust; rc=$?
+[ $rc = 0 ] && pass "a robustness run exits 0" || { fail "a robustness run exits $rc"; cat "$SB/t-robust.out"; }
+grep -q "^set: bench/run_robustness.sh$" "$R/t-robust-arm.txt" && pass "arm record: set: bench/run_robustness.sh" ||
+  fail "arm record of the robustness run: $(grep '^set' "$R/t-robust-arm.txt" 2>/dev/null)"
+grep -q "run_robustness exit 0  interrupted no" "$R/t-robust-after.txt" && pass "after record: run_robustness exit 0" ||
+  fail "after record of the robustness run: $(head -1 "$R/t-robust-after.txt" 2>/dev/null)"
+grep -q "^perf log Traceback lines: 1$" "$R/t-robust-after.txt" && pass "the Tracebacks are counted in the robustness log" ||
+  fail "Tracebacks of the robustness run: $(grep Traceback "$R/t-robust-after.txt" 2>/dev/null)"
+grep -q "robustness set ran for t-robust" "$R/t-robust-robustness.log" 2>/dev/null && pass "run_robustness.sh got the tag" ||
+  fail "run_robustness.sh did not run for t-robust"
+[ ! -e "$R/t-robust-perf.log" ] && pass "the perf set did not run" || fail "the perf set ran in a robustness run"
+
+# 9. the engine started again during the run (by server.py, or systemd's restart): not the same engine
+reset; wrap t-restart STUB_RESTART=1
+grep -q "^same engine as before: NO$" "$R/t-restart-after.txt" 2>/dev/null && pass "an engine started again during the run is not the same" ||
+  fail "an engine restart: $(grep 'same engine' "$R/t-restart-after.txt" 2>/dev/null || cat "$SB/t-restart.out")"
 
 echo "$fails failed"
 exit $((fails > 0))

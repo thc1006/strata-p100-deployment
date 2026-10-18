@@ -89,7 +89,8 @@ class TuningTests(unittest.TestCase):
         self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-mib"), ["8192"])
         self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-slots"), ["8"])
         self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-min-tokens"), ["1024"])
-        self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-min-free-mib"), ["8192"])
+        self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-min-free-mib"), ["6144"])
+        self.assertEqual(cfg["env"]["STRATA_RESIDENT_HEADROOM_GIB"], "6")     # the same 6 GiB floor
         off = tool.tune_config(cfg, park_mib=0)
         self.assertNotIn("--conversation-cache-mib", off["args"])
         for bad in (-1, 99999, True, "8192"):

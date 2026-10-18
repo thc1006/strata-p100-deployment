@@ -35,9 +35,9 @@ PROFILES = {
 # PARK_MIN_TOKENS tokens kept in host RAM, so a conversation whose batch slot was taken by other requests comes back
 # without reading its history again (measured here, 6 clients on 4 slots: 0 -> all of the history reused per turn).
 PARK_SLOTS, PARK_MIN_TOKENS = 8, 1024
-# the engine stops parking when MemAvailable would fall below this (default 2560 MiB): 8 GiB keeps the original guide's
-# headroom for the OS and the lab's other users while conversations are parked
-PARK_MIN_FREE_MIB = 8192
+# the engine stops parking when MemAvailable would fall below this (default 2560 MiB).  6 GiB: the box runs only this
+# service (the maintainer's decision of 2026-10-18; it was 8 GiB, the original guide's headroom for other users)
+PARK_MIN_FREE_MIB = 6144
 PARK_MIB_MAX = 12288                 # RAM beside the locked PLE table (~20 GiB available after load)
 CUTS = {"equal": [12, 24, 36], "last-light": [13, 26, 38]}
 # Tuning-step overrides (the original guide's tuning order): one value changed at a time, kept by a later re-run only
@@ -87,7 +87,9 @@ REFUSED_FLAGS = {
 }
 # All of these have a numeric/string zero-off test in the audited source.
 ENV_DEFAULTS = {
-    "STRATA_RESIDENT_HEADROOM_GIB": "8",
+    # --resident-experts page-locks the experts no card holds while leaving this much of the available RAM free
+    # (engine default 4); the same 6 GiB floor as parking (PARK_MIN_FREE_MIB)
+    "STRATA_RESIDENT_HEADROOM_GIB": "6",
     "STRATA_ROUTE_TAIL_SKIP": "0",
     "STRATA_BATCH_MTP": "0",
     "STRATA_BATCH_MTP_SERIAL": "0",

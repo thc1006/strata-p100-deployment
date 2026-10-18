@@ -57,7 +57,7 @@ section "RAM / ARC / swap"
 grep -E 'MemTotal|MemAvailable|SwapTotal|SwapFree|Mlocked' /proc/meminfo
 awk '$1=="size"{printf "ARC size: %.2f GiB\n", $3/2^30} $1=="c_max"{printf "ARC max:  %.2f GiB\n", $3/2^30}' \
   /proc/spl/kstat/zfs/arcstats 2>/dev/null
-[ "$(cat /sys/module/zfs/parameters/zfs_arc_max 2>/dev/null)" = 8589934592 ] || problem "zfs_arc_max is not 8 GiB"
+[ "$(cat /sys/module/zfs/parameters/zfs_arc_max 2>/dev/null)" = 2147483648 ] || problem "zfs_arc_max is not 2 GiB"
 pid=$(pgrep -P "$(systemctl show -p MainPID --value strata-q3.service)" -f '[e]ngine-cuda12/strata --serve' | head -1)
 if [ -n "$pid" ]; then
   grep -E 'VmRSS|VmLck|VmPin' "/proc/$pid/status"

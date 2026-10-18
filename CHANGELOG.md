@@ -19,6 +19,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Changed
 
+- RAM floors from 8 to 6 GiB and the ZFS ARC cap from 8 to 2 GiB: the box serves only this model. `configure_strata_q3.py` writes `STRATA_RESIDENT_HEADROOM_GIB=6` (the RAM the page-locked copy of the experts no card holds leaves free) and `--conversation-cache-min-free-mib 6144` (the parking floor); `zfs-arc-max.service` writes 2 GiB, and `check-deployment.sh` expects it. The live config changes, so this takes a restart, and the unit takes `scripts/install-system-files.sh`.
 - `scripts/test.sh --repo-only` skips the programs outside the repository, which exist only on this machine. `test.sh` now exits with 2 on an unknown argument, fails when `systemd-analyze` is missing or fails (it passed before), and no longer needs `bc`. `CONTRIBUTING.md` now asks contributors to run `--repo-only`.
 - Upstream PR #2918: the commit was amended to `25f40ed`, with the same engine code. Its test now counts the row hints, so it fails when the check is removed. The description is shorter and links to the raw results (`docs/upstream/pr-2918.md`); a comment on the PR says what changed (`docs/upstream/pr-2918-comment.md`).
 - The directories were reorganized by purpose ([decision 0002](docs/decisions/0002-repository-layout.md)). ExecStartPre and ExecStartPost in `strata-q3.service` now use paths under `scripts/`. After reinstalling, one restart verified the change: preflight and wait-ready both worked normally.

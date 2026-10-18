@@ -1,0 +1,36 @@
+# unit  is-enabled  is-active   (2026-10-18 22:2x, before host trimming)
+default-target graphical.target
+gdm.service static active
+cups.service enabled active
+cups.socket enabled active
+cups.path enabled active
+cups-browsed.service enabled active
+avahi-daemon.service enabled active
+avahi-daemon.socket enabled active
+ModemManager.service enabled active
+fwupd.service static active
+fwupd-refresh.timer enabled active
+packagekit.service static active
+colord.service static active
+switcheroo-control.service enabled active
+power-profiles-daemon.service enabled active
+kerneloops.service enabled active
+upower.service disabled active
+udisks2.service enabled active
+accounts-daemon.service enabled active
+rtkit-daemon.service disabled active
+docker.service enabled active
+docker.socket enabled active
+containerd.service enabled active
+snapd.service enabled active
+snapd.socket enabled active
+snapd.seeded.service enabled active
+motd-news.timer enabled active
+update-notifier-download.timer enabled active
+update-notifier-motd.timer enabled active
+man-db.timer enabled active
+e2scrub_all.timer enabled active
+user:pipewire.socket enabled active
+user:pipewire.service enabled active
+user:pipewire-media-session.service enabled active
+user:snap.snapd-desktop-integration.snapd-desktop-integration.service enabled active

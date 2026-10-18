@@ -53,6 +53,17 @@ sudo systemctl reset-failed strata-q3 && sudo systemctl start strata-q3
 
 First, read `sudo journalctl -u strata-q3 -n 50` to find the cause of the failure. Preflight states why it refused to start (not enough GPUs, not enough memory, a config that does not match `config/profile.conf`, another engine already running, or `:8080` already in use). When the config does not match, it also prints the command that fixes it.
 
+## Services this box does not run
+
+The box serves only Strata: it boots into `multi-user.target` (no desktop), and the idle daemons are disabled or masked. `config/host-units.conf` lists each unit with the reason, and `scripts/check-drift.sh` checks them.
+
+```bash
+scripts/host-units.sh          # read-only: one ok or DRIFT line per unit, exit 1 on any DRIFT
+scripts/host-units.sh apply    # sets them again with sudo, for example after a release upgrade enabled one
+```
+
+To bring one back: `sudo systemctl unmask <unit>`, then `sudo systemctl enable --now <unit>` if it was enabled before (the states before the change are in `results/host-units-before-20261018.txt`), and remove its line from `config/host-units.conf` in the same commit. Remote access (ssh, tailscaled, netbird), the network, ZFS, NVIDIA, cron, logging and unattended security updates are not in the list and must stay on.
+
 ## Prepare for a long test
 
 If the service is stopped while it is loading, it enters failed, and the watchdog starts it automatically after 30 minutes. The service can then compete with the test for the GPUs. Stop the watchdog for the duration of the test:

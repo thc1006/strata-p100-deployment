@@ -5,7 +5,9 @@
 #      limits are what zfs-arc-max.service writes
 #   2. the live Strata config equals config/strata-iq3_xxs.deployed.json, and that snapshot is what
 #      configure_strata_q3.py makes from setup's original config with the arguments in config/profile.conf
-#   3. the engine and the other deployed files match config/deployed-artifacts.sha256
+#   3. the host's units are in the states config/host-units.conf gives (scripts/host-units.sh check): no desktop,
+#      no idle daemons
+#   4. the engine and the other deployed files match config/deployed-artifacts.sha256
 #      (--full also hashes the model shards and the MTP files, 77 GB: 590 s on 2026-10-18, run under nice -n 19 ionice -c3)
 # Exit 0 when everything matches, 1 when anything drifted.  After an intended change, update the repo copy (and the
 # snapshot / the sha256 list) in the same commit as the change.
@@ -43,6 +45,10 @@ for param in zfs_arc_max zfs_arc_shrinker_limit; do
   if [ -n "$want" ] && [ "$have" = "$want" ]; then ok "$param = $have"
   else drift "$param is ${have:-unreadable}, zfs-arc-max.service writes ${want:-?} (did it run at boot?)"; fi
 done
+
+echo "== host units (config/host-units.conf)"
+# its own ok/DRIFT lines; a unit it cannot read counts as drift
+"$D/scripts/host-units.sh" check || bad=1
 
 echo "== Strata config"
 live=$STRATA_DIR/strata-iq3_xxs.json

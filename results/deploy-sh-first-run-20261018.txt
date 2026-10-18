@@ -1,0 +1,69 @@
+# The first deploy with scripts/deploy.sh against GitHub, 2026-10-18, in a scratch clone of this repository on <host>.
+#
+# The clone started at e796bfd, which has no deploy.sh; the deploy.sh of origin/main (ab95f6c) ran from an ignored copy
+# next to where the tracked one would be (scripts/deploy-e2e.sh), and deployed ab95f6c into the clone.  The GitHub
+# check was the real one: the run of .github/workflows/test.yml for the push of ab95f6c (run 39100532499, success).
+# The new commit's scripts/test.sh and scripts/check-drift.sh ran on this machine.  The live checkout was not touched.
+# Command: e2e.sh <scratch> e796bfd (the script follows the output).  <scratch> stands for the scratch directory.
+
+clone at e796bfd Run the repository checks on GitHub; origin/main is ab95f6c Add scripts/deploy.sh, which deploys commits of main that passed CI
+status: []
+== scripts/deploy-e2e.sh
+origin/main is 1 commit(s) ahead of this checkout:
+  ab95f6c Add scripts/deploy.sh, which deploys commits of main that passed CI
+ok     on main, no local changes, and a fast-forward to ab95f6c
+ok     nothing in the commits applies outside this checkout
+ok     strata-q3.service is active
+ok     the newest run of test.yml for ab95f6c passed
+ok     scripts/test.sh of ab95f6c: all checks passed
+ok     scripts/check-drift.sh of ab95f6c: no drift
+dry run: scripts/deploy.sh --apply deploys ab95f6c
+
+real	0m29.801s
+user	0m8.162s
+sys	0m22.807s
+exit 0
+== scripts/deploy-e2e.sh --apply
+origin/main is 1 commit(s) ahead of this checkout:
+  ab95f6c Add scripts/deploy.sh, which deploys commits of main that passed CI
+ok     on main, no local changes, and a fast-forward to ab95f6c
+ok     nothing in the commits applies outside this checkout
+ok     strata-q3.service is active
+ok     the newest run of test.yml for ab95f6c passed
+ok     scripts/test.sh of ab95f6c: all checks passed
+ok     scripts/check-drift.sh of ab95f6c: no drift
+deployed ab95f6c: Add scripts/deploy.sh, which deploys commits of main that passed CI
+
+real	0m30.298s
+user	0m8.605s
+sys	0m23.250s
+exit 0
+== after
+HEAD ab95f6c Add scripts/deploy.sh, which deploys commits of main that passed CI, status: []
+scripts/deploy.sh is the tracked file of ab95f6c
+== scripts/deploy.sh --apply (the tracked one)
+up to date: ab95f6c Add scripts/deploy.sh, which deploys commits of main that passed CI
+exit 0
+
+# ---- e2e.sh ----
+
+#!/usr/bin/env bash
+# End-to-end run of scripts/deploy.sh against the real GitHub repository, in a scratch clone (never the live checkout).
+# The clone starts at OLD, which has no deploy.sh; the deploy.sh of origin/main runs from an ignored file next to where
+# the tracked one will be, and deploys origin/main into the clone.  Usage: e2e.sh <scratch dir> <OLD commit>
+set -u -o pipefail
+E=$1; OLD=$2
+rm -rf "$E" && mkdir -p "$E" || exit 1
+git clone -q https://github.com/thc1006/strata-p100-deployment.git "$E/live" || exit 1
+cd "$E/live" || exit 1
+NEW=$(git rev-parse HEAD)
+git show "$NEW:scripts/deploy.sh" > "$E/deploy.sh" || exit 1
+git reset -q --hard "$OLD" || exit 1
+cp "$E/deploy.sh" scripts/deploy-e2e.sh && chmod 755 scripts/deploy-e2e.sh && echo scripts/deploy-e2e.sh >> .git/info/exclude
+echo "clone at $(git log -1 --format='%h %s'); origin/main is $(git log -1 --format='%h %s' "$NEW")"
+echo "status: [$(git status --porcelain --untracked-files=all)]"
+echo "== scripts/deploy-e2e.sh"; time scripts/deploy-e2e.sh; echo "exit $?"
+echo "== scripts/deploy-e2e.sh --apply"; time scripts/deploy-e2e.sh --apply; echo "exit $?"
+echo "== after"; echo "HEAD $(git log -1 --format='%h %s'), status: [$(git status --porcelain --untracked-files=all)]"
+cmp -s scripts/deploy.sh "$E/deploy.sh" && echo "scripts/deploy.sh is the tracked file of $(git rev-parse --short "$NEW")"
+echo "== scripts/deploy.sh --apply (the tracked one)"; scripts/deploy.sh --apply; echo "exit $?"

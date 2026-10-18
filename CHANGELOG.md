@@ -7,7 +7,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 ### Added
 
 - CI: `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, in Canonical's Ubuntu Base 22.04.5 ([decision 0003](docs/decisions/0003-ci-on-github-deploy-by-pull.md)).
-- `scripts/deploy.sh` deploys `origin/main` to this checkout when the newest `test` run for its push passed and nothing in the commits applies outside the checkout. Even without `--apply`, it runs the new commit's `test.sh` and `check-drift.sh` here. It never runs sudo or restarts the service ([Deploying a commit from GitHub](docs/runbooks/deploy.md)). `tests/test_deploy.py` has 21 tests for it, which fail on 92 of 94 broken copies of the script (`results/deploy-sh-mutants-20261018.txt`).
+- `scripts/deploy.sh` deploys `origin/main` to this checkout when the newest `test` run for its push passed and nothing in the commits applies outside the checkout. Even without `--apply`, it runs the new commit's `test.sh` and `check-drift.sh` here. It never runs sudo or restarts the service ([Deploying a commit from GitHub](docs/runbooks/deploy.md)). `tests/test_deploy.py` has 21 tests for it, which fail on 92 of 94 broken copies of the script (`results/deploy-sh-mutants-20261018.txt`). `results/deploy-sh-first-run-20261018.txt` records its first deploy against GitHub, in a scratch clone.
 - `scripts/install-system-files.sh`, `scripts/test.sh`, `bench/build-engine.sh`.
 - Decision records: 0001, operations repository separate from Strata; 0002, directory structure; 0003, CI on GitHub and deployment pulled by this machine.
 - `results/README.md`: an index of the test results.

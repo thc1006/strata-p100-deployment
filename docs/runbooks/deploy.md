@@ -4,7 +4,7 @@
 
 - When to use: `main` on GitHub has commits that this checkout does not, for example a merged pull request or a change pushed from another clone. A commit made in this checkout is already in place: the service runs it at its next start.
 - Prerequisites: the `test` workflow has finished on the newest commit (`gh run list -w test.yml -L 3`).
-- Last verified: not yet against GitHub. `tests/test_deploy.py` runs the script against stubs.
+- Last verified: on 2026-10-18, steps 1 and 2 in a clone of this repository deployed `ab95f6c`, with the real `test` run on GitHub and that commit's checks on this machine (`results/deploy-sh-first-run-20261018.txt`). The steps to deploy by hand have not been run yet.
 
 ## Steps
 

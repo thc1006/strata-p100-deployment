@@ -135,6 +135,35 @@ class Summary(unittest.TestCase):
                 self.assertEqual(status, 2, out)
                 self.assertIn(text, out)
 
+    def test_a_switch_must_show_in_the_engine_lines(self):
+        arms = {"C0": {"never": ["on a thread of its own"]},
+                "C1": {"engaged": ["^strata batch: read [0-9]+ tokens on a thread of its own"], "never": ["is off beside"]}}
+
+        def b(r, c1_lines, c0_lines=("strata serve: prompt 1200 tokens = 0 reused + 1200 read",)):
+            three(r)
+            for tag, arm, _ in RUNS:
+                lines = c1_lines if arm == "C1" else c0_lines
+                (r / f"{tag}-engine-lines.txt").write_text("".join(l + "\n" for l in lines))
+        on = ["strata batch: read 16021 tokens on a thread of its own in 23000 ms (concurrent, to 16021 of 16021)"]
+        cases = {"it showed": (on, None, 0, None),
+                 "it never showed": (["strata serve: prompt 16021 tokens"], None, 2, "its switch never showed"),
+                 "it said it was off": (on + ["strata batch: STRATA_PIPED_CONCURRENT is off beside this expert source"],
+                                        None, 2, "an engine line matches is off beside"),
+                 "the baseline had it": (on, on, 2, "an engine line matches on a thread of its own")}
+        for name, (c1, c0, want, text) in cases.items():
+            with self.subTest(name):
+                with tempfile.TemporaryDirectory() as tmp:
+                    r = Path(tmp)
+                    b(r, c1, c0) if c0 is not None else b(r, c1)
+                    (r / "arms.json").write_text(json.dumps({"arms": arms}))
+                    out = io.StringIO()
+                    with contextlib.redirect_stdout(out):
+                        status = S.main([t for t, _, _ in RUNS] + ["--baseline", "C0", "--results", str(r),
+                                                                  "--arms", str(r / "arms.json")])
+                    self.assertEqual(status, want, out.getvalue())
+                    if text:
+                        self.assertIn(text, out.getvalue())
+
     def test_no_usable_baseline(self):
         def b(r):
             for tag, arm, at in RUNS:

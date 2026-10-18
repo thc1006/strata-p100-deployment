@@ -1,0 +1,8 @@
+tag c0-1  ended at 2026-10-19 04:44:22  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 33  sent: 33
+load average: 1.64 1.67 1.22
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

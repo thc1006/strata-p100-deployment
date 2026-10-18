@@ -1,0 +1,34 @@
+[04:24:59] ab_engine: === c0-1 (C0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[04:32:35] ab_engine: strata-ab-engine loaded after 442 s
+[04:32:36] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[04:37:47] ab_engine: measuring c0-1
+[04:44:25] ab_engine: done c0-1: screen exit 0, same engine yes
+[04:44:25] ab_engine: === c1-1 (C1: /home/thc1006/dev/strata-0.1.45/cfg-gs1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[04:51:59] ab_engine: strata-ab-engine loaded after 438 s
+[04:51:59] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[04:57:09] ab_engine: measuring c1-1
+[05:03:20] ab_engine: done c1-1: screen exit 0, same engine yes
+[05:03:20] ab_engine: === c0-2 (C0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[05:10:55] ab_engine: strata-ab-engine loaded after 438 s
+[05:10:55] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[05:16:05] ab_engine: measuring c0-2
+[05:22:41] ab_engine: done c0-2: screen exit 0, same engine yes
+[05:22:41] ab_engine: all steps done
+[05:22:41] ab_engine: finishing (exit 0): stopping the test unit, starting strata-q3
+[05:30:16] ab_engine: strata-q3.service loaded after 2 s
+[05:30:16] ab_engine: strata-q3: active

@@ -1,0 +1,18 @@
+{
+  "tree": "/home/thc1006/dev/strata-pr2985",
+  "settle_s": 300,
+  "screen_n": 3,
+  "arms": {
+    "M0": {"config": "cfg-m0.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "0", "STRATA_MMQ_RESIDENT_SORT_NE": "0", "STRATA_BATCH_SELF_COMMIT": "0"},
+           "must": ["session is up \\(engine 0\\.1\\.45"],
+           "must_not": ["STRATA_PIPED_MTP", "prompt MMQ sorts the full expert groups"]},
+    "M1": {"config": "cfg-m1.json",
+           "env": {"STRATA_MMQ_GROUP_SORT": "0", "STRATA_MMQ_RESIDENT_SORT_NE": "0", "STRATA_BATCH_SELF_COMMIT": "0",
+                   "STRATA_PIPED_MTP": "1"},
+           "args_add": ["--batch-mtp"],
+           "must": ["session is up \\(engine 0\\.1\\.45",
+                    "strata generate: STRATA_PIPED_MTP: the 4 pipelined slot groups draft up to 1 MTP proposal per slot"],
+           "must_not": ["--batch-mtp is off", "prompt MMQ sorts the full expert groups"]}
+  }
+}

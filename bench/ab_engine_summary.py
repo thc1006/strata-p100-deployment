@@ -2,13 +2,16 @@
 """An engine experiment's screen (bench/ab_engine.sh, bench/engine_screen.py) from the raw result files: whether each
 run measured what it says, the numbers per arm, and the answers request by request.  Standard library only.
 
-  python3 -B bench/ab_engine_summary.py --baseline C0 c0-1 c1-1 c0-2 > results/SCREEN-group-sort.md
+  python3 -B bench/ab_engine_summary.py --arms bench/arms-group-sort.json --baseline C0 c0-1 c1-1 c0-2 \
+      > results/SCREEN-group-sort.md
 
 Per run (<tag>-arm.txt, <tag>-after.txt, the tag's lines in engine-screen.jsonl): the arm check passed, the same
 engine answered at the end, the service counted, once it served nothing, exactly the requests the warm-up and the
 screen sent (more: another client's requests were measured), the screen exited 0, no record failed, no error line in
 the engine's log after the warm-up, in the test unit's journal or in the kernel log, and both logs were read.  A run
-that fails any of these is listed and left out of the numbers.  All runs must have cut their prompts from the same
+that fails any of these is listed and left out of the numbers.  With --arms, a run must also show its arm's switch at
+work: every "engaged" pattern matches one of its engine lines (<tag>-engine-lines.txt) and no "never" pattern does (a
+switch that acts only on some requests can only be seen there).  All runs must have cut their prompts from the same
 corpus.  An admission round counts only if it ran as designed (every decoder decoding before and while the joiner
 was read); the report gives each run's invalid rounds.
 Numbers per arm: each run's median of a metric's records, then the arms' means of those; the change of each other arm
@@ -74,7 +77,12 @@ def run_info(results: Path, tag: str) -> dict:
             "kernel_lines": [] if k_lines == ["unreadable"] else k_lines, "has_arm": bool(a), "has_after": bool(b)}
 
 
-def problems(i: dict, recs: list) -> list:
+def engine_lines(results: Path, tag: str) -> list | None:
+    f = results / f"{tag}-engine-lines.txt"
+    return f.read_text(errors="replace").splitlines() if f.exists() else None
+
+
+def problems(i: dict, recs: list, spec: dict | None = None, lines: list | None = None) -> list:
     out = []
     if not i["has_arm"] or not i["has_after"]:
         return ["no arm or after record"]
@@ -103,6 +111,16 @@ def problems(i: dict, recs: list) -> list:
         out.append(f"{len(bad)} failed records")
     if not recs:
         out.append("no screen records")
+    if spec is not None:
+        if lines is None:
+            out.append("no engine lines")
+        else:
+            for rx in spec.get("engaged") or []:
+                if not any(re.search(rx, l) for l in lines):
+                    out.append(f"its switch never showed in the engine lines ({rx})")
+            for rx in spec.get("never") or []:
+                if any(re.search(rx, l) for l in lines):
+                    out.append(f"an engine line matches {rx}")
     return out
 
 
@@ -123,7 +141,7 @@ def label(r: dict) -> list:
     return []
 
 
-def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
+def evaluate(tags: list, baseline: str, results: Path, arms: dict | None = None) -> tuple[int, list]:
     recs_all = []
     path = results / "engine-screen.jsonl"
     if path.exists():
@@ -141,7 +159,10 @@ def evaluate(tags: list, baseline: str, results: Path) -> tuple[int, list]:
     status, usable = 0, []
     for t in tags:
         i = info[t]
-        bad = problems(i, recs[t])
+        spec = (arms or {}).get(i["arm"]) if arms is not None else None
+        if arms is not None and spec is None:
+            spec = {"engaged": ["(?!)"]}                     # an arm the arms file does not have: not usable
+        bad = problems(i, recs[t], spec, engine_lines(results, t) if arms is not None else None)
         o.append(f"| {t} | {i['arm'] or '?'} | {i['at'] or '?'} | {i['check'] or '?'} | {i['same'] or '?'} | "
                  f"{i['counted'] or '?'} / {i['sent'] or '?'} | {'yes' if not bad else 'NO: ' + '; '.join(bad)} |")
         if bad:
@@ -227,9 +248,11 @@ def main(argv=None) -> int:
     ap.add_argument("tags", nargs="+")
     ap.add_argument("--baseline", required=True)
     ap.add_argument("--results", type=Path, default=RESULTS)
+    ap.add_argument("--arms", type=Path, help="the arms file: each run must show its arm's engaged patterns, not its never ones")
     a = ap.parse_args(argv)
     try:
-        status, lines = evaluate(a.tags, a.baseline, a.results)
+        arms = json.loads(a.arms.read_text())["arms"] if a.arms else None
+        status, lines = evaluate(a.tags, a.baseline, a.results, arms)
     except Exception as e:                       # a crash is "cannot be evaluated", never a verdict
         status, lines = 2, [f"Cannot be evaluated: {type(e).__name__}: {e}"]
     print("\n".join(lines))

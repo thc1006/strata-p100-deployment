@@ -381,5 +381,31 @@ PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service && ! PATH="$SB/bin
   grep -q "rescue fired" "$SB/actions" && pass "a killed driver is rescued by the timer" || fail "rescue: $(tail -3 "$SB/actions")"
 up
 
+# 23. an arm with engine arguments of its own, declared as args_add: accepted (case 16: undeclared, refused)
+python3 - "$SB" <<'PYEOF'
+import json, sys
+sb = sys.argv[1]
+a = json.load(open(f"{sb}/arms-diff.json")); a["arms"]["C1"]["args_add"] = ["--prefill", "1024"]
+json.dump(a, open(f"{sb}/arms-args.json", "w"))
+PYEOF
+drive argsok "$SB/arms-args.json" c1-22:C1; rc=$?
+[ $rc = 0 ] && grep -q '"tag": "c1-22"' "$R/engine-screen.jsonl" && pass "an arm's declared args_add is accepted" ||
+  fail "args_add: exit $rc, $(tail -2 "$SB/argsok.out")"
+up
+
+# 24. the remote side of the evaluation beside a run: allowed on one CPU, refused unpinned
+printf 'import time\ntime.sleep(300)\n' > "$SB/driver2.py"
+taskset -c 0 python3 "$SB/driver2.py" --endpoint remote & rpid=$!
+drive pinned "$SB/arms.json" c0-23:C0; rc=$?
+kill "$rpid" 2>/dev/null; wait "$rpid" 2>/dev/null
+[ $rc = 0 ] && pass "a remote evaluation pinned to one CPU may run beside" || fail "pinned remote: exit $rc, $(tail -2 "$SB/pinned.out")"
+up
+python3 "$SB/driver2.py" --endpoint remote & rpid=$!
+drive unpinned "$SB/arms.json" c0-24:C0; rc=$?
+kill "$rpid" 2>/dev/null; wait "$rpid" 2>/dev/null
+[ $rc = 1 ] && grep -q "a measurement or an evaluation is running" "$SB/unpinned.out" &&
+  pass "an unpinned remote evaluation is refused" || fail "unpinned remote: exit $rc, $(tail -2 "$SB/unpinned.out")"
+up
+
 echo "$fails failed"
 exit $((fails > 0))

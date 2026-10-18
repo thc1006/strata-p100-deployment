@@ -4,7 +4,11 @@
 #   bench/ab_engine.sh ARMS.json TAG:ARM [TAG:ARM ...]        e.g.  ... c0-1:C0 c1-1:C1 c0-2:C0
 # ARMS.json: {"tree": "<Strata tree>", "settle_s": 300, "screen_n": 3,
 #             "arms": {"C0": {"config": "<config.json in the tree>", "env": {"STRATA_X": "0"},
-#                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"]}, ...}}
+#                             "args_add": ["--flag", "value"],      (optional: engine arguments only this arm has)
+#                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"],
+#                             "engaged": ["<regex an engine line of the screen must match>"], "never": ["<regex>"]}}}
+# (engaged / never are judged by bench/ab_engine_summary.py on <tag>-engine-lines.txt: a switch that acts only on some
+# requests shows only then.)  The arms' configs must be equal but for exe, cwd, log, their env keys and args_add.
 # Before anything is stopped: strata-q3 must be active and loaded (one still loading is waited for; a failed or
 # stopped one is someone else's state and is refused), the GPUs must hold no process but its engine, no measurement or
 # evaluation may run (it would share the CPUs), and no command line may make strata-preflight.sh refuse the restart.
@@ -68,9 +72,14 @@ if what == ["check"]:
         for k, v in a.get("env", {}).items():
             assert str((c.get("env") or {}).get(k)) == str(v), f"{name}: the config's env {k} is not {v}"
         env = {k: v for k, v in (c.get("env") or {}).items() if k not in a.get("env", {})}
-        rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env")}, "env": env},
-                                sort_keys=True)
-    assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log and the arms' env keys"
+        args, add = list(c.get("args") or []), list(a.get("args_add") or [])
+        if add:
+            at = [i for i in range(len(args) - len(add) + 1) if args[i:i + len(add)] == add]
+            assert len(at) == 1, f"{name}: the config's args hold its args_add {add} {len(at)} times, not once"
+            args = args[:at[0]] + args[at[0] + len(add):]
+        rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
+                                 "env": env, "args": args}, sort_keys=True)
+    assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log, the arms' env keys and args_add"
     print("ok")
 elif what[0] == "tree":
     print(tree)
@@ -111,6 +120,19 @@ names = {"run_profile.sh", "stress_matrix.py", "latency_suite.py", "four_user_te
          "engine_screen.py", "driver2.py", "run_side.sh", "grade_lcb.py", "latency_probe.py", "ab_model_run.sh"}
 under = os.environ.get("AB_ENGINE_BUSY_UNDER")
 me = {os.getpid(), os.getppid()}
+
+
+def pinned_remote(pid, argv):
+    """The remote side of the evaluation (driver2.py --endpoint remote, or run_side.sh remote) on one CPU: it talks to
+    the remote gateway only and stays on its CPU, so it may run beside a measurement (it shows in the arm record)."""
+    remote = any(a == "--endpoint" and b == "remote" for a, b in zip(argv, argv[1:])) or (
+        any(os.path.basename(a) == "run_side.sh" for a in argv) and "remote" in argv)
+    try:
+        cpus = next(l.split(":", 1)[1].strip() for l in open(f"/proc/{pid}/status") if l.startswith("Cpus_allowed_list:"))
+    except (OSError, StopIteration):
+        return False
+    return remote and cpus.isdigit()
+
 for pid in filter(str.isdigit, os.listdir("/proc")):
     if int(pid) in me:
         continue
@@ -119,7 +141,7 @@ for pid in filter(str.isdigit, os.listdir("/proc")):
     except OSError:
         continue
     if any(" " not in a and os.path.basename(a) in names for a in argv) and (
-            not under or any(a.startswith(under + "/") for a in argv)):
+            not under or any(a.startswith(under + "/") for a in argv)) and not pinned_remote(pid, argv):
         print(pid, " ".join(argv)[:120])
 EOF2
 )
@@ -175,6 +197,13 @@ stop_all() {
 }
 # the rescue: a timer that stops the test unit and starts strata-q3 if this script is gone by then (re-armed per
 # phase with that phase's longest time; stopped once strata-q3 is started).  (Test hook: AB_ENGINE_RESCUE_S.)
+beside_cpu() {     # CPU seconds the remote evaluation's processes have used so far (0 when none runs)
+  local t=0 p
+  for p in $(pgrep -f 'driver2[.]py --endpoint remote'); do
+    t=$(( t + $(awk '{print $14 + $15}' "/proc/$p/stat" 2>/dev/null || echo 0) ))
+  done
+  echo "$(( t / $(getconf CLK_TCK) ))"
+}
 rescue() {
   sudo -n systemctl stop strata-ab-rescue.timer 2>/dev/null
   sudo -n systemd-run --unit=strata-ab-rescue --collect --on-active="${AB_ENGINE_RESCUE_S:-$1}" \
@@ -300,6 +329,8 @@ for step in "$@"; do
     echo "metrics requests before the warm-up: $total0"
     echo "warm-up: $(head -c 300 "$TMP/warm")"
     echo "shared settings: $(f="${CFG%.json}.shared-settings.json"; [ -e "$f" ] && sha256sum < "$f" | cut -c1-16 || echo none)  load average: $(cut -d' ' -f1-3 /proc/loadavg)"
+    echo "beside: $(pgrep -f 'driver2[.]py --endpoint remote' > /dev/null && echo "the remote evaluation, on CPU $(taskset -cp "$(pgrep -f 'driver2[.]py --endpoint remote' | head -1)" 2>/dev/null | sed 's/.*: //')" || echo nothing)"
+    echo "beside CPU-s before the screen: $(beside_cpu)"
     echo "zfs_arc_max $(cat /sys/module/zfs/parameters/zfs_arc_max)  ARC c_max $(awk '$1=="c_max"{printf "%.0f", $3}' /proc/spl/kstat/zfs/arcstats)  MemAvailable $(awk '/MemAvailable/{print $2}' /proc/meminfo) kB"
     echo "gpu free MiB: $(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits | tr '\n' ' ')"
     echo "arm check: ${bad:-ok}"
@@ -327,6 +358,7 @@ for step in "$@"; do
     echo "idle before the count: $idle_end"
     echo "requests counted by /metrics: $counted  sent: $sent"
     echo "load average: $(cut -d' ' -f1-3 /proc/loadavg)"
+    echo "beside CPU-s after the screen: $(beside_cpu)"
     # after the warm-up; "(upload no error, sync no error)" is the verify line every start prints
     if [ "$NOW" -ge "$OFF2" ]; then
       errs=$(tail -c +$((OFF2 + 1)) "$LOG" | grep -a -i -E 'error|refused|no progress|watchdog|out of memory|abort|non-?finite|said nothing' |

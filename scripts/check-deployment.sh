@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only health and acceptance check for the Strata IQ3_XXS service on 4x P100.  Exits 1 when the service, its
+# Read-only health and acceptance check for the Strata service on 4x P100 (IQ3_XXS or IQ3_S, config/profile.conf).  Exits 1 when the service, its
 # timer, the ARC cap or the API is not as deployed (a problem line says which), 0 otherwise.
 # Usage: scripts/check-deployment.sh [base-url]   (default http://127.0.0.1:8080; STRATA_KEY=<key> if one is set)
 set -u -o pipefail

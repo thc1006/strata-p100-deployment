@@ -1,5 +1,5 @@
 [Unit]
-Description=Strata Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080)
+Description=Strata Qwen3.8-Flash-Next GSQ-RCO (the model in config/profile.conf) on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080)
 Wants=zfs-arc-max.service nvidia-persistenced.service
 After=zfs-arc-max.service nvidia-persistenced.service
 # a crash loop must not re-lock 27 GiB of RAM again and again.  The preflight waits for memory instead of failing fast,

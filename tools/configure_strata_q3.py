@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
-"""Tune an existing Strata IQ3_XXS configuration for four P100 GPUs.
+"""Tune an existing Strata GSQ-RCO IQ3_XXS or IQ3_S configuration for four P100 GPUs.
 
 Audited source: a0116b2782a5b82622358c04a06496485d12b2d6.
 This edits configuration only. It does not install, start, or benchmark Strata.
 
+Models (--model): iq3_xxs (the default) or iq3_s, ISTA-DASLab's GSQ-RCO quantizations of the same checkpoint (the same
+PLE table, tokenizer, MTP draft layer and expert profile).  A config for one is pointed at the other's files only when
+every model path follows setup's layout (models/<Q>/...-<Q>-0000N-of-00002.gguf, packs/<q>, packs/<q>/tokenizer,
+model name qwen3.8-flash-next-<q>); anything else is refused, not guessed.
+
 Profiles:
   deployed    what this machine runs (measured, results/): PLE table locked in RAM without read-ahead hints,
-              layer cuts 13,26,38, 1536 MiB VRAM reserve per card, 8192 MiB of host RAM for parked conversations
+              the model's layer cuts (IQ3_XXS 13,26,38; IQ3_S 13,25,38), 1536 MiB VRAM reserve per card,
+              8192 MiB of host RAM for parked conversations
   baseline    the original setup guide's first step: PLE mmap, equal cuts 12,24,36, 1536 MiB reserve
-  aggressive  the original setup guide's second step as written: PLE ram, cuts 13,26,38, 1024 MiB reserve (not
-              adopted here: it buys no experts on this box - all 24,576 fit at 1536 - and moves the last card toward
-              the <500 MiB free VRAM where issue #2065 hangs)
+  aggressive  the original setup guide's second step as written: PLE ram, the model's cuts, 1024 MiB reserve (not
+              adopted here: with IQ3_XXS it buys no experts - all 24,576 fit at 1536 - and with a full expert cache
+              (IQ3_S) the cards would run at ~0.3-0.5 GiB free, where issue #2065 hangs)
 """
 from __future__ import annotations
 
@@ -26,11 +32,14 @@ import tempfile
 from typing import Any
 
 SOURCE_COMMIT = "a0116b2782a5b82622358c04a06496485d12b2d6"
-PROFILES = {
-    "deployed": {"reserve": 1536, "prefill": "2048", "ple_io": "ram", "split": "last-light", "park_mib": 8192},
+PROFILES = {    # "split": "model" takes the model's own cuts (MODEL_CUTS)
+    "deployed": {"reserve": 1536, "prefill": "2048", "ple_io": "ram", "split": "model", "park_mib": 8192},
     "baseline": {"reserve": 1536, "prefill": "2048", "ple_io": "mmap", "split": "equal", "park_mib": 0},
-    "aggressive": {"reserve": 1024, "prefill": "2048", "ple_io": "ram", "split": "last-light", "park_mib": 0},
+    "aggressive": {"reserve": 1024, "prefill": "2048", "ple_io": "ram", "split": "model", "park_mib": 0},
 }
+MODELS = ("iq3_xxs", "iq3_s")
+# setup's file names for the two GSQ-RCO quantizations (shard 2 is the PLE table, byte-identical in both)
+GSQ_SHARD = re.compile(r"Qwen3\.8-Flash-Next-GSQ-RCO-(IQ3_XXS|IQ3_S)-(0000[12])-of-00002\.gguf")
 # Conversation parking (docs/DETAILS.md "Multiple conversations"): up to PARK_SLOTS conversations of at least
 # PARK_MIN_TOKENS tokens kept in host RAM, so a conversation whose batch slot was taken by other requests comes back
 # without reading its history again (measured here, 6 clients on 4 slots: 0 -> all of the history reused per turn).
@@ -39,7 +48,11 @@ PARK_SLOTS, PARK_MIN_TOKENS = 8, 1024
 # service (the maintainer's decision of 2026-10-18; it was 8 GiB, the original guide's headroom for other users)
 PARK_MIN_FREE_MIB = 6144
 PARK_MIB_MAX = 12288                 # RAM beside the locked PLE table (~20 GiB available after load)
-CUTS = {"equal": [12, 24, 36], "last-light": [13, 26, 38]}
+CUTS = {"equal": [12, 24, 36], "last-light": [13, 26, 38], "iq3_s-light": [13, 25, 38]}
+# IQ3_XXS: measured (4-user decode 85.9 -> 100.6 tok/s, results/R2-lastlight-*); every expert fits at either cut.
+# IQ3_S: its experts (46.8 GiB) do not all fit; 13,25,38 gives the four expert caches the most of the expert profile's
+# routing at a 1536 MiB reserve (98.97%, against 98.67% at 13,26,38: docs/decisions/0004-iq3-s.md)
+MODEL_CUTS = {"iq3_xxs": "last-light", "iq3_s": "iq3_s-light"}
 # Tuning-step overrides (the original guide's tuning order): one value changed at a time, kept by a later re-run only
 # when given again.
 PREFILL_CHOICES = ("1024", "2048", "4096", "auto")
@@ -173,9 +186,11 @@ def validate_config(cfg: Any) -> None:
     # Use only reliable, explicit metadata. An unknown name is left untouched.
     native_name = Path(native[0]).name.lower()
     model_name = str(cfg.get("model_name") or "").lower()
+    # as lenient as before about case and folders; model_of() below is exact, for rewriting paths
+    quant = re.search(r"gsq-rco-(iq3_xxs|iq3_s)(?![a-z0-9_])", native_name)
     if "qwen3.8-flash-next" in native_name:
-        if "iq3_xxs" not in native_name or "gsq-rco" not in native_name:
-            raise ConfigError("Expected the Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS model")
+        if quant is None:
+            raise ConfigError("Expected the Qwen3.8-Flash-Next GSQ-RCO IQ3_XXS or IQ3_S model")
         if "swift" in native_name or "coder" in native_name:
             raise ConfigError("This runbook targets the original Flash-Next model")
     # The Coder's files carry the original's names; its folders and profile do not (setup.py FAMILIES: tag "coder-",
@@ -187,20 +202,77 @@ def validate_config(cfg: Any) -> None:
         raise ConfigError("This runbook targets the original Flash-Next model")
     if model_name.startswith(("swift-", "qwen3.8-flash-next-coder")):
         raise ConfigError("This runbook targets the original Flash-Next model")
-    if model_name.startswith("qwen3.8-flash-next-") and not model_name.endswith("iq3_xxs"):
+    if model_name.startswith("qwen3.8-flash-next-") and \
+            not model_name.endswith("-" + (quant.group(1) if quant else "iq3_xxs")):
         raise ConfigError("The generated model name identifies a different quantization")
+
+
+def model_of(cfg: dict[str, Any]) -> str | None:
+    """iq3_xxs or iq3_s when --native is one of setup's GSQ-RCO shard 1 names, else None (not guessed)."""
+    try:
+        native = option_values(cfg.get("args") or [], "--native")
+    except ConfigError:
+        return None
+    m = GSQ_SHARD.fullmatch(Path(native[0]).name) if len(native) == 1 else None
+    return m.group(1).lower() if m and m.group(2) == "00001" else None
+
+
+def retarget(cfg: dict[str, Any], model: str) -> dict[str, Any]:
+    """A copy of cfg with its model files and name moved to the other GSQ-RCO quantization: --native and --ple-gguf
+    (models/<Q>/...-<Q>-0000N-of-00002.gguf), --pack (packs/<q>), tokenizer (<pack>/tokenizer) and model_name
+    (qwen3.8-flash-next-<q>).  Every one must follow that layout exactly; the log, exe and every other path stay."""
+    have = model_of(cfg)
+    if have is None:
+        raise ConfigError(f"Cannot point this config at {model}: --native is not a GSQ-RCO IQ3_XXS/IQ3_S shard 1 name")
+    if have == model:
+        return copy.deepcopy(cfg)
+    old_q, new_q = have.upper(), model.upper()
+    out = copy.deepcopy(cfg)
+    args = out["args"]
+
+    def shard(flag: str, number: str) -> None:
+        values = option_values(args, flag)
+        if len(values) != 1:
+            raise ConfigError(f"Cannot point this config at {model}: expected one {flag}")
+        p = Path(values[0])
+        m = GSQ_SHARD.fullmatch(p.name)
+        if m is None or m.group(1) != old_q or m.group(2) != number or p.parent.name != old_q:
+            raise ConfigError(f"Cannot point this config at {model}: {flag} is not models/{old_q}/<setup's name>")
+        args[args.index(values[0])] = str(p.parent.with_name(new_q) / p.name.replace(f"-{old_q}-", f"-{new_q}-"))
+
+    shard("--native", "00001")
+    shard("--ple-gguf", "00002")
+    packs = option_values(args, "--pack")
+    if len(packs) != 1 or Path(packs[0]).name != have:
+        raise ConfigError(f"Cannot point this config at {model}: --pack is not packs/{have}")
+    new_pack = str(Path(packs[0]).with_name(model))
+    if out.get("tokenizer") != str(Path(packs[0]) / "tokenizer"):
+        raise ConfigError(f"Cannot point this config at {model}: tokenizer is not <pack>/tokenizer")
+    args[args.index(packs[0])] = new_pack
+    out["tokenizer"] = str(Path(new_pack) / "tokenizer")
+    if out.get("model_name") != "qwen3.8-flash-next-" + have:
+        raise ConfigError(f"Cannot point this config at {model}: model_name is not qwen3.8-flash-next-{have}")
+    out["model_name"] = "qwen3.8-flash-next-" + model
+    return out
 
 
 def tune_config(cfg: dict[str, Any], profile: str = "deployed",
                 ple_io: str | None = None, split: str | None = None, prefill: str | None = None,
                 pool_workers: int | None = None, reserve_mib: int | None = None,
-                batch_groups: str | int | None = None, park_mib: int | None = None) -> dict[str, Any]:
+                batch_groups: str | int | None = None, park_mib: int | None = None,
+                model: str = "iq3_xxs") -> dict[str, Any]:
     validate_config(cfg)
     if profile not in PROFILES:
         raise ConfigError("Unknown profile")
+    if model not in MODELS:
+        raise ConfigError(f"--model must be one of {', '.join(MODELS)}")
+    # a config whose files are not named like setup's (model_of None) is left as it is for the default model only
+    if model_of(cfg) not in (None, model) or (model_of(cfg) is None and model != "iq3_xxs"):
+        cfg = retarget(cfg, model)
+        validate_config(cfg)
     settings = PROFILES[profile]
     ple_io = ple_io or str(settings["ple_io"])
-    split = split or str(settings["split"])
+    split = split or (MODEL_CUTS[model] if settings["split"] == "model" else str(settings["split"]))
     if ple_io not in ("mmap", "ram") or split not in CUTS:
         raise ConfigError("Invalid PLE mode or split")
     prefill = str(prefill) if prefill is not None else str(settings["prefill"])
@@ -328,6 +400,8 @@ def critical(old: dict[str, Any], diff: list[str]) -> list[str]:
 def changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     """What a write changes, as old -> new, for the settings this tool controls (no paths, no secrets)."""
     out = []
+    if model_of(old) != model_of(new):
+        out.append(f"model: {model_of(old)} -> {model_of(new)}")
     oa, na = old.get("args") or [], new["args"]
     for flag in sorted(CONTROLLED_VALUES | CONTROLLED_SWITCHES):
         a, b = _flag_state(oa, flag), _flag_state(na, flag)
@@ -368,14 +442,14 @@ def _backup(path: Path, data: bytes, mode: int, owner: tuple[int, int] | None = 
 def update_file(path: Path, *, profile: str = "deployed", ple_io: str | None = None,
                 split: str | None = None, prefill: str | None = None, pool_workers: int | None = None,
                 reserve_mib: int | None = None, batch_groups: str | int | None = None,
-                park_mib: int | None = None, dry_run: bool = False) -> dict[str, Any]:
+                park_mib: int | None = None, model: str = "iq3_xxs", dry_run: bool = False) -> dict[str, Any]:
     path = path.resolve(strict=True)
     original = path.read_bytes()
     try:
         cfg = json.loads(original.decode("utf-8-sig"))
     except (UnicodeDecodeError, json.JSONDecodeError) as e:
         raise ConfigError("Configuration is not valid UTF-8 JSON") from e
-    tuned = tune_config(cfg, profile, ple_io, split, prefill, pool_workers, reserve_mib, batch_groups, park_mib)
+    tuned = tune_config(cfg, profile, ple_io, split, prefill, pool_workers, reserve_mib, batch_groups, park_mib, model)
     try:
         payload = (json.dumps(tuned, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     except UnicodeEncodeError as e:
@@ -436,6 +510,7 @@ def update_file(path: Path, *, profile: str = "deployed", ple_io: str | None = N
         "critical_changes": critical(cfg, diff if semantic else []),
         "dry_run": dry_run,
         "profile": profile,
+        "model": model_of(tuned),
         "changes": diff,
         "gpu": tuned["gpu"],
         "layer_split": tuned["layer_split"],
@@ -466,8 +541,11 @@ def update_file(path: Path, *, profile: str = "deployed", ple_io: str | None = N
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("config", type=Path, help="Existing generated strata-iq3_xxs.json")
+    parser.add_argument("config", type=Path, help="Existing generated strata-iq3_xxs.json (the service's config, "
+                                                   "whichever model it loads)")
     parser.add_argument("--profile", choices=PROFILES, default="deployed")
+    parser.add_argument("--model", choices=MODELS, default="iq3_xxs",
+                        help="GSQ-RCO quantization the config must load; the other one's paths are rewritten")
     parser.add_argument("--ple-io", choices=("mmap", "ram"), default=None,
                         help="Override the profile's PLE placement")
     parser.add_argument("--split", choices=CUTS, default=None,
@@ -488,7 +566,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         summary = update_file(ns.config, profile=ns.profile, ple_io=ns.ple_io, split=ns.split,
                               prefill=ns.prefill, pool_workers=ns.pool_workers, reserve_mib=ns.reserve_mib,
-                              batch_groups=ns.batch_groups, park_mib=ns.conversation_cache_mib, dry_run=ns.dry_run)
+                              batch_groups=ns.batch_groups, park_mib=ns.conversation_cache_mib, model=ns.model,
+                              dry_run=ns.dry_run)
     except (ConfigError, OSError) as e:
         # OSError includes a user-controlled path; report only the error class/errno.
         message = str(e) if isinstance(e, ConfigError) else f"File operation failed ({type(e).__name__}, errno={e.errno})"

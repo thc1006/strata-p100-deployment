@@ -40,6 +40,29 @@
    ```
    After that, run `scripts/check-drift.sh && scripts/test.sh` in the same way. When they pass, add a CHANGELOG entry and commit.
 
+## Change the model (GSQ-RCO IQ3_XXS or IQ3_S)
+
+The two are ISTA-DASLab's quantizations of the same checkpoint; they share the PLE table (shard 2, the same SHA-256), the tokenizer, the MTP draft layer and the expert profile. The reasons and measurements are in [decision 0004](../decisions/0004-iq3-s.md).
+
+1. Put the model's files in setup's layout, at the revision setup pins (`ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF` at `ed59f92082b1e93c0e96d60a8b11aab089b52f09`), next to the deployed ones. For IQ3_S:
+   ```bash
+   M=~/dev/Strata-data/models; mkdir -p $M/IQ3_S
+   f=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+   nice -n 19 ionice -c 3 curl -L --fail -C - --limit-rate 60M -o $M/IQ3_S/$f.part \
+     https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/IQ3_S/$f
+   sha256sum $M/IQ3_S/$f.part    # must be 4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3
+   mv $M/IQ3_S/$f.part $M/IQ3_S/$f
+   ln $M/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf $M/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+   ```
+   Expected: 54,817,524,224 bytes; the hard link costs no space.
+2. Build its pack with Strata's packer, as setup does, without writing into the Strata tree:
+   ```bash
+   cd ~/dev/strata && PYTHONDONTWRITEBYTECODE=1 STRATA_GGUF_PY=third_party/llama.cpp/gguf-py nice -n 19 ionice -c 3 \
+     .venv/bin/python tools/iq_pack.py --gguf $M/IQ3_S/$f --out ~/dev/Strata-data/packs/iq3_s --experts-bin
+   ```
+   Expected: the last line is `experts.bin: 48 layers, 46.84 GiB`.
+3. Change the model in `config/profile.conf` (`--profile deployed --model iq3_s`), then follow steps 2–5 above. The tool rewrites `--native`, `--ple-gguf`, `--pack`, `tokenizer` and `model_name` to the other model's files; it refuses when one of them is not in setup's layout. The model change is critical: preflight refuses to start a live config whose model differs from the profile. Clients may keep sending the old model name; the server answers any name.
+
 ## Rollback
 
 First change `config/profile.conf` back to its original line. Then do one of the following:

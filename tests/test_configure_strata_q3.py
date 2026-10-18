@@ -218,7 +218,7 @@ class TuningTests(unittest.TestCase):
     def test_other_native_quant_refused(self):
         cfg = fixture()
         i = cfg["args"].index("--native") + 1
-        cfg["args"][i] = cfg["args"][i].replace("IQ3_XXS", "IQ3_S")
+        cfg["args"][i] = cfg["args"][i].replace("IQ3_XXS", "IQ2_XS")
         with self.assertRaises(tool.ConfigError):
             tool.tune_config(cfg)
 
@@ -271,6 +271,104 @@ class TuningTests(unittest.TestCase):
         self.assertIn("--vram-reserve-mib: 1536 -> 1024", diff)
         self.assertEqual(tool.changes(deployed, tool.tune_config(deployed)), [])
         self.assertFalse(any("/models" in line or "private-fixture" in line for line in diff))
+
+
+SETUP_JSON = Path(__file__).resolve().parents[1] / "config" / "strata-iq3_xxs.setup.json"
+
+
+def setup_config() -> dict:
+    """The config setup wrote on this machine: the model paths in setup's own layout."""
+    return json.loads(SETUP_JSON.read_text(encoding="utf-8-sig"))
+
+
+class ModelTests(unittest.TestCase):
+    """--model: ISTA-DASLab's GSQ-RCO IQ3_XXS and IQ3_S, and setup's paths rewritten from one to the other."""
+    D = "/home/thc1006/dev/Strata-data"
+
+    def test_iq3_s_points_every_model_path_at_its_files(self):
+        old = setup_config()
+        ref = tool.tune_config(old)
+        cfg = tool.tune_config(old, model="iq3_s")
+        renamed = {
+            f"{self.D}/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf":
+                f"{self.D}/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf",
+            f"{self.D}/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf":
+                f"{self.D}/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf",
+            f"{self.D}/packs/iq3_xxs": f"{self.D}/packs/iq3_s",
+        }
+        self.assertTrue(set(renamed) <= set(ref["args"]), "the setup snapshot no longer has setup's paths")
+        self.assertEqual(cfg["args"], [renamed.get(a, a) for a in ref["args"]])
+        self.assertEqual(cfg["tokenizer"], f"{self.D}/packs/iq3_s/tokenizer")
+        self.assertEqual(cfg["model_name"], "qwen3.8-flash-next-iq3_s")
+        self.assertEqual(cfg["layer_split"], [13, 25, 38])
+        self.assertEqual(tool.model_of(cfg), "iq3_s")
+        for key in set(ref) | set(cfg):                       # the log, exe, env, server fields: the deployment's
+            if key not in ("args", "tokenizer", "model_name", "layer_split"):
+                self.assertEqual(cfg.get(key), ref.get(key), key)
+        self.assertEqual(old, setup_config(), "Input must not mutate")
+
+    def test_switching_is_idempotent_and_reversible(self):
+        old = setup_config()
+        there = tool.tune_config(old, model="iq3_s")
+        self.assertEqual(tool._canon(tool.tune_config(there, model="iq3_s")), tool._canon(there))
+        self.assertEqual(tool._canon(tool.tune_config(there)), tool._canon(tool.tune_config(old)))
+
+    def test_model_change_is_reported_and_critical(self):
+        old = tool.tune_config(setup_config())
+        new = tool.tune_config(old, model="iq3_s")
+        diff = tool.changes(old, new)
+        self.assertIn("model: iq3_xxs -> iq3_s", diff)
+        self.assertIn("layer_split: [13, 26, 38] -> [13, 25, 38]", diff)
+        self.assertIn("model: iq3_xxs -> iq3_s", tool.critical(old, diff))
+        self.assertFalse(any("/home/" in line for line in diff), "no paths in the report")
+        self.assertEqual(tool.changes(new, tool.tune_config(new, model="iq3_s")), [])
+
+    def test_paths_outside_setups_layout_are_refused_not_guessed(self):
+        with self.assertRaises(tool.ConfigError):             # the fixture's pack and PLE paths are not setup's
+            tool.tune_config(fixture(), model="iq3_s")
+        tool.tune_config(fixture())                           # while keeping its model is fine, as before
+        cases = {
+            "native in another folder": ("--native", lambda v: v.replace("/models/IQ3_XXS/", "/models/other/")),
+            "PLE path names shard 1": ("--ple-gguf", lambda v: v.replace("00002-of-00002", "00001-of-00002")),
+            "PLE in another folder": ("--ple-gguf", lambda v: v.replace("/models/IQ3_XXS/", "/models/")),
+            "pack named differently": ("--pack", lambda v: v + "-copy"),
+        }
+        for name, (flag, change) in cases.items():
+            with self.subTest(name):
+                cfg = setup_config()
+                i = cfg["args"].index(flag) + 1
+                cfg["args"][i] = change(cfg["args"][i])
+                with self.assertRaises(tool.ConfigError):
+                    tool.tune_config(cfg, model="iq3_s")
+        for key, value in (("tokenizer", "/elsewhere/tokenizer"), ("model_name", "my-model")):
+            with self.subTest(key):
+                cfg = setup_config()
+                cfg[key] = value
+                with self.assertRaises(tool.ConfigError):
+                    tool.tune_config(cfg, model="iq3_s")
+
+    def test_model_name_must_agree_with_the_files(self):
+        cfg = tool.tune_config(setup_config(), model="iq3_s")
+        cfg["model_name"] = "qwen3.8-flash-next-iq3_xxs"
+        with self.assertRaises(tool.ConfigError):
+            tool.validate_config(cfg)
+        with self.assertRaises(tool.ConfigError):
+            tool.tune_config(setup_config(), model="q4_0")
+
+    def test_cli_dry_run_reports_the_switch_without_writing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "strata-iq3_xxs.json"
+            path.write_text(json.dumps(tool.tune_config(setup_config()), indent=2), encoding="utf-8")
+            before = path.read_bytes()
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                rc = tool.main([str(path), "--profile", "deployed", "--model", "iq3_s", "--dry-run"])
+            self.assertEqual(rc, 0)
+            summary = json.loads(out.getvalue())
+            self.assertEqual(summary["model"], "iq3_s")
+            self.assertIn("model: iq3_xxs -> iq3_s", summary["critical_changes"])
+            self.assertEqual(summary["layer_split"], [13, 25, 38])
+            self.assertEqual(path.read_bytes(), before)
 
 
 class FileTests(unittest.TestCase):

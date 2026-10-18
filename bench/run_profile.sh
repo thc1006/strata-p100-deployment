@@ -2,6 +2,8 @@
 # The same performance set for every configuration under test, with the resource monitor around it.
 # Usage: bench/run_profile.sh <tag>      (the service must be running the configuration <tag> names)
 # A tag is used once: its result files are refused if they exist, so two runs never mix.
+# SERVE_LOAD_NONCE, when set, is serve_load's --nonce: the same prompts in every run, so a greedy decode reads the
+# same text (and drafts the same) in each; unset, serve_load takes the clock, and every run decodes other text.
 set -u
 TAG=${1:?tag}
 D=$(cd "$(dirname "$0")/.." && pwd)
@@ -19,9 +21,9 @@ python3 "$D/bench/monitor.py" record "$R/$TAG-monitor.csv" --every 2 &
 MON=$!
 trap 'kill $MON 2>/dev/null' EXIT
 {
-  echo "[$(date +%T)] serve_load 1,2,4 ($TAG)"
+  echo "[$(date +%T)] serve_load 1,2,4 ($TAG, nonce ${SERVE_LOAD_NONCE:-the clock})"
   (cd "$HOME/dev/strata" && .venv/bin/python tools/serve_load.py http://127.0.0.1:8080 --clients 1,2,4 --rounds 3 \
-     --max-tokens 512 --json "$R/$TAG-serve_load.json" | tail -5)
+     --max-tokens 512 ${SERVE_LOAD_NONCE:+--nonce "$SERVE_LOAD_NONCE"} --json "$R/$TAG-serve_load.json" | tail -5)
   python3 "$D/bench/stress_matrix.py" replicate think4 worst --runs 3 --tag "$TAG" --out "$R/stress.jsonl"
   for t in 8192 16384; do
     echo "[$(date +%T)] burst 4x$t"

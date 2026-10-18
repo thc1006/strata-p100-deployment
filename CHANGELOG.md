@@ -2,6 +2,12 @@
 
 Notable changes to this machine and this repository, newest first. There are no version numbers; sections are by date. The categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-19
+
+### Changed
+
+- `bench/run_profile.sh` passes `SERVE_LOAD_NONCE`, when set, to serve_load's `--nonce`: every run then sends the same prompts and decodes the same text. Two runs of one configuration differed by up to 4.8% on 1 client with the default nonce (`results/v441-1-serve_load.json` against `v441-2`), because the 1-client rate follows the drafts the text accepts. `bench/ab_model_run.sh` sets it for decision 0004's A/B.
+
 ## 2026-10-18
 
 ### Added

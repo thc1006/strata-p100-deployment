@@ -31,6 +31,17 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Fixed
 
+- The IQ3_XXS / IQ3_S A/B tools after a fourth adversarial review, before any IQ3_S run (decision 0004 amended):
+  - A run measured again could never replace the one it repeated. `--remeasured OLD=NEW` now does, only when the summary rates OLD "cannot tell" with no fault; a clean run is not replaced, and a run with a fault is never replaced (its fault counts). The report lists each replacement.
+  - server.py's two refusals that print no status (a foreign Host, another site's web page) failed IQ3_S (exit 3); they are now other traffic (exit 2).
+  - Exit 3 came in cases 0004 calls impossible to judge. A candidate fault now fails stability only when that run has no reason to be measured again and no baseline run has a fault or such a reason. An engine restart that also cost records is now 2.
+  - The robustness run of criterion 1 was in no step of the protocol. `bench/ab_model_run.sh TAG B robustness` runs it, and `--robustness TAG` judges its floors (at least 700 MiB of VRAM per card, MemAvailable at least 6 GiB) and that the run is valid. The summary no longer names the quality subset.
+  - The wrapper ran despite drifted host units, a wrong ARC cap or wrong floors; it now refuses before the run.
+  - The arm record again keeps the expert complement page-locked in RAM, and records the conversations parked before the run. The summary reports other clients' requests per run and flags large differences (not judged).
+  - The summary says the ECC check cannot fire on these cards (ECC disabled).
+  - Tests: `tests/test_ab_model_summary.py` (25 tests, catching each of 118 planted bugs) and 15 more checks in `tests/ab_model_run_stubs.sh` (64 in all), one of them an engine restarted during the run.
+- `config/strata-iq3_xxs.deployed.json` had the 8 GiB floors; it is now what the tool makes from setup's config (6144 and "6"), and `config/deployed-artifacts.sha256` names its checksum.
+- Decision 0004 cited `results/iq3s-memory-budget-20261018.txt`, which was never committed. The computation was run again on the same files at the same pinned revisions (`results/iq3s-memory-budget-20261019.txt`, identical numbers; `bench/model_memory_budget.py` now also prints each PLE table's quantization), and the download sizes now have a source (`results/iq3s-model-files-20261019.txt`).
 - The IQ3_XXS / IQ3_S A/B tools, after a third adversarial review and before any IQ3_S run (decision 0004 amended):
   - A request waiting 90 s for a slot counted as an error line; the Poisson phase causes such waits on purpose. The leaked-slot message (`marked busy with no request`) was not captured; it now counts as a fault.
   - Other clients' traffic, an interrupted run, a perf set that refused to start and an OOM kill inside another process's cgroup counted as an IQ3_S failure (exit 3); they now make the run impossible to judge (exit 2), and so does a dirty baseline next to a dirty candidate. The wrapper captures the lines wide and the summary sorts them into faults, other traffic and unclear lines.

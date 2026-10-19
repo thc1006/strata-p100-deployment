@@ -18,7 +18,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))   # tools/configure_strata_q3.py
 import configure_strata_q3 as tool  # noqa: E402
 
-STRATA = Path.home() / "dev" / "strata"
+STRATA = Path(os.environ.get("STRATA_DIR") or Path.home() / "dev" / "strata")    # STRATA_DIR: another tree's server.py
+VENV_PY = Path(os.environ.get("STRATA_PY") or STRATA / ".venv" / "bin" / "python")
 
 
 def fixture() -> dict:
@@ -548,6 +549,16 @@ class FileTests(unittest.TestCase):
             "lazy_load true": lambda c: c.__setitem__("lazy_load", True),
             "--prefill=2048 form": lambda c: c["args"].__setitem__(slice(c["args"].index("--prefill"),
                                                                        c["args"].index("--prefill") + 2), ["--prefill=2048"]),
+            # one element "--x v": 0.1.45's server.py splits it, so its value would reach the engine unchecked
+            "--prefill 2048 in one element": lambda c: c["args"].__setitem__(slice(c["args"].index("--prefill"),
+                                                                                c["args"].index("--prefill") + 2), ["--prefill 2048"]),
+            "--vram-reserve-mib 512 in one element, later": lambda c: c["args"].insert(c["args"].index("--resident-experts"),
+                                                                                   "--vram-reserve-mib 512"),
+            "--prefill 4096 in one element, after a switch": lambda c: c["args"].append("--prefill 4096"),
+            # after a bare flag server.py splits nothing and lifts only the = form: the engine gets an unknown argument
+            "--reasoning-effort high in one element, after a switch": lambda c: c["args"].append("--reasoning-effort high"),
+            "a flag without its value before a switch": lambda c: c["args"].insert(c["args"].index("--resident-experts"),
+                                                                                    "--spec-min-p"),
         }
         allowed = {
             "--prefill auto": arg("--prefill", "auto"),
@@ -562,6 +573,7 @@ class FileTests(unittest.TestCase):
             "open_browser": lambda c: c.__setitem__("open_browser", True),
             "lazy_load 1": lambda c: c.__setitem__("lazy_load", 1),        # server.py: only True is lazy
             "--reasoning-effort=high form": lambda c: c["args"].append("--reasoning-effort=high"),   # server.py lifts it
+            "--reasoning-effort high in one element, first": lambda c: c["args"].insert(0, "--reasoning-effort high"),  # split, lifted
         }
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "strata-iq3_xxs.json"
@@ -571,8 +583,114 @@ class FileTests(unittest.TestCase):
                         cfg = tool.tune_config(fixture())
                         edit(cfg)
                         path.write_text(json.dumps(cfg))
-                        crit = tool.update_file(path, dry_run=True)["critical_changes"]
+                        try:
+                            crit = tool.update_file(path, dry_run=True)["critical_changes"]
+                        except tool.ConfigError as e:          # strata-preflight.sh refuses on the tool's error too
+                            crit = [str(e)]
                         self.assertEqual(bool(crit), expect_refused, crit)
+
+    def test_one_element_flag_value_forms(self):
+        def with_args(*extra):
+            cfg = fixture()
+            cfg["args"] += list(extra)
+            return cfg
+        # an uncontrolled or refused flag with its value in one element: refused, in either form
+        for bad, says in (("--spec-min-p 0.5", "two elements"), ("--spec-min-p=0.5", "two elements"),
+                          ("--peer-device 1", tool.REFUSED_FLAGS["--peer-device"]),
+                          ("--trim-stage-weights 1", "is a switch")):
+            with self.subTest(bad=bad), self.assertRaises(tool.ConfigError) as e:
+                tool.tune_config(with_args(bad))
+            self.assertIn(says, str(e.exception))
+        # a controlled flag's: rebuilt, as its = form is
+        tuned = tool.tune_config(with_args("--vram-reserve-mib 512", "--prefill\t4096"))
+        self.assertEqual(tool.option_values(tuned["args"], "--vram-reserve-mib"), ["1536"])
+        self.assertEqual(tool.option_values(tuned["args"], "--prefill"), ["2048"])
+        self.assertNotIn("--vram-reserve-mib 512", tuned["args"])
+        self.assertNotIn("--prefill\t4096", tuned["args"])
+        # in a live config the value the engine gets is reported and stops a start
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "strata-iq3_xxs.json"
+            cfg = tool.tune_config(fixture())
+            cfg["args"].insert(cfg["args"].index("--resident-experts"), "--vram-reserve-mib 512")
+            path.write_text(json.dumps(cfg))
+            r = tool.update_file(path, dry_run=True)
+            self.assertIn("--vram-reserve-mib: 512 -> 1536", r["changes"])
+            self.assertIn("args hold a flag and its value in one element (write them as two): --vram-reserve-mib",
+                          r["critical_changes"])
+            self.assertTrue(any(c.startswith("--vram-reserve-mib is 512") for c in r["critical_changes"]))
+
+    def test_server_split_splits_as_server_py_does(self):
+        cases = {
+            ("--ple-io mmap",): ["--ple-io", "mmap"],
+            ("--ple-io=mmap",): ["--ple-io", "mmap"],
+            ("--x  y",): ["--x", "y"],
+            ("--x=y z",): ["--x", "y z"],
+            ("--a=b", "--c=d"): ["--a", "b", "--c", "d"],
+            ("--pack", "--x y"): ["--pack", "--x y"],          # the value place of a bare flag: kept
+            ("--x=",): ["--x="],
+            ("-x y",): ["-x y"],
+            ("path with space",): ["path with space"],
+            ("--x=y ",): ["--x", "y"],                          # the value is stripped
+            ("--x\ty",): ["--x", "y"],                           # any whitespace
+            ("--p", "--a=b", "--c d"): ["--p", "--a=b", "--c", "d"],  # "--a=b" is no bare flag
+            ("---x y",): ["---x y"],                           # a flag name starts with a letter or digit
+            ("--a=--b", "--c d"): ["--a", "--b", "--c d"],     # the value place of the split-off "--b"
+            ("--p", "--x y", "--x y"): ["--p", "--x y", "--x", "y"],
+        }
+        for args, want in cases.items():
+            with self.subTest(args=args):
+                self.assertEqual(tool.server_split(list(args)), want)
+
+    def test_engine_view_lifts_reasoning_effort_as_server_py_does(self):
+        cases = {
+            ("--reasoning-effort", "high", "--x", "1"): ["--x", "1"],
+            ("--pack", "--reasoning-effort", "high", "/p"): ["--pack", "/p"],     # wherever it stands
+            ("--x", "1", "--reasoning-effort"): ["--x", "1", "--reasoning-effort"],   # last: kept
+            ("--a=b", "--reasoning-effort=high"): ["--a", "b"],
+            ("--reasoning-effort high",): [],                                    # split, then lifted
+            ("--spec-min-p", "--reasoning-effort", "--vram-reserve-mib", "1536"): ["--spec-min-p", "1536"],
+        }
+        for args, want in cases.items():
+            with self.subTest(args=args):
+                self.assertEqual(tool.engine_view(list(args)), want)
+
+    def test_args_the_engine_would_read_otherwise_are_refused(self):
+        def edited(edit):
+            cfg = tool.tune_config(fixture())
+            edit(cfg["args"])
+            return cfg
+        def before_switch(*items):
+            return lambda a: a.__setitem__(slice(a.index("--resident-experts"), a.index("--resident-experts")), list(items))
+        unsafe = {   # the engine takes the element after a flag as its value, whatever it is
+            "a flag without its value before a switch": before_switch("--spec-min-p"),
+            "--reasoning-effort taken out between a flag and a switch": before_switch("--spec-min-p", "--reasoning-effort=high"),
+            "a flag without its value at the end": lambda a: a.append("--spec-min-p"),
+            "a controlled flag before a flag": lambda a: a.__setitem__(slice(a.index("--prefill"), a.index("--prefill") + 2),
+                                                                      ["--prefill"]),
+        }
+        for name, edit in unsafe.items():
+            with self.subTest(name=name), self.assertRaises(tool.ConfigError) as e:
+                tool.tune_config(edited(edit))
+            self.assertIn("give each flag its value", str(e.exception))
+        with self.assertRaises(tool.ConfigError) as e:      # one element the engine gets whole
+            tool.tune_config(edited(lambda a: a.insert(a.index("--resident-experts") + 1, "--prefill 4096")))
+        self.assertIn("'--prefill 4096' reaches the engine as one argument", str(e.exception))
+        # a value the engine reads after the lift: the reserve it gets is reported, and stops a start
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "strata-iq3_xxs.json"
+            cfg = tool.tune_config(fixture())
+            cfg["args"][cfg["args"].index("--vram-reserve-mib") + 1] = "512"
+            cfg["args"] += ["--spec-min-p", "--reasoning-effort", "--vram-reserve-mib", "1536"]
+            path.write_text(json.dumps(cfg))
+            r = tool.update_file(path, dry_run=True)
+            self.assertIn("--vram-reserve-mib: 512 -> 1536", r["changes"])
+            self.assertTrue(any(c.startswith("--vram-reserve-mib is 512") for c in r["critical_changes"]))
+        # the configs of this deployment read the same both ways
+        root = Path(__file__).resolve().parents[1] / "config"
+        for name in ("strata-iq3_xxs.setup.json", "strata-iq3_xxs.deployed.json"):
+            with self.subTest(config=name):
+                args = json.loads((root / name).read_text())["args"]
+                self.assertEqual(tool.engine_pairs(tool.engine_view(args)), (args, []))
 
     def test_missing_reserve_names_the_engine_default(self):
         cfg = tool.tune_config(fixture())
@@ -649,7 +767,7 @@ class FileTests(unittest.TestCase):
             self.assertEqual(path.read_text(), "[]")
 
 
-@unittest.skipUnless((STRATA / ".venv" / "bin" / "python").exists() and (STRATA / "serve" / "server.py").exists(),
+@unittest.skipUnless(VENV_PY.exists() and (STRATA / "serve" / "server.py").exists(),
                      "the pinned Strata checkout is not here")
 class ServerIntegrationTests(unittest.TestCase):
     """The tuned args through the real server.py, and every emitted flag against the engine's own parser."""
@@ -667,7 +785,7 @@ class ServerIntegrationTests(unittest.TestCase):
         for profile in tool.PROFILES:
             with self.subTest(profile=profile):
                 cfg = tool.tune_config(fixture(), profile)
-                r = subprocess.run([str(STRATA / ".venv" / "bin" / "python"), "-c", self.PROBE, str(STRATA / "serve")],
+                r = subprocess.run([str(VENV_PY), "-c", self.PROBE, str(STRATA / "serve")],
                                    input=json.dumps(cfg), capture_output=True, text=True, timeout=120)
                 self.assertEqual(r.returncode, 0, r.stderr[-2000:])
                 out = json.loads(r.stdout.strip().splitlines()[-1])
@@ -680,6 +798,41 @@ class ServerIntegrationTests(unittest.TestCase):
                                     f"{flag} is not an engine option")
                 controlled = [a for a in args if a in tool.CONTROLLED_VALUES | tool.CONTROLLED_SWITCHES]
                 self.assertEqual(len(controlled), len(set(controlled)), "a controlled flag appears twice")
+
+    SPLIT_PROBE = (
+        "import json, sys\n"
+        "sys.path.insert(0, sys.argv[1])\n"
+        "import server\n"
+        "out, lifted = [], []\n"
+        "for args in json.load(sys.stdin):\n"
+        "    cfg = {'args': list(args)}\n"
+        "    if hasattr(server, 'split_joined_args'):\n"
+        "        server.split_joined_args(cfg)\n"
+        "    out.append(cfg['args'])\n"
+        "    server.lift_reasoning_effort_arg(cfg)\n"
+        "    lifted.append(cfg['args'])\n"
+        "print(json.dumps({'split': hasattr(server, 'split_joined_args'), 'out': out, 'lifted': lifted}))\n"
+    )
+
+    def test_server_split_is_what_server_py_splits(self):
+        cases = [["--ple-io mmap"], ["--ple-io=mmap"], ["--x  y"], ["--x=y z"], ["--x\ty"], ["--a=b", "--c=d"],
+                 ["--pack", "--x y"], ["--x="], ["--x =y"], ["-x y"], ["--1a b"], ["--a-b c", "--d"], ["--d", "--e f"],
+                 ["--e f", "--g"], ["path with space"], ["--vram-reserve-mib 512", "--resident-experts"],
+                 ["--x=y "], ["--x y\t"], ["---x y"], ["--a=--b", "--c d"], ["--p", "--x y", "--x y"], ["--x\u00a0y"],
+                 ["--p", "--a=b", "--c d"], ["--reasoning-effort", "high", "--x", "1"],
+                 ["--pack", "--reasoning-effort", "high", "/p"], ["--x", "1", "--reasoning-effort"],
+                 ["--a=b", "--reasoning-effort=high"], ["--reasoning-effort high"],
+                 ["--spec-min-p", "--reasoning-effort", "--vram-reserve-mib", "1536"]]
+        r = subprocess.run([str(VENV_PY), "-c", self.SPLIT_PROBE, str(STRATA / "serve")],
+                           input=json.dumps(cases), capture_output=True, text=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        got = json.loads(r.stdout.strip().splitlines()[-1])
+        if not got["split"]:
+            self.skipTest("this server.py does not split args elements (before 0.1.45)")
+        for args, out, lifted in zip(cases, got["out"], got["lifted"]):
+            with self.subTest(args=args):
+                self.assertEqual(tool.server_split(args), out)
+                self.assertEqual(tool.engine_view(args), lifted)
 
 
 if __name__ == "__main__":

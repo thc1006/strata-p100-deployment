@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Tune an existing Strata GSQ-RCO IQ3_XXS or IQ3_S configuration for four P100 GPUs.
 
-Audited source: a0116b2782a5b82622358c04a06496485d12b2d6.
+Audited source: 477ac13cbe8e582c20484871ce459d20d82df09d (v0.1.45; checked again on 2026-10-19 against setup.py,
+serve/server.py and the engine's options, first written against a0116b2, v0.1.43.1).
 This edits configuration only. It does not install, start, or benchmark Strata.
 
 Models (--model): iq3_xxs (the default) or iq3_s, ISTA-DASLab's GSQ-RCO quantizations of the same checkpoint (the same
@@ -31,7 +32,7 @@ import sys
 import tempfile
 from typing import Any
 
-SOURCE_COMMIT = "a0116b2782a5b82622358c04a06496485d12b2d6"
+SOURCE_COMMIT = "477ac13cbe8e582c20484871ce459d20d82df09d"
 PROFILES = {    # "split": "model" takes the model's own cuts (MODEL_CUTS)
     "deployed": {"reserve": 1536, "prefill": "2048", "ple_io": "ram", "split": "model", "park_mib": 8192},
     "baseline": {"reserve": 1536, "prefill": "2048", "ple_io": "mmap", "split": "equal", "park_mib": 0},
@@ -98,7 +99,7 @@ REFUSED_FLAGS = {
     "--experimental-speed-projection": "An ablation or unsupported engine switch is present; regenerate the config",
     "--vision": "This text-service profile requires setup --vision no",
 }
-# All of these have a numeric/string zero-off test in the audited source.
+# Each key's own test in the audited source reads these values as meant: "0" is off.
 ENV_DEFAULTS = {
     # --resident-experts page-locks the experts no card holds while leaving this much of the available RAM free
     # (engine default 4); the same 6 GiB floor as parking (PARK_MIN_FREE_MIB)
@@ -131,6 +132,80 @@ SERVER_FIELDS = ("cuda", "gpu", "gpu_order", "layer_split", "parallel", "split_s
 
 class ConfigError(ValueError):
     """Invalid or incompatible input; messages never include user secrets."""
+
+
+# 0.1.45's serve/server.py (split_joined_args, #2267) splits an args element that holds a flag and its value,
+# "--ple-io mmap" or "--ple-io=mmap", into the two before the engine starts, unless the element sits in the value
+# place of a bare flag before it.  At a0116b2 the engine refused such an element as one unknown argument.
+JOINED_ARG = re.compile(r"^(--[A-Za-z0-9][A-Za-z0-9-]*)(?:\s+|=)(\S.*)$")
+BARE_FLAG = re.compile(r"^--[A-Za-z0-9][A-Za-z0-9-]*$")
+
+
+def server_split(args: list[Any]) -> list[Any]:
+    """args after 0.1.45's split_joined_args."""
+    out: list[Any] = []
+    for a in args:
+        m = JOINED_ARG.match(a) if isinstance(a, str) else None
+        prev = out[-1] if out else None
+        if m is None or (isinstance(prev, str) and BARE_FLAG.match(prev) is not None):
+            out.append(a)
+        else:
+            out += [m.group(1), m.group(2).strip()]
+    return out
+
+
+def engine_view(args: list[Any]) -> list[Any]:
+    """The args 0.1.45's server.py hands the engine: split, then lift_reasoning_effort_arg (#1641, the same at a0116b2),
+    which takes "--reasoning-effort" and the element after it, or "--reasoning-effort=...", out wherever they stand."""
+    split, out, i = server_split(args), [], 0
+    while i < len(split):
+        a = split[i]
+        if a == "--reasoning-effort" and i + 1 < len(split):
+            i += 2
+        elif isinstance(a, str) and a.startswith("--reasoning-effort="):
+            i += 1
+        else:
+            out.append(a)
+            i += 1
+    return out
+
+
+def engine_pairs(args: list[Any]) -> tuple[list[Any], list[str]]:
+    """The engine's reading of its args: a value flag takes the next element, whatever it is (generate.cpp next()).
+    This tool knows the arity of its own flags only, so another flag followed by a flag, or last, cannot be read safely:
+    it would take that flag as its value, or it is a switch this tool does not know.  Returns the args as flag-value
+    pairs and switches, and those positions."""
+    norm: list[Any] = []
+    problems: list[str] = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        nxt = args[i + 1] if i + 1 < len(args) else None
+        takes_next = isinstance(nxt, str) and not nxt.startswith("--")
+        if not (isinstance(a, str) and a.startswith("--")):
+            norm.append(a)                       # not a flag: the engine refuses it as an unknown argument
+            i += 1
+        elif BARE_FLAG.match(a) is None:         # one element server.py left whole (after a bare flag)
+            problems.append(f"{a!r} reaches the engine as one argument, which it refuses")
+            norm.append(a)
+            i += 1
+        elif a in CONTROLLED_SWITCHES:
+            norm.append(a)
+            i += 1
+        elif takes_next:
+            norm += [a, nxt]
+            i += 2
+        else:
+            problems.append(f"{a} is followed by {nxt}, which the engine would take as its value" if nxt is not None
+                            else f"{a} is the last argument and has no value")
+            norm.append(a)
+            i += 1
+    return norm, problems
+
+
+def engine_reads(args: list[Any]) -> list[Any]:
+    """The args as the engine reads them (engine_view, engine_pairs), for comparing values."""
+    return engine_pairs(engine_view(args))[0]
 
 
 def option_values(args: list[str], flag: str) -> list[str]:
@@ -173,13 +248,19 @@ def validate_config(cfg: Any) -> None:
     if Path(cfg["exe"]).parent.name != "engine-cuda12":
         raise ConfigError("exe must point to engine-cuda12/strata; rerun setup --cuda 12")
     for x in args:
-        flag = x.partition("=")[0]
+        joined = JOINED_ARG.match(x)
+        flag = joined.group(1) if joined else x.partition("=")[0]
         if flag in REFUSED_FLAGS:
             raise ConfigError(REFUSED_FLAGS[flag])
-        # the engine matches flags exactly (generate.cpp: "unknown argument"); a controlled flag's = form is
-        # stripped below, any other one would stop the engine at start
-        if x.startswith("--") and "=" in x and flag not in CONTROLLED_VALUES | CONTROLLED_SWITCHES | SERVER_LIFTED:
-            raise ConfigError(f"{flag}=...: the engine does not accept --flag=value; give the value separately")
+        # a flag and its value in one element ("--x v", "--x=v"): a controlled flag's is rebuilt below; any other one
+        # the engine refused at a0116b2, and 0.1.45's server.py splits it, so the engine would run a value this tool
+        # never checked
+        if x.startswith("--") and (joined or "=" in x) and flag not in CONTROLLED_VALUES | CONTROLLED_SWITCHES | SERVER_LIFTED:
+            raise ConfigError(f"{flag}: its value is in the same args element; give the flag and the value as two elements")
+    unsafe = engine_pairs(engine_view(args))[1]
+    if unsafe:
+        raise ConfigError("; ".join(unsafe) + ": give each flag its value as the next element (a switch this tool does "
+                          "not know must be added to it first)")
     native = option_values(args, "--native")
     if len(native) != 1:
         raise ConfigError("Expected exactly one generated --native model path")
@@ -298,7 +379,8 @@ def tune_config(cfg: dict[str, Any], profile: str = "deployed",
     i = 0
     while i < len(args):
         arg = args[i]
-        flag, equals, value = arg.partition("=")
+        joined = JOINED_ARG.match(arg)
+        flag, equals, value = (joined.group(1), "=", joined.group(2)) if joined else arg.partition("=")
         if flag in CONTROLLED_VALUES:
             if equals:
                 if not value:
@@ -377,7 +459,7 @@ def _flag_state(args: list[str], flag: str) -> Any:
 def critical(old: dict[str, Any], diff: list[str]) -> list[str]:
     """The entries of diff (from changes(old, ...)) that must stop a start, plus the conditions changes() cannot see."""
     out = [d for d in diff if d.split(":", 1)[0] not in NOTE_ONLY_KEYS]
-    reserve = _flag_state(old.get("args") or [], "--vram-reserve-mib")
+    reserve = _flag_state(engine_reads(old.get("args") or []), "--vram-reserve-mib")
     if reserve is None:
         out.append(f"--vram-reserve-mib is missing: the engine uses {ENGINE_DEFAULT_RESERVE_MIB} MiB "
                    f"(below {RESERVE_CRITICAL_BELOW_MIB} MiB: issue #2065)")
@@ -388,12 +470,14 @@ def critical(old: dict[str, Any], diff: list[str]) -> list[str]:
                    f"(below {RESERVE_CRITICAL_BELOW_MIB} MiB: issue #2065)")
     if old.get("lazy_load") is True:
         out.append("lazy_load is true: the model would not load at start")
-    # server.py passes args through (only --reasoning-effort is lifted out) and the engine rejects --flag=value as an
-    # unknown argument (generate.cpp), so such a form in the live config is a failed start, not a formatting detail
-    eq = sorted({a.partition("=")[0] for a in old.get("args") or []
-                 if a.startswith("--") and "=" in a and a.partition("=")[0] not in SERVER_LIFTED})
-    if eq:
-        out.append("args use --flag=value, which the engine rejects: " + ", ".join(eq))
+    # a flag and its value in one element: a failed start at a0116b2 (the engine's "unknown argument"); 0.1.45's
+    # server.py splits it (#2267), and a value given so can stand beside, or after, the one this tool wrote.  Only
+    # --reasoning-effort, which server.py lifts out, is harmless
+    one = sorted({(JOINED_ARG.match(a).group(1) if JOINED_ARG.match(a) else a.partition("=")[0])
+                  for a in old.get("args") or [] if isinstance(a, str) and a.startswith("--")
+                  and (JOINED_ARG.match(a) or "=" in a)} - SERVER_LIFTED)
+    if one:
+        out.append("args hold a flag and its value in one element (write them as two): " + ", ".join(one))
     return out
 
 
@@ -402,7 +486,7 @@ def changes(old: dict[str, Any], new: dict[str, Any]) -> list[str]:
     out = []
     if model_of(old) != model_of(new):
         out.append(f"model: {model_of(old)} -> {model_of(new)}")
-    oa, na = old.get("args") or [], new["args"]
+    oa, na = engine_reads(old.get("args") or []), engine_reads(new["args"])     # as the engine reads them
     for flag in sorted(CONTROLLED_VALUES | CONTROLLED_SWITCHES):
         a, b = _flag_state(oa, flag), _flag_state(na, flag)
         if _canon(a) != _canon(b):
@@ -461,7 +545,7 @@ def update_file(path: Path, *, profile: str = "deployed", ple_io: str | None = N
     diff = changes(cfg, tuned)
     semantic = bool(diff)
     if changed and not diff:
-        diff = ["format: indentation, args order, repeats or --flag=value forms normalised (same values)"]
+        diff = ["format: indentation, args order, repeats or one-element flag-value forms normalised (same values)"]
     backup: Path | None = None
     warnings: list[str] = []
     if changed and not dry_run:

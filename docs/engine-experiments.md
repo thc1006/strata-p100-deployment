@@ -65,6 +65,13 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
   alone made 11.0% and 5.2% worse. The runs use the phases prefill, decode, four, decode4, eval4, admit, admit28 and
   turns, and screen version 2026-10-19c. Its eval4 asks harder questions, so that the thinking runs to the
   1536-token cap; the first questions ended after 98 to 874 tokens (m0-1 and m1-1 in `results/engine-screen.jsonl`).
+- 2026-10-19 10:17, the maintainer: results of a script with a defect are not used. The combination's first run
+  (k0-1, k1-1, k1-2; `results/ab_engine-combo-20261019.log`) is therefore set aside. In it the driver failed to read
+  K1's `must_not`, which K1 does not have, and took the missing field for no check; it would have taken a missing
+  `must` or `env` the same way. K1's `env` and `must` checks did run and pass. k0-2 was interrupted while its engine
+  loaded, which showed a second defect: the restore waited 60 s for a reply that could not exist, printing a traceback
+  at each poll. Both are fixed and tested (`tests/ab_engine_stubs.sh`, cases 26 and 27), and the confirmation runs
+  again as k0-3, k1-3, k1-4, k0-4, with the same arms, screen and criteria.
 
 ## Results
 

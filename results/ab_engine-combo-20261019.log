@@ -1,0 +1,111 @@
+[09:02:50] ab_engine: === k0-1 (K0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[09:10:30] ab_engine: strata-ab-engine loaded after 442 s
+[09:10:30] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[09:15:40] ab_engine: measuring k0-1
+[09:27:02] ab_engine: done k0-1: screen exit 0, same engine yes
+[09:27:02] ab_engine: === k1-1 (K1: /home/thc1006/dev/strata-0.1.45/cfg-gs1-pc1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[09:34:25] ab_engine: strata-ab-engine loaded after 426 s
+[09:34:25] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Traceback (most recent call last):
+  File "<stdin>", line 30, in <module>
+KeyError: 'must_not'
+[09:39:35] ab_engine: measuring k1-1
+[09:50:07] ab_engine: done k1-1: screen exit 0, same engine yes
+[09:50:07] ab_engine: === k1-2 (K1: /home/thc1006/dev/strata-0.1.45/cfg-gs1-pc1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[09:57:41] ab_engine: strata-ab-engine loaded after 438 s
+[09:57:41] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Traceback (most recent call last):
+  File "<stdin>", line 30, in <module>
+KeyError: 'must_not'
+[10:02:51] ab_engine: measuring k1-2
+[10:13:27] ab_engine: done k1-2: screen exit 0, same engine yes
+[10:13:27] ab_engine: === k0-2 (K0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[10:17:37] ab_engine: interrupted
+[10:17:37] ab_engine: finishing (exit 130): stopping the test unit, starting strata-q3
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+Traceback (most recent call last):
+  File "<string>", line 2, in <module>
+  File "/usr/lib/python3.10/json/__init__.py", line 293, in load
+    return loads(fp.read(),
+  File "/usr/lib/python3.10/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+  File "/usr/lib/python3.10/json/decoder.py", line 337, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+  File "/usr/lib/python3.10/json/decoder.py", line 355, in raw_decode
+    raise JSONDecodeError("Expecting value", s, err.value) from None
+json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+[10:18:38] ab_engine: the test unit is still serving a reply after 60 s; stopping it
+[10:24:51] ab_engine: strata-q3.service loaded after 2 s
+[10:24:51] ab_engine: strata-q3: active

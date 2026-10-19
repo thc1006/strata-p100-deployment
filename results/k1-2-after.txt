@@ -1,0 +1,9 @@
+tag k1-2  ended at 2026-10-19 10:13:25  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 53  sent: 53
+load average: 4.45 4.36 3.07
+beside CPU-s after the screen: 101
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

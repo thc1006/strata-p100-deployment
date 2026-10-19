@@ -1,0 +1,9 @@
+tag m0-1  ended at 2026-10-19 08:04:47  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 45  sent: 45
+load average: 2.08 1.71 1.44
+beside CPU-s after the screen: 67
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

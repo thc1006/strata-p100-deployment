@@ -13,6 +13,10 @@ User=thc1006
 Group=thc1006
 WorkingDirectory=/home/thc1006/dev/strata
 Environment=PYTHONUNBUFFERED=1 OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1
+# how long server.py waits for the engine's READY (its default is 900 s; the engine inherits this variable).  IQ3_S's
+# first start read its experts from the rotational disk at about 60 MB/s and was still loading at 900 s
+# (results/ab-iq3s-1-switch.txt); 1800 s is what strata-wait-ready.sh allows
+Environment=STRATA_ENGINE_READY_S=1800
 # GPUs present, RAM available for the locked PLE table, config unchanged, no second copy (scripts/strata-preflight.sh)
 ExecStartPre=/home/thc1006/dev/p100-q3-deployment/scripts/strata-preflight.sh
 # server.py directly, not run-iq3_xxs.sh or ./setup.sh: setup's start path rewrites "--prefill 2048" to "auto"

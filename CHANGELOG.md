@@ -10,6 +10,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Changed
 
+- `strata-q3.service` gives server.py 1800 s instead of 900 s to see the engine's READY (`STRATA_ENGINE_READY_S`). IQ3_S's first start read its experts from the rotational disk at about 60 MB/s and was still loading at 906 s, so server.py ended it and `bench/switch_model.sh` switched the service back to IQ3_XXS: no service from 01:55 to 02:18 (`results/ab-iq3s-1-switch.txt`). 1800 s is what `strata-wait-ready.sh` allows. Decision 0004's four runs start again under new tags, since the engine inherits the variable.
 - `bench/ab_model_run.sh` records the engine's concurrent-read lines during a run (one for each stretch of a prompt it reads on a thread of its own), how many of them had slots decoding meanwhile, and the reason the engine gave, if any, for keeping such reads off. `bench/ab_model_summary.py` reports them and flags runs that differ, without judging them: decision 0004's criteria do not measure how long the other users stop while a prompt is read, and whether decision 0005's concurrent read stays on with IQ3_S is not known before its runs.
 
 ### Fixed

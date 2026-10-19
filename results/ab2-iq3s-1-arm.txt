@@ -1,0 +1,39 @@
+tag ab2-iq3s-1  arm B  at 2026-10-20 04:04:54
+service checkout /home/thc1006/dev/p100-q3-deployment  commit 3099737f605afa02834d70209b8c4986585c9043  tracked files changed: config/profile.conf 
+deployment code sha256 213abb8241b270c6  (scripts tools systemd bench config, profile.conf aside)
+perf set sha256 03e06e1a73b2bcc4  (/home/thc1006/dev/p100-q3-iq3s/bench)
+set: bench/run_profile.sh
+profile.conf: --profile deployed --model iq3_s 
+config /home/thc1006/dev/strata/strata-iq3_xxs.json sha256 e3e5a7b4e22e72c1  without the model's fields 20cc6083b158c7e5
+shared settings /home/thc1006/dev/strata/strata-iq3_xxs.shared-settings.json sha256 absent
+server.py sha256 9eb13d12dc3ed0f6  serve_load.py sha256 bf97e79f14835cf2
+serve_load nonce ab-0004
+engine pid 497885 exe /home/thc1006/dev/strata/engine-cuda12/strata sha256 00869ac7b733d821
+engine start ticks 60985402  engine age 879 s
+service ready for 332 s  settle 300 s
+engine args: /home/thc1006/dev/strata/engine-cuda12/strata --serve --pack /home/thc1006/dev/Strata-data/packs/iq3_s --native /home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf --ple-gguf /home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf --expert-profile /home/thc1006/dev/strata/data/expert-profile.bin --spec-min-p 0.5 --mtp /home/thc1006/dev/Strata-data/mtp/rt --max-context 32768 --kv int8 --expert-cache auto --prefill 2048 --pool-workers 6 --batch-groups auto --vram-reserve-mib 1536 --ple-io ram --spec 4 --conversation-cache-mib 8192 --conversation-cache-slots 8 --conversation-cache-min-tokens 1024 --conversation-cache-min-free-mib 6144 --resident-experts --trim-stage-weights --no-kv-grow --no-ple-prefetch --layer-split 13,25,38 --batch 4 
+engine env: CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=0,1,2,3 STRATA_ADAPT_NOWAIT=0 STRATA_ADAPT_OVERLAP=0 STRATA_ADAPT_OVERLAP_RESIDENT=0 STRATA_BATCH_MTP=0 STRATA_BATCH_MTP_SERIAL=0 STRATA_ENGINE_READY_S=1800 STRATA_KV_GROW=0 STRATA_MMQ_GROUP_SORT=1 STRATA_MMQ_RESIDENT_SORT_NE=0 STRATA_PIPED_CONCURRENT=1 STRATA_PIPELINE_ADAPT_ASYNC=0 STRATA_PREFILL_CPU_SHARE=0 STRATA_RESIDENT_HEADROOM_GIB=6 STRATA_ROUTE_TAIL_SKIP=0 
+engine log: /home/thc1006/dev/strata/strata-iq3_xxs.log
+engine started: Tue Oct 20 03:50:12 2026
+load: strata generate: memory guard: limit 62.8 GiB (source: meminfo), current 4.8 GiB, reclaimable cache credited 0.0 GiB; available 58.0 GiB (MemAvailable 58.0 GiB), floor 6144 MiB
+load: strata generate: PCIe probe: 11.5 GB/s host->device (best of 11.2 11.5 11.2 11.3) -> pcie_frac 0.32 (default 0.55)
+load: strata generate: layer split: CUDA1 PCIe probe 11.3 GB/s (best of 11.2 11.1 11.3 10.9) -> pcie_frac 0.31
+load: strata generate: layer split: CUDA2 PCIe probe 11.7 GB/s (best of 11.6 11.6 11.7 11.7) -> pcie_frac 0.32
+load: strata generate: layer split: CUDA3 PCIe probe 11.3 GB/s (best of 11.1 11.2 11.3 11.3) -> pcie_frac 0.31
+load: strata generate: expert cache auto: 13.72 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 4927 slots
+load: strata generate: expert cache 6656 slots, 11.63 GiB of VRAM; policy is
+load: strata generate: layer split: CUDA1 runs layers 13-24, expert cache 6144 slots (11.45 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+load: strata generate: layer split: CUDA2 runs layers 25-37, expert cache 6218 slots (12.16 GiB), 6218 of its 6656 profiled pairs; slot 0 verified
+load: strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (10.73 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+load: strata generate: layer split: CUDA0 runs layers 0-12
+load: strata generate: session is up (engine 0.1.45)
+load: strata serve: layer split: 98% of the experts resident, the prompt path's streamed ring 96 slots
+load: FileExpertSource: mapped pinned cache complement ready: resident 5.46 GiB, pinned 5.46 GiB in 32 s; 5.46 GiB page-locked after taking the pages in steps; 
+load: strata generate: resident RAM mode: 5.46 GiB of experts in RAM (page-locked), 6656 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)
+health: {"status": "ok", "max_context": 32768, "model": "qwen3.8-flash-next-iq3_s", "images": false, "api_key": false, "image_generation": false, "loaded": true, "service": "strata"}
+metrics requests before the run: 0
+conversation cache before the run: parked 0 bytes 0
+version line: session is up (engine 0.1.45)
+zfs_arc_max 2147483648  MemAvailable 23914168 kB
+host units: ok
+gpu ecc (index, corrected, uncorrected): 0, [N/A], [N/A];1, [N/A], [N/A];2, [N/A], [N/A];3, [N/A], [N/A];

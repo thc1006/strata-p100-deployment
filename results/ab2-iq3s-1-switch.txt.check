@@ -1,0 +1,91 @@
+
+== service ==
+strata-q3.service          active / enabled
+strata-q3-health.timer     active / enabled
+zfs-arc-max.service        active / enabled
+
+== API ==
+{"status":"ok","loaded":true,"model":"qwen3.8-flash-next-iq3_s","max_context":32768}
+qwen3.8-flash-next-iq3_s
+{"engine":"0.1.45","concurrency":{"serving":4,"requested":4},"context":32768,"activity":{"requests":0,"in_flight":0,"last_request_at":null}}
+
+== engine log (last start) ==
+[strata] 2026-10-20 03:50:12 engine started: ~/dev/strata/engine-cuda12/strata --serve --pack ~/dev/Strata-data/packs/iq3_s --native ~/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf --p
+strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,25,38)
+strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+strata generate: PLE table locked in RAM (--ple-io ram) in 6.7 s
+strata generate: layer split: CUDA1 loads the dense weights of layers 13-24 only
+strata generate: layer split: CUDA1 PCIe probe 11.3 GB/s (best of 11.2 11.1 11.3 10.9) -> pcie_frac 0.31
+strata generate: layer split: CUDA1 holds its weights; 14.63 GiB free (its session follows the split search)
+strata generate: layer split: CUDA2 loads the dense weights of layers 25-37 only
+strata generate: layer split: CUDA2 PCIe probe 11.7 GB/s (best of 11.6 11.6 11.7 11.7) -> pcie_frac 0.32
+strata generate: layer split: CUDA2 holds its weights; 14.54 GiB free (its session follows the split search)
+strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+strata generate: layer split: CUDA3 PCIe probe 11.3 GB/s (best of 11.1 11.2 11.3 11.3) -> pcie_frac 0.31
+strata generate: layer split: CUDA3 holds its weights; 14.78 GiB free (its session follows the split search)
+strata generate: layer split: CUDA1 holds its weights, session [13, 25); 14.48 GiB free
+strata generate: layer split: CUDA2 holds its weights, session [25, 38); 14.38 GiB free
+strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.15 GiB free
+strata generate: --batch-groups auto: 4 groups of 1 slot
+strata generate: --batch: 4 slot sessions on CUDA0 (0.16 GiB each); 13.72 GiB free
+strata generate: --batch: 4 slot sessions on CUDA1 (0.15 GiB each); 13.86 GiB free
+strata generate: --batch: 4 slot sessions on CUDA2 (0.16 GiB each); 13.76 GiB free
+strata generate: --batch: 4 slot sessions on CUDA3 (0.15 GiB each); 13.56 GiB free
+strata generate: --batch 4: the slot sessions take 0.62 GiB of VRAM on CUDA0 that the expert cache would otherwise hold
+strata generate: 6 pool workers on logical processors 1,2,3,4,5,6, the host thread on 0 (draining too) (--host-core first)
+strata aux cpus: threads that are neither pool workers nor the host go to CPUs 7 (off at start; a request's aux_cpus=1 turns it on)
+strata generate: expert cache auto: 13.72 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 4927 slots
+strata generate: expert cache 6656 slots, 11.63 GiB of VRAM; policy is
+strata generate: layer split, CUDA1: 13.86 GiB free of 15.89, room for experts 12.27 GiB
+strata generate: layer split: CUDA1 runs layers 13-24, expert cache 6144 slots (11.45 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA2: 13.76 GiB free of 15.89, room for experts 12.16 GiB
+strata generate: layer split: CUDA2 runs layers 25-37, expert cache 6218 slots (12.16 GiB), 6218 of its 6656 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA3: 12.74 GiB free of 15.89, room for experts 11.15 GiB
+strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (10.73 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+strata generate: layer split: CUDA0 runs layers 0-12
+strata generate: R4 hit path ON - resident experts are computed on the GPU
+strata generate: 6 expert-pool workers + the host thread
+strata generate: token graph hit path: 24138 resident experts, decided on the device
+FileExpertSource: mapped pinned cache complement ready: resident 5.46 GiB, pinned 5.46 GiB in 32 s; 5.46 GiB page-locked after taking the pages in steps; 
+strata generate: resident RAM mode: 5.46 GiB of experts in RAM (page-locked), 6656 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)
+strata verify: window up to 6 tokens, 74.5 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: window up to 6 tokens, 74.5 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: window up to 6 tokens, 74.5 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+-- requests since this start, errors/warnings in their lines:
+   prompt lines: 0
+   error or warning lines: 0
+
+== GPU ==
+0, 14314 MiB, 16384 MiB, 0 %, 39, 1189 MHz, 33.82 W
+1, 13980 MiB, 16384 MiB, 0 %, 37, 1189 MHz, 32.81 W
+2, 14814 MiB, 16384 MiB, 0 %, 37, 1189 MHz, 33.54 W
+3, 14610 MiB, 16384 MiB, 0 %, 38, 1189 MHz, 32.86 W
+
+== RAM / ARC / swap ==
+MemTotal:       65846904 kB
+MemAvailable:   24236476 kB
+Mlocked:        28125136 kB
+SwapTotal:       2097148 kB
+SwapFree:         633700 kB
+ARC max:  2.00 GiB
+ARC size: 2.01 GiB
+VmLck:	28125136 kB
+VmPin:	       0 kB
+VmRSS:	36662172 kB
+engine memlock limit: unlimited unlimited
+
+== health checks and service events (last 2 h; needs sudo for the system journal) ==
+ 十  20 03:41:48 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  20 03:43:58 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  20 03:43:58 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  20 03:46:02 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  20 03:46:02 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  20 03:48:04 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  20 03:48:04 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  20 03:50:11 <host> strata-preflight.sh[497829]: strata-preflight: ok: 4 GPUs, 58 GiB usable, config matches (--profile deployed --model iq3_s) in everything that decides memory and placement
+ 十  20 03:59:18 <host> strata-wait-ready.sh[497873]: strata-wait-ready: loaded after 548 s
+ 十  20 03:59:18 <host> systemd[1]: Started Strata Qwen3.8-Flash-Next GSQ-RCO (the model in config/profile.conf) on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080).
+ 十  20 03:59:18 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  20 03:59:19 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+
+no problems found

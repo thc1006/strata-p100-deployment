@@ -63,6 +63,10 @@ The two are ISTA-DASLab's quantizations of the same checkpoint; they share the P
    Expected: the last line is `experts.bin: 48 layers, 46.84 GiB`.
 3. Change the model in `config/profile.conf` (`--profile deployed --model iq3_s`), then follow steps 2–5 above. The tool rewrites `--native`, `--ple-gguf`, `--pack`, `tokenizer` and `model_name` to the other model's files; it refuses when one of them is not in setup's layout. The model change is critical: preflight refuses to start a live config whose model differs from the profile. Clients may keep sending the old model name; the server answers any name.
 
+   `bench/switch_model.sh iq3_s <record>` does this step with checks before and after the restart, and switches the
+   service back to IQ3_XXS when IQ3_S does not come up. It refuses while a measurement runs, and it records the start
+   in `<record>`. `--check` runs only the checks and changes nothing. Decision 0004's runs restart the service with it.
+
 ## Rollback
 
 First change `config/profile.conf` back to its original line. Then do one of the following:

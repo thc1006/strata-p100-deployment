@@ -1,0 +1,221 @@
+# bench/switch_model.sh against broken copies of itself, and the concurrent-read report of bench/ab_model_run.sh and
+# bench/ab_model_summary.py against broken copies of them, 2026-10-20, before decision 0004's runs.
+#
+# Each mutant is a copy of the worktree with one deliberate bug in one script, made by the text replacements in the two
+# runners at the end of this file.  "killed" means that its test failed on the copy: tests/switch_model_stubs.sh for the
+# switch (run by tests/harness_run.py, three copies at a time), tests/ab_model_run_stubs.sh for the wrapper and
+# tests/test_ab_model_summary.py for the summary.  The text after "killed" is the first failing check.
+# The six that pass break checks that another check repeats, or one no test can time: the copy's dry run after the tool
+# wrote it (the tool reaches a fixed point), the read-back of profile.conf just written, three of the four checks that
+# the service came up (the unit's state, /health's model name, the engine's shard: each failure the harness makes
+# trips more than one), and the signals ignored while the files are put back (a few milliseconds).
+# An earlier run of mutate_switch.py, on 2026-10-19 before the review that led to this version, also had the mutant
+# "restart in the script's session" (setsid around the restart), which survived: GNU timeout puts itself in a process
+# group of its own, so a Ctrl-C to the script's group never reached the restart.  The setsid was removed.
+# Machine: <host>, Ubuntu 22.04.5, Python 3.10.12, git 2.34.1, bash 5.1.16.  Temporary directories are written <tmp>.
+# Inputs (sha256): bench/switch_model.sh 097f6fd58bb1d2a999b62983e4ff14818a8bd5782ac6dae6d6510753495730c5
+#                  tests/switch_model_stubs.sh ba46ad49ec40515b39eea4b874f3f32a5abde7b3d0f849fe873f835dffd9a9e8
+#                  tests/fake_strata.py 590ad6a02fdce30c74e980ccc124f8080af31cc26d6187181fc2cc054a6538a8
+#                  bench/ab_model_run.sh 78334caef148e4614190d5a0d548aa4fab6422440b9d0db6061d9feffeb0aa19
+#                  bench/ab_model_summary.py f622262218144eca9d72b0ffb6e5c575dee02593738ab65c82e712d0020f8df9
+#                  tests/ab_model_run_stubs.sh 03d958058e2d84676f805ee17b20205191d8dfc008624ea27840c817e1be6fec
+#                  tests/test_ab_model_summary.py b5b20b5f2fd47e60dce9904722780298b12fb7b2bff9be406a1412b9b07efb86
+
+== bench/switch_model.sh: 45 of 51 killed   (python3 -B mutate_switch.py 3)
+killed ( no signal ignore before the restart: killed (2 FAIL: FAIL interrupt during the restart: exit 1, restarts 26 -> 27, 00:36:52 restarting strata-q3 on iq3_s; MemAvail)
+killed ( PIPE not ignored from the restart on: killed (1 FAIL: FAIL the reader gone: exit 1, restarts 28 -> 28, qwen3.8-flash-next-iq3_xxs)
+killed ( QUIT not in the undo trap: killed (1 FAIL: FAIL QUIT before the restart: exit 0, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-0)
+killed ( no undo trap: killed (4 FAIL: FAIL TERM before the restart: exit 143,   change: model: iq3_xxs -> iq3_s)
+SURVIVED undo can be interrupted: SURVIVED
+killed ( a failed restore exits 1: killed (1 FAIL: FAIL read-only: exit 1, 00:38:05 interrupted)
+killed ( ours() never matches: killed (52 FAIL: FAIL --check: exit 1, 00:39:11 refusing: a measurement, evaluation, pack build or switch is running:)
+killed ( switch_model.sh not a busy name: killed (14 FAIL: FAIL refusal 'a measurement, evaluation, pack build or switch is running': exit 0, restarts 7 -> 8, the model')
+killed ( remote_only always False: killed (1 FAIL: FAIL pinned remote: 00:39:32 refusing: a measurement, evaluation, pack build or switch is running:)
+killed ( one_cpu always True: killed (12 FAIL: FAIL refusal 'a measurement, evaluation, pack build or switch is running': exit 0, restarts 7 -> 8, the model')
+killed ( own engine counted as a stray: killed (51 FAIL: FAIL --check: exit 1, 00:41:01 refusing: strata-preflight.sh would refuse the start while these run (it takes )
+killed ( no active-state check: killed (20 FAIL: FAIL refusal 'strata-q3.service is failed': exit 0, restarts 4 -> 5, the model's files: the pack iq3_s and Qwe)
+killed ( no job check: killed (19 FAIL: FAIL refusal 'with job 4711 queued': exit 0, restarts 4 -> 5, the model's files: the pack iq3_s and Qwen3.8-Fl)
+killed ( no profile.conf check: killed (7 FAIL: FAIL refusal 'config/profile.conf holds '--profile deployed --reserve-mib 2048'': exit 0, restarts 7 -> 8, the)
+killed ( no loaded check: killed (1 FAIL: FAIL refusal 'but its model is not loaded': exit 1, restarts 4 -> 4, 00:44:16 refusing: strata-q3.service has )
+killed ( no ARC check: killed (10 FAIL: FAIL refusal 'zfs_arc_max is 8589934592': exit 0, restarts 7 -> 8, the model's files: the pack iq3_s and Qwen3)
+killed ( no sudo check: killed (9 FAIL: FAIL refusal 'sudo -n does not work': exit 4, restarts 7 -> 7,   pgrep -af '[e]ngine-cuda12/strata --serve'   )
+killed ( no check-deployment before: killed (8 FAIL: FAIL refusal 'scripts/check-deployment.sh finds a problem now': exit 0, restarts 7 -> 8, the model's files: th)
+killed ( check-deployment without a timeout: killed (1 FAIL: FAIL check hangs: exit 0, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-0000)
+killed ( check-deployment status ignored: killed (10 FAIL: FAIL refusal 'scripts/check-deployment.sh finds a problem now': exit 0, restarts 7 -> 8, the model's files: th)
+killed ( wrong IQ3_S cuts expected: killed (44 FAIL: FAIL --check: exit 1,   change: model: iq3_xxs -> iq3_s)
+SURVIVED no settled check on the copy: SURVIVED
+killed ( no model/cuts check on the copy: killed (1 FAIL: FAIL refusal 'on a copy of the live config the tool does not give iq3_s with the cuts \[13, 25, 38\]': exit 0,)
+killed ( no pack-shards check: killed (4 FAIL: FAIL refusal 'the pack was built from': exit 0, restarts 7 -> 8, the model's files: the pack iq3_s and Qwen3.8)
+killed ( no experts.bin size check: killed (3 FAIL: FAIL refusal 'experts.bin has 506 bytes; the pack's record says 505': exit 0, restarts 7 -> 8, the model's fil)
+killed ( no missing-file check: killed (6 FAIL: FAIL refusal 'missing or empty: [^ ]*/packs/iq3_s/index.txt': exit 0, restarts 7 -> 8, the model's files: the )
+killed ( restore leaves the config: killed (7 FAIL: FAIL a request came in: exit 1, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-o)
+killed ( restore leaves profile.conf: killed (8 FAIL: FAIL a request came in: exit 1, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-o)
+killed ( unit not checked before the writes: killed (1 FAIL: FAIL another start (waiting): exit 1, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-0)
+killed ( unit not checked before the restart: killed (1 FAIL: FAIL another start (written): exit 0, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-0)
+killed ( no idle check before the restart: killed (2 FAIL: FAIL a request came in: exit 0, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-o)
+killed ( no busy check before the restart: killed (1 FAIL: FAIL a late measurement: exit 0, the model's files: the pack iq3_s and Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-)
+killed ( no stray check before the restart: killed (1 FAIL: FAIL a late stray: exit 4,   pgrep -af '[e]ngine-cuda12/strata --serve'    # only strata-q3's own engine, or n)
+killed ( no reset-failed before a restart: killed (2 FAIL: FAIL start limit: exit 4,   pgrep -af '[e]ngine-cuda12/strata --serve'    # only strata-q3's own engine, or no)
+killed ( restart rc ignored: killed (1 FAIL: FAIL restart exit 1: exit 0, switch to iq3_s at 2026-10-20 00:57:40: systemctl restart exit 1 after 0 s (124: )
+SURVIVED state after restart ignored: SURVIVED
+SURVIVED health model not checked: SURVIVED
+SURVIVED shard not checked: SURVIVED
+killed ( check-deployment ignored after the restart: killed (4 FAIL: FAIL record lacks check-deployment.sh's output (^no problems found$): )
+killed ( no rollback: killed (8 FAIL: FAIL IQ3_S failing: exit 4, --profile deployed --model iq3_s, iq3_xxs [13, 26, 38] changed, ,   pgrep -af '[e])
+killed ( rollback exits 0: killed (5 FAIL: FAIL IQ3_S failing: exit 0, --profile deployed --model iq3_xxs, iq3_xxs [13, 26, 38] settled, qwen3.8-flash-ne)
+killed ( no by-hand commands: killed (3 FAIL: FAIL both failing: exit 4, 01:01:25 the engine did not load the IQ3_XXS shard)
+killed ( record not redacted: killed (2 FAIL: FAIL a host name is left in the record)
+killed ( restart wait not used: killed (1 FAIL: FAIL hang: exit 3, switch to iq3_s at 2026-10-20 01:02:48: systemctl restart exit 0 after 60 s (124: no answer)
+killed ( own engine pattern wrong: killed (51 FAIL: FAIL --check: exit 1, 01:01:50 refusing: strata-preflight.sh would refuse the start while these run (it takes )
+killed ( own engine pattern unbracketed: killed (1 FAIL: FAIL a command line of bench/switch_model.sh holds the preflight's text)
+killed ( no stray check at the rollback: killed (1 FAIL: FAIL stray left: exit 4, restarts 55 -> 57,   pgrep -af '[e]ngine-cuda12/strata --serve'    # only strata-q3's)
+SURVIVED profile write not verified: SURVIVED
+killed ( wait_idle passes a busy service: killed (6 FAIL: FAIL refusal 'has been serving requests for 0 s': exit 1, restarts 6 -> 6, the model's files: the pack iq3_s a)
+killed ( usage accepts one argument: killed (1 FAIL: FAIL refusal 'usage: bench/switch_model.sh': exit 1, restarts 4 -> 4, <tmp>/repo/benc)
+killed ( existing record not refused: killed (1 FAIL: FAIL refusal 'to-s.txt exists': exit 0, restarts 4 -> 5, the model's files: the pack iq3_s and Qwen3.8-Flash-N)
+
+== the concurrent-read report: 10 of 10 killed   (python3 -B mutate_conc.py)
+killed lines pattern wrong: FAIL after record lacks: ^concurrent read lines during the run: 2, with slots decoding: 1$
+killed slots decoding counted with 0 rows: FAIL after record lacks: ^concurrent read lines during the run: 2, with slots decoding: 1$
+killed no reset at an engine start: FAIL after record lacks: ^concurrent read off beside: no such line$
+killed reason not cut: FAIL concurrent read off: concurrent read lines during the run: 0, with slots decoding: 0
+killed lines line not written: FAIL after record lacks: ^concurrent read lines during the run: 2, with slots decoding: 1$
+killed engine pattern unbracketed: FAIL a command line of bench/ab_model_run.sh holds the preflight's text
+killed no flag: FAILED (failures=1)
+killed unknown taken for 0: FAILED (failures=1)
+killed lines not parsed: FAILED (failures=1)
+killed slots decoding not parsed: FAILED (failures=1)
+
+== mutate_switch.py
+"""Mutants of bench/switch_model.sh, each run through tests/switch_model_stubs.sh in a copy of the worktree.
+A mutant is killed when the harness exits non-zero or prints a FAIL line."""
+import concurrent.futures as cf
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+W = Path("<worktree>")
+sys.path.insert(0, str(W / "tests"))
+import harness_run as H  # noqa: E402
+
+M = [
+    ("no signal ignore before the restart", "trap '' INT TERM HUP QUIT PIPE            # from here on", "true            # from here on"),
+    ("PIPE not ignored from the restart on", "trap '' INT TERM HUP QUIT PIPE            # from here on", "trap '' INT TERM HUP QUIT            # from here on"),
+    ("QUIT not in the undo trap", "trap 'undo \"interrupted\"' INT TERM HUP QUIT PIPE", "trap 'undo \"interrupted\"' INT TERM HUP PIPE"),
+    ("no undo trap", "trap 'undo \"interrupted\"' INT TERM HUP QUIT PIPE", "true"),
+    ("undo can be interrupted", "  trap '' INT TERM HUP QUIT PIPE\n  say \"$1\"; restore", "  say \"$1\"; restore"),
+    ("a failed restore exits 1", "  [ $keep = 1 ] && exit 5\n", ""),
+    ("ours() never matches", "        if pid == SELF:\n            return True", "        if pid == -1:\n            return True"),
+    ("switch_model.sh not a busy name", ', "switch_model.sh"}', '}'),
+    ("remote_only always False", "def remote_only(argv):\n", "def remote_only(argv):\n    return False\n"),
+    ("one_cpu always True", "    return cpus.isdigit()", "    return True"),
+    ("own engine counted as a stray", '    [ "$p" = "$own" ] && continue\n', ''),
+    ("no active-state check", '[ "$state" = active ] && [ -z "$job" ] ||', '[ -z "$job" ] ||'),
+    ("no job check", '[ "$state" = active ] && [ -z "$job" ] ||', '[ "$state" = active ] ||'),
+    ("no profile.conf check", '    *) refuse "config/profile.conf holds', '    *) : "config/profile.conf holds'),
+    ("no loaded check", """  curl -fsS -m 10 "$URL/health" 2>/dev/null | grep -q '"loaded": *true' || refuse "$UNIT is active but its model is not loaded"\n""", ''),
+    ("no ARC check", '[[ "$arc_want" =~ ^[0-9]+$ ]] && [ "$arc_have" = "$arc_want" ] ||', 'true ||'),
+    ("no sudo check", '  sudo -n true 2>/dev/null || refuse', '  true || refuse'),
+    ("no check-deployment before", '  deployment_ok "$tmp/check-before.txt" ||', '  true ||'),
+    ("check-deployment without a timeout", 'timeout -k 10 "$CHECK_WAIT_S" "$R/scripts/check-deployment.sh"', '"$R/scripts/check-deployment.sh"'),
+    ("check-deployment status ignored", '  [ "$rc" = 124 ] && echo "(no answer within $CHECK_WAIT_S s)" >> "$1"\n  [ "$rc" = 0 ]\n', '  [ "$rc" = 124 ] && echo "(no answer within $CHECK_WAIT_S s)" >> "$1"\n  true\n'),
+    ("wrong IQ3_S cuts expected", "iq3_s) Q=IQ3_S; WANT_SPLIT='[13, 25, 38]'", "iq3_s) Q=IQ3_S; WANT_SPLIT='[13, 26, 38]'"),
+    ("no settled check on the copy", '  settled "$tmp/copy/cfg.json" "$MODEL" || refuse', '  true || refuse'),
+    ("no model/cuts check on the copy", 'sys.exit(0 if d["model"] == sys.argv[2] and str(d["layer_split"]) == sys.argv[3] else 1)', 'sys.exit(0)'),
+    ("no pack-shards check", '    if built != named:', '    if False:'),
+    ("no experts.bin size check", '    if src.get("bytes") != size:', '    if False:'),
+    ("no missing-file check", 'bad = [f"  missing or empty: {p}" for p in files if not (os.path.isfile(p) and os.path.getsize(p) > 0)]', 'bad = []'),
+    ("restore leaves the config", '{ cmp -s "$tmp/cfg.before" "$CFG" || { cp -p "$tmp/cfg.before" "$CFG.restore.$$" && mv -f "$CFG.restore.$$" "$CFG"; }; }', 'true'),
+    ("restore leaves profile.conf", '{ cp -p "$tmp/profile.conf.before" "$R/config/.profile.conf.$$" && mv -f "$R/config/.profile.conf.$$" "$R/config/profile.conf"; }', 'true'),
+    ("unit not checked before the writes", '[ "$(unit_id)" = "$ID0" ] || refuse "$UNIT was started again', 'true || refuse "$UNIT was started again'),
+    ("unit not checked before the restart", '[ "$(unit_id)" = "$ID0" ] ||\n  undo', 'true ||\n  undo'),
+    ("no idle check before the restart", 'idle || undo "a request came in"', 'true || undo "a request came in"'),
+    ("no busy check before the restart", 'b=$(busy) && [ -z "$b" ] || undo', 'true || undo'),
+    ("no stray check before the restart", 's=$(strays); [ -z "$s" ] || undo "strata-preflight.sh would refuse', 's=; [ -z "$s" ] || undo "strata-preflight.sh would refuse'),
+    ("no reset-failed before a restart", '  sudo -n systemctl reset-failed $UNIT 2>/dev/null     # its failed state', '  : sudo -n systemctl reset-failed $UNIT 2>/dev/null     # its failed state'),
+    ("restart rc ignored", '[ "$rc" = 0 ] && [ "$state" = active ] || ok=no', '[ "$state" = active ] || ok=no'),
+    ("state after restart ignored", '[ "$rc" = 0 ] && [ "$state" = active ] || ok=no', '[ "$rc" = 0 ] || ok=no'),
+    ("health model not checked", 'grep -q "\\"model\\": \\"qwen3.8-flash-next-$m\\"" <<< "$health" ||', 'true ||'),
+    ("shard not checked", 'grep -q -- "--native [^ ]*/models/$q/Qwen3.8-Flash-Next-GSQ-RCO-$q-00001-of-00002.gguf" <<< "$args" ||', 'true ||'),
+    ("check-deployment ignored after the restart", '  deployment_ok "$file.check" ||', '  true ||'),
+    ("no rollback", 'if [ "$MODEL" = iq3_s ]; then', 'if false; then'),
+    ("rollback exits 0", 'see $OUT.rollback)"; exit 3; }', 'see $OUT.rollback)"; exit 0; }'),
+    ("no by-hand commands", '\nby_hand\nexit 4', '\nexit 4'),
+    ("record not redacted", '} | redact > "$file"', '} > "$file"'),
+    ("restart wait not used", 'timeout -k 30 "$RESTART_WAIT_S"', 'timeout -k 30 4800'),
+    ("own engine pattern wrong", '/[e]ngine-cuda12/strata --serve"\nPROFILE_HEAD', '/[e]ngine-cuda12/strata --xserve"\nPROFILE_HEAD'),
+    ("own engine pattern unbracketed", '/[e]ngine-cuda12/strata --serve"\nPROFILE_HEAD', '/engine-cuda12/strata --serve"\nPROFILE_HEAD'),
+    ("no stray check at the rollback", '    s=$(strays)\n    if [ -z "$s" ]; then', '    s=\n    if [ -z "$s" ]; then'),
+    ("profile write not verified", ' && [ "$(profile_args)" = "--profile deployed --model $1" ]', ''),
+    ("wait_idle passes a busy service", 'until idle; do', 'until true; do'),
+    ("usage accepts one argument", '[ $# = 2 ] || {', '[ $# -ge 1 ] || {'),
+    ("existing record not refused", '  [ -e "$f" ] && { say "refusing: $f exists"; exit 2; }', '  :'),
+]
+
+
+def run(m):
+    name, old, new = m
+    d = Path(tempfile.mkdtemp(prefix="mut."))
+    try:
+        for sub in ("bench", "scripts", "tools", "systemd", "config", "tests"):
+            shutil.copytree(W / sub, d / sub, ignore=shutil.ignore_patterns("__pycache__"))
+        p = d / "bench" / "switch_model.sh"
+        s = p.read_text()
+        if s.count(old) != 1:
+            return name, f"PATTERN COUNT {s.count(old)}"
+        p.write_text(s.replace(old, new))
+        r = H.run(d / "tests" / "switch_model_stubs.sh", d, 900)
+        fails = [l for l in r["out"].splitlines() if l.startswith("FAIL")]
+        killed = r["status"] != 0 or fails or r["left"]
+        return name, ("killed" if killed else "SURVIVED") + (f" ({len(fails)} FAIL: {fails[0][:110]})" if fails else "") + (f" left {len(r['left'])}" if r["left"] else "") + (" timeout" if r["status"] is None else "")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+with cf.ThreadPoolExecutor(int(sys.argv[1]) if len(sys.argv) > 1 else 3) as ex:
+    for name, verdict in ex.map(run, M):
+        print(f"{verdict[:8]:8} {name}: {verdict}", flush=True)
+
+== mutate_conc.py
+"""Mutants of the concurrent-read report: bench/ab_model_run.sh through tests/ab_model_run_stubs.sh, and
+bench/ab_model_summary.py through tests/test_ab_model_summary.py, each in a copy of the worktree."""
+import shutil, subprocess, sys, tempfile
+from pathlib import Path
+W = Path("<worktree>")
+sys.path.insert(0, str(W / "tests"))
+import harness_run as H  # noqa: E402
+M = [
+    ("bench/ab_model_run.sh", "lines pattern wrong", "awk '/^strata batch: read [0-9]+ tokens on a thread of its own/ { n++;", "awk '/^strata batch: read [0-9]+ tokens on a thread of its ownX/ { n++;"),
+    ("bench/ab_model_run.sh", "slots decoding counted with 0 rows", "if (/the slots decoded [1-9][0-9]* rows meanwhile/) b++", "if (/the slots decoded [0-9]* rows meanwhile/) b++"),
+    ("bench/ab_model_run.sh", "no reset at an engine start", '/^\\[strata\\] .*engine started: / { off = "" }', '/^NEVER/ { off = "" }'),
+    ("bench/ab_model_run.sh", "reason not cut", 'sub(/^strata batch: STRATA_PIPED_CONCURRENT is off beside /, "", off)', 'off = off'),
+    ("bench/ab_model_run.sh", "lines line not written", '  echo "concurrent read lines during the run: $conc_lines, with slots decoding: $conc_beside"\n', ''),
+    ("bench/ab_model_run.sh", "engine pattern unbracketed", 'engine() { pgrep -P "$1" -f "^$STRATA/[e]ngine-cuda12/strata --serve" | head -1; }', 'engine() { pgrep -P "$1" -f "^$STRATA/engine-cuda12/strata --serve" | head -1; }'),
+    ("bench/ab_model_summary.py", "no flag", '    if len({after[t]["conc_lines"] > 0 for t in tags if after[t].get("conc_lines") is not None}) > 1:', '    if False:'),
+    ("bench/ab_model_summary.py", "unknown taken for 0", '    if len({after[t]["conc_lines"] > 0 for t in tags if after[t].get("conc_lines") is not None}) > 1:', '    if len({(after[t].get("conc_lines") or 0) > 0 for t in tags}) > 1:'),
+    ("bench/ab_model_summary.py", "lines not parsed", 'r"^concurrent read lines during the run: (\\S+),"', 'r"^concurrent read lines during the runX: (\\S+),"'),
+    ("bench/ab_model_summary.py", "slots decoding not parsed", 'with slots decoding: (\\S+)$"', 'with slots decodingX: (\\S+)$"'),
+]
+for f, name, old, new in M:
+    d = Path(tempfile.mkdtemp(prefix="mutc."))
+    try:
+        for sub in ("bench", "scripts", "tools", "systemd", "config", "tests"):
+            shutil.copytree(W / sub, d / sub, ignore=shutil.ignore_patterns("__pycache__"))
+        p = d / f
+        s = p.read_text()
+        if s.count(old) != 1:
+            print(f"PATTERN {s.count(old)} {name}", flush=True); continue
+        p.write_text(s.replace(old, new))
+        if f.endswith(".sh"):
+            r = H.run(d / "tests" / "ab_model_run_stubs.sh", d, 600)
+            fails = [l for l in r["out"].splitlines() if l.startswith("FAIL")]
+            killed = r["status"] != 0 or fails
+            detail = fails[0][:120] if fails else ""
+        else:
+            r = subprocess.run([sys.executable, "-B", "-m", "unittest", "tests.test_ab_model_summary"], cwd=d, capture_output=True, text=True)
+            killed = r.returncode != 0
+            detail = (r.stderr.strip().splitlines() or [""])[-1][:120]
+        print(f"{'killed' if killed else 'SURVIVED'} {name}: {detail}", flush=True)
+    finally:
+        shutil.rmtree(d, ignore_errors=True)

@@ -4,6 +4,10 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ## 2026-10-20
 
+### Added
+
+- `bench/switch_model.sh` switches the service to IQ3_XXS or IQ3_S and restarts it; decision 0004's runs restart the service with it, also when the model stays. Before it changes anything, it checks that the service is up and idle, that no measurement or other switch runs, that no command line the preflight would take for a second engine is there, the ARC cap, that `scripts/check-deployment.sh` finds no problem, and that the pack and the shards the new config names are the files the pack was built from. A failure or an interrupt before the restart, or another start of the service in the meantime, puts `config/profile.conf` and the live config back. Each restart comes after `systemctl reset-failed`, so earlier starts within the hour cannot hit the unit's start limit, and is waited for up to 80 minutes, longer than its 75-minute start timeout. An IQ3_S that does not come up is switched back to IQ3_XXS. Before its first real run, an adversarial review of the script and of the A/B's run sequence found 17 problems; the script's are fixed, and `tests/switch_model_stubs.sh` tests the fixes (64 checks). `results/switch-model-mutants-20261020.txt` lists the broken copies of the script it catches.
+
 ### Changed
 
 - `bench/ab_model_run.sh` records the engine's concurrent-read lines during a run (one for each stretch of a prompt it reads on a thread of its own), how many of them had slots decoding meanwhile, and the reason the engine gave, if any, for keeping such reads off. `bench/ab_model_summary.py` reports them and flags runs that differ, without judging them: decision 0004's criteria do not measure how long the other users stop while a prompt is read, and whether decision 0005's concurrent read stays on with IQ3_S is not known before its runs.

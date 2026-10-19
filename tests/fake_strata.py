@@ -20,7 +20,10 @@ first chat request (another client's request inside a measurement); FAKE_BUSY=1 
 FAKE_ENV_DROP=<name> starts the engine without that variable of the config's env (a server.py that lost it), while
 the log lines still follow the config; FAKE_RESTART=<n> kills the engine at the n-th chat request and starts a new
 one (an engine that restarted during a measurement); FAKE_ENGINE_ERR=<n> writes an engine error line to the log at
-the n-th chat request.
+the n-th chat request.  For bench/switch_model.sh: FAKE_ENGINE_ARGS=1 starts the engine with the config's args after
+"--serve" (as server.py does), so that its command line names the model's files; FAKE_BUSY_FROM=<n> reports a reply in
+flight from the n-th /metrics request on (a request that came in); FAKE_METRICS_SLOW_FROM=<n> answers the n-th
+/metrics request and the later ones after 5 s.
 """
 from __future__ import annotations
 
@@ -35,7 +38,7 @@ import threading
 import time
 
 LOCK = threading.Lock()
-STATE = {"requests": 0, "busy": 0, "first_prompt": True, "n": 0}
+STATE = {"requests": 0, "busy": 0, "first_prompt": True, "n": 0, "metrics": 0}
 
 
 def main() -> None:
@@ -55,6 +58,8 @@ def main() -> None:
     restart_at = int(os.environ.get("FAKE_RESTART", "0"))
     err_at = int(os.environ.get("FAKE_ENGINE_ERR", "0"))
     no_gs, extra, busy_forever = (os.environ.get(k) == "1" for k in ("FAKE_NO_GS", "FAKE_EXTRA", "FAKE_BUSY"))
+    engine_args = (cfg.get("args") or []) if os.environ.get("FAKE_ENGINE_ARGS") == "1" else ["--fake"]
+    busy_from, slow_from = (int(os.environ.get(k, "0")) for k in ("FAKE_BUSY_FROM", "FAKE_METRICS_SLOW_FROM"))
 
     def logline(s: str) -> None:
         if log:
@@ -75,7 +80,7 @@ def main() -> None:
     def start_engine() -> None:
         # the engine: the binary at that path (in the tests a program that only waits), its command line the
         # engine's, its stderr the log
-        engine.append(subprocess.Popen([a.engine, "--serve", "--fake"], env=child_env,
+        engine.append(subprocess.Popen([a.engine, "--serve", *engine_args], env=child_env,
                                        stderr=open(log, "a") if log else None, stdout=subprocess.DEVNULL))
 
     if a.engine:
@@ -97,7 +102,12 @@ def main() -> None:
                 self.send_json({"status": "ok", "model": cfg.get("model_name", "fake"), "loaded": True})
             elif self.path == "/metrics":
                 with LOCK:
-                    busy = STATE["busy"] + (1 if busy_forever else 0)
+                    STATE["metrics"] += 1
+                    m = STATE["metrics"]
+                if slow_from and m >= slow_from:
+                    time.sleep(5)
+                with LOCK:
+                    busy = STATE["busy"] + (1 if busy_forever or (busy_from and m >= busy_from) else 0)
                     self.send_json({"live": {"state": "decoding" if busy else "idle", "running": busy, "queued": 0},
                                     "totals": {"requests": STATE["requests"], "since": 1.0}})
             else:

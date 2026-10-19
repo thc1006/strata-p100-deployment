@@ -46,7 +46,7 @@ def _active(unit: str) -> bool:
 
 def not_now() -> str | None:
     """Why a harness must not run now, or None."""
-    drivers = (b"bench/ab_engine.sh", b"bench/ab_model_run.sh", b"ab-ops/switch_model.sh")
+    drivers = (b"bench/ab_engine.sh", b"bench/ab_model_run.sh", b"bench/switch_model.sh", b"ab-ops/switch_model.sh")
     running = [pid for pid, cmd in _cmdlines() if any(part.endswith(d) for part in cmd[:3] for d in drivers)]
     if running:
         return (f"an experiment driver runs (pids {', '.join(map(str, running))}); it starts strata-q3, which a fake "

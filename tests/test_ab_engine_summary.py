@@ -80,6 +80,9 @@ class Summary(unittest.TestCase):
         self.assertIn("- C1: 32 requests; differ between its own runs: n/a (one run); differ from the baseline on 0 of "
                       "the 32 requests the baseline's runs answer alike (0 left out)", out)
         self.assertIn("- C0: 32 requests; differ between its own 2 runs: 0", out)
+        # the opt-in phases did not run: no rows for them
+        self.assertNotIn("summed engine decode", out)
+        self.assertNotIn("28K joining", out)
 
     def test_an_arm_that_changes_the_answers(self):
         status, out = run(lambda r: three(r, sha_salt="x"))

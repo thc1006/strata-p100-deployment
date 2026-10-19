@@ -226,6 +226,8 @@ def evaluate(tags: list, baseline: str, results: Path, arms: dict | None = None)
                 within = (" within the baseline's spread" if bspread is not None and abs(mean - bmean) / bmean <= bspread
                           else "")
                 cells.append(f"{mean:.2f} ({each}): {(mean - bmean) / bmean:+.1%} ({ch}){within}")
+        if all(c == "-" for c in cells):          # a phase this screen did not run
+            continue
         o.append(f"| {lab} ({'higher' if higher else 'lower'} is better) | " + " | ".join(cells) + " |")
     # answers, request by request
     o += ["", "## Answers", ""]

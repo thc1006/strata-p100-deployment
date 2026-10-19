@@ -1,0 +1,69 @@
+# Two runs of Strata 0.2.0-beta's ple_reader_test --selftest at the same time, 2026-10-20 (issue #2991's reopening).
+# The test was built for the CPU only from 3d1fb48's src/kernels/ngram.cpp, src/ngram/ple_reader.cpp,
+# src/platform/direct_file.cpp and src/ngram/ple_reader_test.cpp, with g++ 11.4:
+#   g++ -std=c++20 -O2 -pthread -Iinclude -Isrc <the four files> -o ple_reader_test_020
+# race.sh and reaper.sh are those of ple-selftest-shared-tmp-20261018.txt with the binary renamed (ple_reader_test_020);
+# reaper.sh was started one second after race.sh. std::filesystem::temp_directory_path() returns $TMPDIR.
+# The temporary folders were on the root file system: ZFS, OpenZFS kernel module 2.2.2-0ubuntu9.4. <work> is a
+# temporary folder. rc 135 is SIGBUS, rc 143 is SIGTERM from reaper.sh.
+
+## One run alone
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16 NVFP4: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+13.39 s elapsed
+
+## Output of race.sh (race_out.txt; lines are cut at 150 characters, a cut-off folder name is shown as <work>)
+shared   offset 0    a rc=1    FAIL src/ngram/ple_reader_test.cpp:287: mapped open: PLE table size mismatch: 499 rows x 90 B = 44910 at offset 0, but the file holds 24660 from data_
+shared   offset 0    b rc=1    FAIL src/ngram/ple_reader_test.cpp:287: mapped open: PLE table size mismatch: 2000 rows x 170 B = 340000 at offset 0, but the file holds 41480 from da
+./race.sh: line 12: 417232 Bus error               (core dumped) TMPDIR=$PWD/$da nice -n 19 $bin --selftest > r/$mode-$off/out_a.txt 2>&1
+shared   offset 0.3  a rc=135  
+shared   offset 0.3  b rc=0    
+./race.sh: line 12: 419276 Bus error               (core dumped) TMPDIR=$PWD/$da nice -n 19 $bin --selftest > r/$mode-$off/out_a.txt 2>&1
+shared   offset 1    a rc=135  
+shared   offset 1    b rc=0    
+Terminated
+shared   offset 2    a rc=143  FAIL src/ngram/ple_reader_test.cpp:65: bulk: collect failed: PleReader: short read inside the table
+shared   offset 2    b rc=0    
+Terminated
+shared   offset 4    a rc=143  FAIL src/ngram/ple_reader_test.cpp:65: decode: collect failed: PleReader: short read inside the table
+shared   offset 4    b rc=1    FAIL src/ngram/ple_reader_test.cpp:358: open: DirectFile: cannot open <work>
+shared   offset 6    a rc=1    FAIL src/ngram/ple_reader_test.cpp:65: keep-alive, caller thread: collect failed: PleReader: short read inside the table
+shared   offset 6    b rc=1    FAIL src/ngram/ple_reader_test.cpp:358: open: DirectFile: cannot open <work>
+control  offset 0    a rc=0    
+control  offset 0    b rc=0    
+control  offset 0.3  a rc=0    
+control  offset 0.3  b rc=0    
+control  offset 1    a rc=0    
+control  offset 1    b rc=0    
+control  offset 2    a rc=0    
+control  offset 2    b rc=0    
+control  offset 4    a rc=0    
+control  offset 4    b rc=0    
+control  offset 6    a rc=0    
+control  offset 6    b rc=0    
+done 02:32:06
+
+## The first matching line of each shared run, in full
+shared-0   a rc=1    FAIL src/ngram/ple_reader_test.cpp:287: mapped open: PLE table size mismatch: 499 rows x 90 B = 44910 at offset 0, but the file holds 24660 from data_start 160
+shared-0   b rc=1    FAIL src/ngram/ple_reader_test.cpp:287: mapped open: PLE table size mismatch: 2000 rows x 170 B = 340000 at offset 0, but the file holds 41480 from data_start 160
+shared-0.3 a rc=135  
+shared-0.3 b rc=0    
+shared-1   a rc=135  
+shared-1   b rc=0    
+shared-2   a rc=143  FAIL src/ngram/ple_reader_test.cpp:65: bulk: collect failed: PleReader: short read inside the table
+shared-2   b rc=0    
+shared-4   a rc=143  FAIL src/ngram/ple_reader_test.cpp:65: decode: collect failed: PleReader: short read inside the table
+shared-4   b rc=1    FAIL src/ngram/ple_reader_test.cpp:358: open: DirectFile: cannot open <work>/r/shared-4/a/ple_reader_selftest_90.bin
+shared-6   a rc=1    FAIL src/ngram/ple_reader_test.cpp:65: keep-alive, caller thread: collect failed: PleReader: short read inside the table
+shared-6   b rc=1    FAIL src/ngram/ple_reader_test.cpp:358: open: DirectFile: cannot open <work>/r/shared-6/a/ple_reader_selftest_110.bin
+
+## reaper_log.txt
+02:27:02 pid 421362:     186 00:00:05 SNl cwd-out=<work>/r/shared-2/out_a.txt
+  threads: 18, wchan:       1 futex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queue 
+  fd: <work>/r/shared-2/a/ple_reader_selftest_90.bin (deleted) 
+02:30:04 pid 423822:     182 00:00:11 SNl cwd-out=<work>/r/shared-4/out_a.txt
+  threads: 17, wchan:       1 futex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queuefutex_wait_queue 
+  fd: <work>/r/shared-4/a/ple_reader_selftest_110.bin (deleted) 
+02:32:06 race.sh finished

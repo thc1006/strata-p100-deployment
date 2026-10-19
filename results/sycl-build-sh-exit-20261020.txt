@@ -1,0 +1,43 @@
+# sycl/tools/build.sh of Strata 0.2.0-beta (3d1fb48), run on 2026-10-20 to check its exit status again (issue #2990's reopening).
+# sha256 of the script: a5f95ab736c072b9160d523456454c8689791750cfae91f82f03e2a97374b122 (the same file as 0.1.45's, sycl-build-sh-exit-20261018.txt)
+# This machine has no Intel GPU and no strata-sycl-dev image; /opt/intel/oneapi/setvars.sh does not exist (the
+# script ignores that). cmake 4.4.3 and ninja 1.13.2 from the deployed Strata's .venv were on PATH. <work> is a temporary folder.
+
+## The script that ran it (re2990/run.sh)
+    #!/bin/bash
+    # #2990 again, with sycl/tools/build.sh of Strata 0.2.0-beta (3d1fb48), as on 2026-10-18: two small CMake projects with
+    # one target named strata (Ninja, g++ 11.4), REPO and BUILD_DIR set to each; cmake and ninja of the Strata .venv on PATH.
+    set -u
+    here=$(cd "$(dirname "$0")" && pwd)
+    W=$(mktemp -d)
+    export PATH=$HOME/dev/strata/.venv/bin:$PATH
+    for kind in good bad; do
+      mkdir -p "$W/src-$kind"
+      printf 'cmake_minimum_required(VERSION 3.16)\nproject(t CXX)\nadd_executable(strata main.cpp)\n' > "$W/src-$kind/CMakeLists.txt"
+      if [ $kind = good ]; then echo 'int main() { return 0; }' > "$W/src-$kind/main.cpp"
+      else echo 'int main() { return x; }' > "$W/src-$kind/main.cpp"; fi
+      cmake -S "$W/src-$kind" -B "$W/b-$kind" -G Ninja > /dev/null 2>&1 || { echo "configure of $kind failed"; exit 1; }
+    done
+    echo "# sha256 of the script: $(sha256sum < "$here/build.sh" | cut -c1-64)"
+    for kind in good bad; do
+      echo "### $kind build:"
+      REPO=$W BUILD_DIR=$W/b-$kind bash "$here/build.sh" strata
+      echo "### build.sh exit status: $?"
+    done 2>&1 | sed "s#$W#<work>#g"
+    rm -rf "$W"
+
+## Its output
+# sha256 of the script: a5f95ab736c072b9160d523456454c8689791750cfae91f82f03e2a97374b122
+### good build:
+[2/2] Linking CXX executable strata
+BUILD EXIT 0
+errors: 0
+### build.sh exit status: 1
+### bad build:
+FAILED: [code=1] CMakeFiles/strata.dir/main.cpp.o 
+<work>/src-bad/main.cpp:1:21: error: ‘x’ was not declared in this scope
+ninja: build stopped: cannot make progress due to previous errors.
+BUILD EXIT 1
+errors: 1
+main.cpp.o 
+### build.sh exit status: 0

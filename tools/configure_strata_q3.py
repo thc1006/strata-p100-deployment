@@ -99,7 +99,8 @@ REFUSED_FLAGS = {
     "--experimental-speed-projection": "An ablation or unsupported engine switch is present; regenerate the config",
     "--vision": "This text-service profile requires setup --vision no",
 }
-# Each key's own test in the audited source reads these values as meant: "0" is off.
+# Each key's own test in the audited source reads these values as meant: "0" is off for every key set to "0", and the
+# two set to "1" are on.
 ENV_DEFAULTS = {
     # --resident-experts page-locks the experts no card holds while leaving this much of the available RAM free
     # (engine default 4); the same 6 GiB floor as parking (PARK_MIN_FREE_MIB)
@@ -113,6 +114,15 @@ ENV_DEFAULTS = {
     "STRATA_ADAPT_OVERLAP_RESIDENT": "0",
     "STRATA_PIPELINE_ADAPT_ASYNC": "0",
     "STRATA_KV_GROW": "0",
+    # 0.1.45, confirmed here (docs/engine-experiments.md): the prompt MMQ takes each full 16-expert group's experts in
+    # row-count order, exact by design; 1.2K to 16K-token prompts read 9-18% faster with the same answers.  On only
+    # for the value "1" (prefill/mmq_resident_sort.hpp)
+    "STRATA_MMQ_GROUP_SORT": "1",
+    # its inexact variant, which sorts the partial group too, would take precedence over it; off as in every run
+    "STRATA_MMQ_RESIDENT_SORT_NE": "0",
+    # a prompt is read on a thread of its own while the slot groups decode: three decoders' longest stall while a
+    # 16K prompt is read fell from 22.7 s to 0.5 s; the joining prompt's first token came 11% later, 1% with the sort
+    "STRATA_PIPED_CONCURRENT": "1",
 }
 # The differences a start may have and only warns about (strata-preflight.sh): the tuning steps (--prefill,
 # --pool-workers, --vram-reserve-mib) and the fields the web Settings view edits.  Every other difference in

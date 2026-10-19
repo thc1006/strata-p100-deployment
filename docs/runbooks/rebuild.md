@@ -5,6 +5,7 @@
   - NVIDIA driver 535.230.02 is installed (do not install the 575 driver that comes with the CUDA runfile). The root file system is on ZFS. You have sudo. `jq` is installed (`check-deployment.sh` uses it).
   - The account is `thc1006`. The units and logrotate file in `systemd/`, the preflight, watchdog and `check-deployment.sh` in `scripts/`, and the two config snapshots in `config/` all hard-code `/home/thc1006`. To use another account, change these files first; otherwise the comparison in step 5 will not match either.
   - At least about 134 GiB (144 GB) of space. File sizes measured on 2026-10-18 (not counting ZFS compression): `~/dev/Strata-data` 118.5 GiB, `~/cuda-12.9` 9.4 GiB, the CUDA installer 5.5 GiB, `~/dev/strata` 0.6 GiB.
+- The steps rebuild 0.1.43.1 (`a0116b2`), as deployed on 2026-10-16. The service runs 0.1.45 since 2026-10-19 ([decision 0005](../decisions/0005-strata-0.1.45-group-sort-concurrent-read.md)): after the last step, switch to it with step 6 of [Evaluating and upgrading Strata](upgrade-strata.md).
 - Last verified: the downloads, installs and setup.sh in steps 2–5 are the commands that were run during the deployment on 2026-10-16. The repo and scripts used in steps 1, 6 and 7 were created only on 10-17 and 10-18, and have not been used in a rebuild. The whole procedure has never been rerun from scratch. Step 5 is verified: recomputing from the config that setup.sh produced at the time gave a result byte-for-byte identical to the live config.
 
 ## Steps

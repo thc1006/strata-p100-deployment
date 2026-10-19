@@ -8,10 +8,10 @@ This repository holds the configuration, operations scripts and measurements of 
 
 All numbers come from this machine. The [deployment record](docs/deployment-record.md) gives the method, the raw files and the limits of each one.
 
-- With the per-layer embedding (PLE) table locked in RAM (`--ple-io ram`), Strata 0.1.43.1 still sends one `madvise(MADV_WILLNEED)` hint per PLE row. OpenZFS turns each hint into an ARC prefetch of the 128 KiB record that holds the row, which is read from disk when the record is not in the ARC. One 16K-token prompt read 15.5–17.8 GB from disk, and prefill ran at 407–440 tok/s. With `--no-ple-prefetch`, prefill ran at 692–706 tok/s ([section 4](docs/deployment-record.md#4-problems-found-in-this-deployment-by-impact)). A proposed engine fix is upstream [PR #2918](https://github.com/Niko1221/Strata/pull/2918), not merged yet.
+- With the per-layer embedding (PLE) table locked in RAM (`--ple-io ram`), Strata 0.1.43.1, like 0.1.45, still sends one `madvise(MADV_WILLNEED)` hint per PLE row. OpenZFS turns each hint into an ARC prefetch of the 128 KiB record that holds the row, which is read from disk when the record is not in the ARC. One 16K-token prompt read 15.5–17.8 GB from disk, and prefill ran at 407–440 tok/s. With `--no-ple-prefetch`, prefill ran at 692–706 tok/s ([section 4](docs/deployment-record.md#4-problems-found-in-this-deployment-by-impact)). A proposed engine fix is upstream [PR #2918](https://github.com/Niko1221/Strata/pull/2918), not merged yet.
 - Four users with short prompts reached 100.0 tok/s in total. One user decoded at 48.7–52.0 tok/s with multi-token prediction ([section 3.1](docs/deployment-record.md#31-one-user-and-short-prompts-deployed)).
 - Moving the layer split from 12/24/36 to 13/26/38 raised four-user decode from 85.9 to 100.6 tok/s ([section 2](docs/deployment-record.md#2-how-the-final-configuration-differs-from-the-original-setup-guide)).
-- Long prompts pause the other users. While a 16K-token prompt is read, users who are generating stop for about 23 s. When four 16K-token prompts arrive at once, the last user waits 94.4 s for the first token ([section 3.2](docs/deployment-record.md#32-long-inputs-and-concurrent-users-the-main-p100-limit-deployed)).
+- On 0.1.43.1, long prompts paused the other users: while a 16K-token prompt was read, users who were generating stopped for about 23 s, and when four 16K-token prompts arrived at once, the last user waited 94.4 s for the first token ([section 3.2](docs/deployment-record.md#32-long-inputs-and-concurrent-users-the-main-p100-limit-deployed)). 0.1.45's concurrent prompt read, deployed on 2026-10-19, cut that stop to 0.55 s ([section 3.8](docs/deployment-record.md#38-strata-0145-and-its-two-switches-engine-experiments)).
 - With 8 GiB of RAM for conversation parking, multi-turn conversations stayed cached while six clients competed for four slots. Cache reuse went from 0/16 to 16/16, and the median time to first token went from 38.8 s to 20.2 s ([section 3.4](docs/deployment-record.md#34-conversation-parking)).
 
 ## Current state of the service
@@ -19,8 +19,8 @@ All numbers come from this machine. The [deployment record](docs/deployment-reco
 | Item | Details |
 |---|---|
 | Service | `strata-q3.service`, 4 slots, 32K context each, no API key set |
-| Engine | Strata 0.1.43.1 (commit `a0116b2`) in `~/dev/strata`, built with CUDA 12.9.1 for `sm_60` only |
-| Configuration | Output of `tools/configure_strata_q3.py --profile deployed`, SHA-256 `9d774535…` |
+| Engine | Strata 0.1.45 (commit `477ac13cb`) in `~/dev/strata`, built with CUDA 12.9 for `sm_60` only, with `STRATA_MMQ_GROUP_SORT=1` and `STRATA_PIPED_CONCURRENT=1` (decision 0005) |
+| Configuration | Output of `tools/configure_strata_q3.py --profile deployed`, SHA-256 `05539a70…` |
 | Upstream | ZFS read-ahead hint problem: [follow-up comment on issue #2281](https://github.com/Niko1221/Strata/issues/2281#issuecomment-6216816902) and [PR #2918](https://github.com/Niko1221/Strata/pull/2918) (not merged, no review yet) |
 
 ## Repository layout
@@ -61,7 +61,7 @@ sudo systemctl restart strata-q3   # the service is ready after about 7–9 minu
 | [Evaluating and upgrading Strata](docs/runbooks/upgrade-strata.md) | Building a new release and comparing it with the deployed one |
 | [System changes and how to undo them](docs/reference/system-changes.md) | Everything the deployment changed outside the repository |
 | [Deployment record](docs/deployment-record.md) | The evidence for each setting, measured results, known limits and the test method |
-| [Decision records](docs/decisions/) | [0001: keep this repository separate from Strata](docs/decisions/0001-keep-ops-repo-separate-from-strata.md); [0002: repository layout](docs/decisions/0002-repository-layout.md); [0003: CI on GitHub, deployment pulled by this machine](docs/decisions/0003-ci-on-github-deploy-by-pull.md) |
+| [Decision records](docs/decisions/) | [0001: keep this repository separate from Strata](docs/decisions/0001-keep-ops-repo-separate-from-strata.md); [0002: repository layout](docs/decisions/0002-repository-layout.md); [0003: CI on GitHub, deployment pulled by this machine](docs/decisions/0003-ci-on-github-deploy-by-pull.md); [0004: IQ3_S, 6 GiB RAM floors and a 2 GiB ARC (proposed)](docs/decisions/0004-iq3-s.md); [0005: Strata 0.1.45 with its grouped prompt sort and concurrent prompt reads](docs/decisions/0005-strata-0.1.45-group-sort-concurrent-read.md) |
 | Upstream posts | [Comment on issue #2281](docs/upstream/issue-2281-comment.md); [PR #2918](docs/upstream/pr-2918.md) and [its comment](docs/upstream/pr-2918-comment.md); bug reports [#2990](docs/upstream/issue-2990.md) (`sycl/tools/build.sh` exit status) and [#2991](docs/upstream/issue-2991.md) (`ple_reader_selftest` temp files) |
 | [Test results](results/README.md) | Index of the raw output files and the commands that regenerate the summaries |
 | [Changelog](CHANGELOG.md) | Changes by date |

@@ -92,6 +92,10 @@ class TuningTests(unittest.TestCase):
         self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-min-tokens"), ["1024"])
         self.assertEqual(tool.option_values(cfg["args"], "--conversation-cache-min-free-mib"), ["6144"])
         self.assertEqual(cfg["env"]["STRATA_RESIDENT_HEADROOM_GIB"], "6")     # the same 6 GiB floor
+        # 0.1.45's grouped MMQ sort, without its inexact variant, and the concurrent prompt read (engine experiments)
+        self.assertEqual(cfg["env"]["STRATA_MMQ_GROUP_SORT"], "1")
+        self.assertEqual(cfg["env"]["STRATA_MMQ_RESIDENT_SORT_NE"], "0")
+        self.assertEqual(cfg["env"]["STRATA_PIPED_CONCURRENT"], "1")
         off = tool.tune_config(cfg, park_mib=0)
         self.assertNotIn("--conversation-cache-mib", off["args"])
         for bad in (-1, 99999, True, "8192"):
@@ -543,6 +547,9 @@ class FileTests(unittest.TestCase):
             "--rope-scaling yarn": lambda c: c["args"].extend(["--rope-scaling", "yarn"]),
             "env STRATA_BATCH_MTP 1": lambda c: c["env"].__setitem__("STRATA_BATCH_MTP", "1"),
             "env STRATA_KV_GROW 1": lambda c: c["env"].__setitem__("STRATA_KV_GROW", "1"),
+            "env STRATA_MMQ_GROUP_SORT 0": lambda c: c["env"].__setitem__("STRATA_MMQ_GROUP_SORT", "0"),
+            "env STRATA_MMQ_RESIDENT_SORT_NE 1": lambda c: c["env"].__setitem__("STRATA_MMQ_RESIDENT_SORT_NE", "1"),
+            "env STRATA_PIPED_CONCURRENT missing": lambda c: c["env"].pop("STRATA_PIPED_CONCURRENT"),
             "split_skip_if_fits": lambda c: c.__setitem__("split_skip_if_fits", True),
             "gpu_order": lambda c: c.__setitem__("gpu_order", "pci_bus_id"),
             "parallel 4.0": lambda c: c.__setitem__("parallel", 4.0),

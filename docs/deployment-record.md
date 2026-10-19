@@ -1,6 +1,6 @@
 # Deployment record: Strata with Qwen3.8-Flash-Next IQ3_XXS on 4× Tesla P100 (ZFS root)
 
-Last updated: 2026-10-18. Tested with Strata 0.1.43.1 (commit `a0116b2`), CUDA 12.9.1 and NVIDIA driver 535.230.02.
+Last updated: 2026-10-19. Runs Strata 0.1.45 (commit `477ac13cb`) since 2026-10-19; the measurements in section 3 were made on 0.1.43.1 (commit `a0116b2`) unless a section says otherwise. CUDA 12.9.1, NVIDIA driver 535.230.02.
 
 Deployment date: 2026-10-16 (all times in this document are Taiwan time, UTC+8). Machine: VMware VM (8 vCPU E5-2696 v4, 62.8 GiB RAM, 4× Tesla P100-PCIE-16GB, driver 535.230.02, ZFS root).
 
@@ -24,8 +24,8 @@ Sources of numbers: each number is labeled with the configuration it came from (
 |---|---|
 | API | `http://127.0.0.1:8080/v1` (OpenAI-compatible), `/v1/messages` (Anthropic-compatible). Listens only on 127.0.0.1. No API key is set (see section 5). |
 | Model | `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF` IQ3_XXS, revision `ed59f92`. The SHA-256 of both shards matches the Hugging Face LFS hashes (`deployed-artifacts.sha256`). |
-| Engine | Strata 0.1.43.1, pinned to commit `a0116b2782a5b82622358c04a06496485d12b2d6`, built locally with CUDA 12.9.1 (nvcc 12.9.86), `sm_60` only (machine code and PTX) |
-| Services | `strata-q3.service` (starts at boot), `strata-q3-health.timer` (runs the watchdog every 2 minutes, except while the service is starting), `zfs-arc-max.service` (ZFS Adaptive Replacement Cache (ARC) limit 8 GiB) |
+| Engine | Strata 0.1.45, commit `477ac13cbe8e582c20484871ce459d20d82df09d`, built locally with CUDA 12.9 for `sm_60` (`engine-cuda12/BUILD.json`), with `STRATA_MMQ_GROUP_SORT=1` and `STRATA_PIPED_CONCURRENT=1` ([decision 0005](decisions/0005-strata-0.1.45-group-sort-concurrent-read.md)). Until 2026-10-19: 0.1.43.1 (`a0116b2`), kept at `~/dev/strata-0.1.43.1`. |
+| Services | `strata-q3.service` (starts at boot), `strata-q3-health.timer` (runs the watchdog every 2 minutes, except while the service is starting), `zfs-arc-max.service` (ZFS Adaptive Replacement Cache (ARC) limit 2 GiB; 8 GiB until 2026-10-19, decision 0004) |
 | Concurrent serving | 4 slots (`concurrency.serving=4` in `/v1/status`), 32K context per user, INT8 key-value (KV) cache |
 | Startup time | In 12 measured service starts, the service took 428–542 s to become ready (`results/service-load-times.txt`; during this time `systemctl status` shows `activating`). A full machine reboot was not measured. |
 
@@ -42,11 +42,11 @@ Quick check: `scripts/check-deployment.sh`
 | Layer split | 12/24/36 | **13/26/38** | 4-user decode: 85.9 → 100.6 tok/s (R1b → R2, one run each; A/A restart difference <1%). All 24,576 experts are resident. Average utilization was about 60% on each of the four GPUs. |
 | VRAM reserve | aggressive 1024 MiB | **1536 MiB** | At 1536, experts are already 100% resident, so a lower value would not fit more experts (1024 itself was not measured). Upstream #2065 reports a hang at about 400–500 MiB remaining (a Windows case; whether Linux behaves the same is not verified). |
 | batch groups | 4 | **auto** (same as 4 with 4 slots and 4 stages; the log shows `4 groups of 1 slot`) | Cost of `1`: 4-user decode −40% (one user −2%). For long inputs that arrive at the same time, the last user's time to first token (TTFT) became 2.3–2.8 times as long. GPU3 had as little as 414 MiB left. auto still groups correctly when VRAM is not enough for 4 slots (that case was not measured). |
-| Conversation parking | Not mentioned | **8192 MiB, 8 conversations, ≥1024 tokens, parking stops when available memory is <8 GiB** | See section 3.4 |
+| Conversation parking | Not mentioned | **8192 MiB, 8 conversations, ≥1024 tokens, parking stops when available memory is <6 GiB** (8 GiB until 2026-10-19, decision 0004) | See section 3.4 |
 | prefill chunk | 2048 (and suggests comparing 1024/4096) | **2048** | 1024/4096 were measured once each on [deployed], with only `--prefill` changed. 2048 uses the [deployed*] performance suite. See section 3.3. |
 | CPU workers | 6 | 6 | No 4/6/8 comparison was done. Experts are 100% in VRAM. During the robustness test of the deployed configuration (47 minutes), CPU0 averaged 90.7% (99.9% during the soak; the engine main thread). The other 7 CPUs averaged 4.8–6.7% (`deployed-robust-monitor-all.json`). |
-| Engine version | 0.1.43.1 | 0.1.43.1 (not upgraded: in the local A/B, 0.1.44.1 throughput and prefill were within about 1% of 0.1.43.1, except one-user short prompts; see section 3.6) | Upstream was checked on 2026-10-16 (latest 0.1.44.1, 10-14; for 0.1.45, released 10-17, see section 3.7). Two issues report layer split slowing down in the 0.1.43 series. This configuration has neither of the two causes in #2038 (`--batch-mtp` on layer split, the PLE probe falling back to mmap) (startup log: `4 groups of 1 slot`, `PLE table locked in RAM`). The fix for #2281 (0.1.43.1 decode −20%) is `--no-ple-prefetch`. `ngram.cpp` did not change in 0.1.44.1, so this flag is still needed. The reporter measured 0.1.44.1 + `--no-ple-prefetch` within about 1% of 0.1.43 on 2× RTX 3090 (a single reporter, not this machine). An upgrade also requires replacing `serve/server.py`. |
-| Environment variables | 10 | Same (kept) | Checked against the source code: in this configuration only `STRATA_RESIDENT_HEADROOM_GIB=8` changes behavior. The others are already off. |
+| Engine version | 0.1.43.1 | 0.1.45 since 2026-10-19, with two switches the engine experiments confirmed (section 3.8, [decision 0005](decisions/0005-strata-0.1.45-group-sort-concurrent-read.md)). 0.1.44.1 was not adopted: in the local A/B it was within about 1% of 0.1.43.1, except one-user short prompts (section 3.6) | Upstream was checked on 2026-10-16 (latest 0.1.44.1, 10-14; for 0.1.45, released 10-17, see section 3.7). Two issues report layer split slowing down in the 0.1.43 series. This configuration has neither of the two causes in #2038 (`--batch-mtp` on layer split, the PLE probe falling back to mmap) (startup log: `4 groups of 1 slot`, `PLE table locked in RAM`). The fix for #2281 (0.1.43.1 decode −20%) is `--no-ple-prefetch`. `ngram.cpp` did not change in 0.1.44.1, so this flag is still needed. The reporter measured 0.1.44.1 + `--no-ple-prefetch` within about 1% of 0.1.43 on 2× RTX 3090 (a single reporter, not this machine). An upgrade also requires replacing `serve/server.py`. |
+| Environment variables | 10 | The guide's 10, and 3 of 0.1.45 since 2026-10-19 | Checked against the source code: in this configuration `STRATA_RESIDENT_HEADROOM_GIB=6` (8 until 2026-10-19), `STRATA_MMQ_GROUP_SORT=1` and `STRATA_PIPED_CONCURRENT=1` change behavior, and `STRATA_MMQ_RESIDENT_SORT_NE=0` keeps an inexact variant of the sort off. The others are already off. |
 | memlock | Service account memlock set to unlimited; systemd service sets `LimitMEMLOCK=infinity` | Only systemd `LimitMEMLOCK=infinity` is set; the account limits were not changed | Affects only the service itself. Measured: when the engine is run manually outside systemd, the memlock limit is about 8 GiB, and the PLE table is "loaded (not locked)". |
 | ARC limit | modprobe.d + initramfs | systemd oneshot | Does not touch the boot chain. `zfs_arc_shrinker_limit=0` is also set. |
 
@@ -110,7 +110,7 @@ The prefill numbers are medians of three runs. All three settings read the same 
 | Without competition (a single conversation, or 4 conversations without interference) | The cache is reused normally without parking (`conversation_cache.jsonl`) |
 | Whether output after restore is the same as if "the conversation never left" | IDENTICAL (92/92 tokens). Engine-level test with snapshot read-back verification enabled (`parking_test.out`; the configuration then was [deployed*], plus `--pcie-frac 0 --adapt-every 1000000` for exact comparison). |
 | Cost | When switching to a new conversation, the previous one (≥1024 tokens) is first saved to RAM: median 89 ms (1K–4K tokens) to 592 ms (20K–40K tokens), longest 1.15 s. Restore median 38 ms (185 parks and 32 restores in the engine log before 15:28). Poisson at 6 per minute, paired request by request ([deployed*] against the two R2 runs): TTFT median difference +0.02 to +0.09 s (A/A: +0.04 s). SLO results flipped for 2 requests against R2 (1 right at the threshold, 1 from a changed queue order) and for 3 against the A/A run (the 1 extra went from fail to pass). The two A/A runs also differ by 1 flip. Direct comparison of [no-parking] and [deployed]: at 3 per minute both 22/30, 0 flips, TTFT median difference +0.09 s; at 12 per minute 6 and 7/30 (5 flips under overload). |
-| RAM | 4 conversations take about 4 GB. Limit 8 GiB. Parking of new conversations stops when system available memory is below 8 GiB. |
+| RAM | 4 conversations take about 4 GB. Limit 8 GiB. Parking of new conversations stops when system available memory is below 8 GiB (6 GiB since 2026-10-19). |
 
 ### 3.5 Correctness and stability [deployed] (unless noted otherwise)
 
@@ -175,6 +175,14 @@ Order: 0.1.43.1 → 0.1.44.1 → 0.1.44.1 with the read-ahead hint on → 0.1.44
 - The mmap runs only confirmed that the hint is issued as usual when the table is not locked. Their page cache was not controlled, so their speed cannot be compared.
 - Problems found and handled during testing. In the first version of the probe, `z_rd_int` CPU could come out negative (taskq threads exited midway), the engine's separate user/sys times could not be seen per request, and the summary hid small differences; these were fixed in a revised version. The first ext4 start failed because `--ple-gguf` in a different directory was treated as a duplicate shard 2; it was rerun with a symbolic link. At 21:42 the production service was stopped while it was loading, which put it into the failed state. The watchdog restarted it at 22:13 after its 30-minute cooldown. After that failed, systemd retried at 22:15 under `Restart=on-failure`. Both attempts were blocked by preflight (`:8080` was already in use by the test engine).
 
+### 3.8 Strata 0.1.45 and its two switches [engine experiments]
+
+The engine experiments measured 0.1.45's switches with this configuration, in a transient unit with the service's
+limits (`docs/engine-experiments.md`). Against 0.1.45 without them, two runs each in the order K0, K1, K1, K0
+(`results/SCREEN-combo.md`): prompts were read 17.4% (1.2K), 10.7% (4K) and 9.1% (16K) faster; while a 16K prompt was
+read beside three decoders, their longest stop was 0.55 s instead of 22.73 s, and the joining prompt's first token came
+1.1% later; four users with 1.5K prompts got 2.7% more tokens per second; one user's decode did not change (+0.5%).
+
 ---
 
 ## 4. Problems found in this deployment, by impact
@@ -194,7 +202,8 @@ Order: 0.1.43.1 → 0.1.44.1 → 0.1.44.1 with the read-ahead hint on → 0.1.44
 
 ## 5. Known limits to share with lab members
 
-- Long documents pause other users. When one user sends a 16K document, the others who are generating stop for about 23 s. When two long documents arrive one after the other, about 37 s. When four users send long documents at the same time, the last one waits about 1.6–2.4 minutes (94 s at 16K each, 143 s at about 27K each). `--batch-groups 1` can cut the others' pause to about 8 s, but 4-user decode drops by 40% and long inputs get slower (section 4, item 4).
+- Long documents pause other users for about half a second (since 2026-10-19, `STRATA_PIPED_CONCURRENT=1`). While a 16K document was read, three users who were generating stopped for at most 0.55 s, against 22.73 s without the switch; with a 28K document, 0.59 s against 35.81 s (section 3.8). The document's own first token comes about 1% later. A request answered while a document is read can get another answer than it would alone, and another answer each time. When four users send long documents at the same time, the last one waited about 1.6–2.4 minutes on 0.1.43.1 (94 s at 16K each, 143 s at about 27K each); this was not measured on 0.1.45.
+- Requests that send no sampling settings are sampled with the model card's settings since 2026-10-19 (0.1.45's `serve/server.py`): temperature 1.0, top_p 0.95 and top_k 20 with thinking; temperature 0.7, top_p 0.8, top_k 20 and presence_penalty 1.5 without. Before, they were decoded greedily. Send `temperature: 0` for greedy answers.
 - Capacity: with the same document-heavy mixed load (short questions, 2K/8K/16K documents), the strict SLO met rate was 73% (22/30) at 3 requests per minute, 23% (7/30, TTFT p95 57 s) at 6 per minute, and 23% (7/30, TTFT p95 175 s) at 12 per minute. Above capacity, queuing grows, but there were never errors during testing. Actual capacity depends on document length and on how many requests arrive at the same time.
 - Slot limit 4: from the 5th user on, requests queue; they do not fail.
 - Memory needed to start: preflight waits until "available memory + the part of ARC that can be freed" is at least 36 GiB before it starts the engine, and waits at most 25 minutes. Before the 2026-10-18 start there was 57 GiB; after loading, about 26 GiB remained (engine RSS 30.6 GiB, of which the locked PLE table was 26.8 GiB). Extrapolating from this usage, if exactly 36 GiB were available at start, only about 5 GiB would remain after loading. That is below the 8 GiB floor of conversation parking, so new conversations would not be parked.

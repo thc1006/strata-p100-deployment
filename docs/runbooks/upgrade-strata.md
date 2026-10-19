@@ -42,7 +42,7 @@
      ```bash
      grep -rnE 'dev/strata([/"[:space:]}]|$)|"dev" / "strata"' scripts systemd tests tools bench
      ```
-   - `tools/configure_strata_q3.py` was written against `setup.py` and `serve/server.py` of `a0116b2` (the Audited source in the docstring, and `SOURCE_COMMIT`). Check against the new release first, then change these two places, and run `scripts/test.sh`.
+   - `tools/configure_strata_q3.py` names the release its assumptions about `setup.py`, `serve/server.py` and the engine's options were checked against (the Audited source in the docstring, and `SOURCE_COMMIT`: `477ac13cb`, 0.1.45, since 2026-10-19). Check them against the new release first, then change these two places, and run `scripts/test.sh`.
    - Regenerate the config with `tools/configure_strata_q3.py`, update the two snapshots in `config/` and `config/deployed-artifacts.sha256`, run `scripts/install-system-files.sh`, and then run `sudo systemctl restart strata-q3`.
    - Run `scripts/check-drift.sh` and `scripts/check-deployment.sh`.
 

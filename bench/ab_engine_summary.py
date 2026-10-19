@@ -19,8 +19,9 @@ against the --baseline arm, of its mean and of each run; the baseline's own runs
 of the baseline bracket the others: their difference is the drift and the noise a change has to clear), and a change
 no larger than that spread is marked "within the baseline's spread".
 Answers: every request's answer sha256 across the runs: within an arm (does the engine repeat itself; "n/a" for an
-arm with one run), and against the baseline, counted only on requests where all the baseline's runs agree (a request
-the baseline itself answers in more than one way is counted apart).
+arm with one run), and against the baseline, counted only on requests that every baseline run answered alike (the
+others, which the baseline answers in more than one way or not in every run, are left out, and the report says how
+many).
 Exit status: 0 the runs are usable, 2 a run is not (the report says which).  The screen decides nothing on its own:
 a candidate goes on to the ABBA confirmation, whose criteria are fixed before it runs.
 """
@@ -246,8 +247,8 @@ def evaluate(tags: list, baseline: str, results: Path, arms: dict | None = None)
             line = f"- {a}: {len(by_label)} requests; differ between its own runs: n/a (one run)"
         if a != baseline and base_runs:
             vs = sum(1 for lb, ref in agreed.items() if any(t in by_label[lb] and by_label[lb][t] != ref for t in runs))
-            line += (f"; differ from the baseline on {vs} of the {len(agreed)} requests all its runs answer alike"
-                     f" ({len(by_label) - len(agreed)} it answers in more than one way)")
+            line += (f"; differ from the baseline on {vs} of the {len(agreed)} requests the baseline's runs answer"
+                     f" alike ({len(by_label) - len(agreed)} left out)")
         o.append(line)
     if status:
         o += ["", "Not every run is usable: the numbers above use only the usable ones."]

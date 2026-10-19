@@ -78,7 +78,7 @@ class Summary(unittest.TestCase):
                       "770.00 (770.00): +10.0% (+10.0%) |", out)
         # 9 prefill + 3 decode + 8 four-user + 8 admission (2 joiners, 6 decoders) + 4 conversation turns
         self.assertIn("- C1: 32 requests; differ between its own runs: n/a (one run); differ from the baseline on 0 of "
-                      "the 32 requests all its runs answer alike (0 it answers in more than one way)", out)
+                      "the 32 requests the baseline's runs answer alike (0 left out)", out)
         self.assertIn("- C0: 32 requests; differ between its own 2 runs: 0", out)
 
     def test_an_arm_that_changes_the_answers(self):
@@ -93,8 +93,9 @@ class Summary(unittest.TestCase):
         status, out = run(b)
         self.assertEqual(status, 0, out)
         self.assertIn("differ between its own 2 runs: 1", out)
-        self.assertIn("differ from the baseline on 0 of the 31 requests all its runs answer alike (1 it answers in more "
-                      "than one way)", out)
+        # the request C0 answers two ways is C0's, not C1's (C1 has one run): it is left out of the comparison
+        self.assertIn("- C1: 32 requests; differ between its own runs: n/a (one run); differ from the baseline on 0 of "
+                      "the 31 requests the baseline's runs answer alike (1 left out)", out)
 
     def test_a_change_within_the_baselines_spread_is_marked(self):
         def b(r):

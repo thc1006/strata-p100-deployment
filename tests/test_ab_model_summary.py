@@ -124,6 +124,10 @@ def write_run(r: Path, tag: str, model: str, at: str, ticks: int, speed: float =
             f"journal: {k.get('journal', 'system')}; lines during the run: {k.get('journal_count', len(jl))}",
             f"journal done lines during the run: {done} ({k.get('finishes', 'length,cancel=False 44, stop,cancel=False 54')})",
             f"kernel lines during the run: {k.get('kernel_count', len(kl))}",
+            *([] if k.get("old_wrapper") else [
+                f"concurrent read lines during the run: {k.get('conc_lines', 3)}, with slots decoding: "
+                f"{k.get('conc_beside', 2)}",
+                f"concurrent read off beside: {k.get('conc_off', 'no such line')}"]),
             f"perf log Traceback lines: {k.get('tracebacks', 0)}",
             f"gpu ecc (index, corrected, uncorrected): {k.get('ecc1', '0, [N/A], [N/A];1, [N/A], [N/A];')}"]
         (r / f"{tag}-after.txt").write_text("\n".join(lines) + "\n")
@@ -585,6 +589,33 @@ class Reported(unittest.TestCase):
         self.assertIn("| x1 | 100% | 6656/6656/6144/5120 | 0.32/0.31/0.30/0.30 | 1.12 / 1.12 |", out)
         self.assertIn("| y2 | 100% | 6656/6656/6144/5120 | 0.32/0.31/0.30/0.30 | ? |",
                       run(lambda r: four(r, y2={"load": LOAD[:-2]}))[1])
+
+    def test_the_concurrent_reads(self):
+        status, out = run(four)
+        self.assertEqual(status, 0, out)
+        self.assertIn("| x1 | 3 | 2 | no such line |", out)
+        self.assertNotIn("Flag", out)
+        # an IQ3_S engine that keeps the concurrent read off: reported and flagged, not judged
+        status, out = run(lambda r: four(r, y={"conc_lines": 0, "conc_beside": 0, "conc_off": "this expert source"}))
+        self.assertEqual(status, 0, out)
+        self.assertIn("| y1 | 0 | 0 | this expert source |", out)
+        self.assertIn("Flag (reported, not judged by decision 0004): the runs differ in the concurrent read of decision "
+                      "0005: x1 3 lines, y1 0 lines, kept off beside this expert source, y2 0 lines, kept off beside "
+                      "this expert source, x2 3 lines.", out)
+        # no line at all in one run (no line that says why) is flagged too
+        self.assertIn("y2 0 lines, x2 3 lines.", run(lambda r: four(r, y2={"conc_lines": 0, "conc_beside": 0}))[1])
+        # lines with no slot decoding still say the read was on: no flag
+        self.assertNotIn("Flag", run(lambda r: four(r, y={"conc_beside": 0}))[1])
+        # a count the wrapper could not take (the log replaced during the run) is left out, not taken for 0
+        status, out = run(lambda r: four(r, y2={"conc_lines": "unknown", "conc_beside": "unknown"}))
+        self.assertEqual(status, 0, out)
+        self.assertIn("| y2 | - | - | no such line |", out)
+        self.assertNotIn("Flag", out)
+        # records of the wrapper before these lines: shown as unknown, no flag
+        status, out = run(lambda r: four(r, every={"old_wrapper": True}))
+        self.assertEqual(status, 0, out)
+        self.assertIn("| x1 | - | - | ? |", out)
+        self.assertNotIn("Flag", out)
 
     def test_ecc_that_cannot_fire(self):
         self.assertIn("ECC: no card gave ECC error counters in any run", run(four)[1])

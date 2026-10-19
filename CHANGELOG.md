@@ -2,6 +2,12 @@
 
 Notable changes to this machine and this repository, newest first. There are no version numbers; sections are by date. The categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-20
+
+### Changed
+
+- `bench/ab_model_run.sh` records the engine's concurrent-read lines during a run (one for each stretch of a prompt it reads on a thread of its own), how many of them had slots decoding meanwhile, and the reason the engine gave, if any, for keeping such reads off. `bench/ab_model_summary.py` reports them and flags runs that differ, without judging them: decision 0004's criteria do not measure how long the other users stop while a prompt is read, and whether decision 0005's concurrent read stays on with IQ3_S is not known before its runs.
+
 ## 2026-10-19
 
 ### Added

@@ -28,6 +28,9 @@ echo "serve_load nonce ${SERVE_LOAD_NONCE:-unset}" > "$R/$TAG-perf.log"
 sleep "${STUB_SLEEP:-0}"
 [ -n "${STUB_RESTART:-}" ] && "$SB/start_service.sh"      # the engine started again during the run
 echo "strata serve: engine error: CUDA error on TESTHOST-MACHINE" >> "$STUB_LOG"
+if [ -z "${STUB_CONC_OFF:-}" ]; then for nr in 852:0 16384:40; do    # a read with no slot decoding, and one beside slots
+  echo "strata batch: read ${nr%:*} tokens on a thread of its own in 3793 ms (concurrent, to ${nr%:*} of ${nr%:*}); the slots decoded ${nr#*:} rows meanwhile (10.5 rows/s; stage 1: 40 windows, 0.0 ms host each)" >> "$STUB_LOG"
+done; fi
 python3 -c 'import json, os, sys; p = sys.argv[1]; d = json.load(open(p)); d["totals"]["requests"] += int(os.environ.get("STUB_REQUESTS", "98"))
 if os.environ.get("STUB_END_STATE"): d["live"].update(state=os.environ["STUB_END_STATE"], running=1)
 json.dump(d, open(p, "w"))' "$SB/metrics"
@@ -97,6 +100,7 @@ cat > "$SB/start_service.sh" <<'EOF'
 [ -f "$SB/server.pid" ] && kill -- -"$(cat "$SB/server.pid")" 2>/dev/null
 cat > "$STUB_LOG" <<'LOG'
 strata serve: prompt 15 tokens = 8 reused + 7 read in 112 ms (62.2 tok/s), of an older engine
+strata batch: STRATA_PIPED_CONCURRENT is off beside STRATA_PREFILL_HELP
 [strata] 2026-10-19 00:50:00 engine started: /x/engine-cuda12/strata --serve --pack /d/packs/iq3_xxs
 strata generate: memory guard: limit 62.8 GiB (source: meminfo), current 11.3 GiB; available 51.5 GiB (MemAvailable 51.5 GiB), floor 6144 MiB
 strata generate: PCIe probe: 11.7 GB/s host->device (best of 11.7 11.6 11.4 11.4) -> pcie_frac 0.32 (default 0.55)
@@ -110,6 +114,7 @@ strata generate: resident RAM mode: 1.12 GiB of experts in RAM (page-locked), 66
 strata serve: prompt 15 tokens = 8 reused + 7 read in 112 ms (62.2 tok/s), the warm-up
 strata generate: expert cache 9999 slots, a line after the first request
 LOG
+[ -n "${STUB_CONC_OFF:-}" ] && echo "strata batch: STRATA_PIPED_CONCURRENT is off beside this expert source" >> "$STUB_LOG"
 setsid bash -c 'exec 2>>"$STUB_LOG"; env -i STRATA_RESIDENT_HEADROOM_GIB="$1" CUDA_VISIBLE_DEVICES=0,1,2,3 OTHER=1 \
   "$SB/strata/engine-cuda12/strata" --serve --pack /d/packs/iq3_xxs \
   --native /d/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --layer-split 13,26,38 \
@@ -163,7 +168,8 @@ grep -q -e "prompt 15 tokens" -e "9999 slots" "$R/t-clean-arm.txt" && fail "arm 
 grep -q "serve_load nonce ab-0004" "$R/t-clean-perf.log" && pass "run_profile.sh got the nonce" || fail "run_profile.sh did not get the nonce"
 for want in "run_profile exit 0  interrupted no" "same engine as before: yes" "idle at the end: yes" \
             "metrics requests during the run: 98" "engine log lines during the run: 1" "journal: system; lines during the run: 1" \
-            "journal done lines during the run: 98 \(length,cancel=False 44, stop,cancel=False 54\)" "kernel lines during the run: 1"; do
+            "journal done lines during the run: 98 \(length,cancel=False 44, stop,cancel=False 54\)" "kernel lines during the run: 1" \
+            "^concurrent read lines during the run: 2, with slots decoding: 1$" "^concurrent read off beside: no such line$"; do
   grep -Eq -- "$want" "$R/t-clean-after.txt" && pass "after record: $want" || fail "after record lacks: $want"
 done
 grep -q "marked busy with no request" "$R/t-clean-journal-errors.txt" && ! grep -q "has waited" "$R/t-clean-journal-errors.txt" &&
@@ -277,6 +283,13 @@ grep -q "robustness set ran for t-robust" "$R/t-robust-robustness.log" 2>/dev/nu
 reset; wrap t-restart STUB_RESTART=1
 grep -q "^same engine as before: NO$" "$R/t-restart-after.txt" 2>/dev/null && pass "an engine started again during the run is not the same" ||
   fail "an engine restart: $(grep 'same engine' "$R/t-restart-after.txt" 2>/dev/null || cat "$SB/t-restart.out")"
+
+# 10. an engine whose configuration keeps the concurrent prompt read off: no read, and the reason it gave at its start
+STUB_CONC_OFF=1 start_service; reset; wrap t-conc-off STUB_CONC_OFF=1
+grep -q "^concurrent read lines during the run: 0, with slots decoding: 0$" "$R/t-conc-off-after.txt" 2>/dev/null &&
+  grep -q "^concurrent read off beside: this expert source$" "$R/t-conc-off-after.txt" &&
+  pass "an engine that keeps the concurrent read off: no reads, and its reason" ||
+  fail "concurrent read off: $(grep concurrent "$R/t-conc-off-after.txt" 2>/dev/null || cat "$SB/t-conc-off.out")"
 
 echo "$fails failed"
 exit $((fails > 0))

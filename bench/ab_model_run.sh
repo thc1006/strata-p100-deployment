@@ -20,7 +20,10 @@
 #   <tag>-after.txt   after: the set's exit status, whether it was interrupted, whether the same engine answered,
 #                     whether the service was idle at the end, the requests /metrics counted during the run
 #                     (run_profile.sh sends 98), the journal's "[strata] done:" lines by finish, the number of lines in
-#                     each file below, the set's log's Traceback lines, the ECC counters
+#                     each file below, the engine's concurrent-read lines (STRATA_PIPED_CONCURRENT: one per stretch of
+#                     a prompt read on a thread of its own, the ones with slots decoding meanwhile counted apart) and
+#                     the reason it gave, if any, for keeping such reads off, the set's log's Traceback lines, the ECC
+#                     counters
 #   <tag>-engine-errors.txt, <tag>-journal-errors.txt, <tag>-kernel-errors.txt   the lines of the engine log, of the
 #                     service journal (systemd's own lines included) and of the kernel log that may tell of a fault,
 #                     from exactly the run (journal cursors); the summary sorts them into faults and other traffic
@@ -232,9 +235,19 @@ patterns='error|warn|refused|no progress|watchdog|out of memory|restart|fail|abo
 if [ -r "$LOG" ] && [ "$(stat -c %i "$LOG")" = "$start_inode" ] && [ "$(stat -c %s "$LOG")" -ge "$start_size" ]; then
   tail -n +"$((start_line + 1))" "$LOG" | grep -a -i -E "$patterns" | grep -v 'upload no error, sync no error' | redact > "$R/$TAG-engine-errors.txt"
   engine_errors=$(wc -l < "$R/$TAG-engine-errors.txt")
+  read -r conc_lines conc_beside <<< "$(tail -n +"$((start_line + 1))" "$LOG" |
+    awk '/^strata batch: read [0-9]+ tokens on a thread of its own/ { n++; if (/the slots decoded [1-9][0-9]* rows meanwhile/) b++ }
+         END { print n + 0, b + 0 }')"
 else
   : > "$R/$TAG-engine-errors.txt"; engine_errors="unknown (the log was replaced, truncated or removed during the run)"
+  conc_lines=unknown; conc_beside=unknown
 fi
+# the concurrent prompt read (STRATA_PIPED_CONCURRENT, decision 0005): the engine says once, at its first prompt read
+# (the warm-up's, perhaps), when its configuration keeps it off; from this engine's start on
+conc_off=$(awk '/^\[strata\] .*engine started: / { off = "" }
+                /^strata batch: STRATA_PIPED_CONCURRENT is off beside / && off == "" {
+                  off = $0; sub(/^strata batch: STRATA_PIPED_CONCURRENT is off beside /, "", off) }
+                END { print (off == "" ? "no such line" : off) }' "$LOG" 2>/dev/null)
 if sudo -n journalctl -u $UNIT --after-cursor "$cur" --no-pager -q > "$TMP/journal" 2>/dev/null; then
   grep -a -i -E '\[strata\] [45][0-9]{2}\b|Traceback|ERROR|error:|refused|restart|had stopped|non-?finite|repeated|said nothing|marked busy with no request|cancel=True|Failed with result|Main process exited|code=killed|Scheduled restart|Stopping|Stopped|Starting|Started' "$TMP/journal" |
     redact > "$R/$TAG-journal-errors.txt"
@@ -264,6 +277,8 @@ same=NO; [ -n "$pid2" ] && [ "$pid2" = "$pid" ] && [ "$(start_ticks "$pid2")" = 
   echo "journal: $([ "$journal_errors" = unknown ] && echo unreadable || echo system); lines during the run: $journal_errors"
   echo "journal done lines during the run: $done_lines (${done_finish})"
   echo "kernel lines during the run: $kernel_errors"
+  echo "concurrent read lines during the run: $conc_lines, with slots decoding: $conc_beside"
+  echo "concurrent read off beside: ${conc_off:-unknown}"
   # grep -c prints the count and exits 1 when it is 0: read the count, not the status
   if [ -r "$R/$TAG-$SETLOG" ]; then echo "perf log Traceback lines: $(grep -c 'Traceback' "$R/$TAG-$SETLOG")"
   else echo "perf log Traceback lines: unknown (no $TAG-$SETLOG)"; fi

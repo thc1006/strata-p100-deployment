@@ -47,7 +47,10 @@ same wrapper around bench/run_robustness.sh (bench/ab_model_run.sh <tag> B robus
      the host (decision 0004 names only the floors for this run: the maintainer decides).
 Reported, not judged: the requests other clients completed between each run's restart and its start, and the
 conversations parked then (flagged when the runs differ by more than OTHER_REQUESTS_FLAG requests or in the parked
-conversations); each engine's placement at its load, with the expert complement page-locked in RAM.
+conversations); each engine's placement at its load, with the expert complement page-locked in RAM; each run's
+concurrent-read lines (decision 0005's concurrent read: the engine prints one per stretch of a prompt it reads on a
+thread of its own, also with no slot decoding), how many of them had slots decoding meanwhile, and the reason the
+engine gave, if any, for keeping such reads off (flagged when the runs differ in whether they have such lines).
 Metrics: "1 / 2 / 4 clients" is serve_load's total tok/s, the median over its 3 rounds of the tokens a round
 received divided by the round's wall time (time to first token included); the prompt rates are the engine's, the
 median of the 3 replicate runs.  A value that is not a finite number counts as missing.
@@ -265,7 +268,10 @@ def after_info(results: Path, tag: str) -> dict:
             "ecc": ecc(grep(t, r"^gpu ecc \(index, corrected, uncorrected\): (.*)$")),
             "engine_lines": lines(grep(t, r"^engine log lines during the run: (\S+)"), "engine"),
             "journal_lines": lines(grep(t, r"^journal: \w+; lines during the run: (\S+)"), "journal"),
-            "kernel_lines": lines(grep(t, r"^kernel lines during the run: (\S+)"), "kernel")}
+            "kernel_lines": lines(grep(t, r"^kernel lines during the run: (\S+)"), "kernel"),
+            "conc_lines": num(grep(t, r"^concurrent read lines during the run: (\S+),")),
+            "conc_beside": num(grep(t, r"^concurrent read lines during the run: \S+, with slots decoding: (\S+)$")),
+            "conc_off": grep(t, r"^concurrent read off beside: (.+)$")}
 
 
 def journal_kinds(lines: list) -> dict:
@@ -464,6 +470,18 @@ def other_work_flag(tags: list, info: dict) -> str | None:
     return None
 
 
+def concurrent_flag(tags: list, after: dict) -> str | None:
+    """The flag when the runs differ in whether their engines read prompts on a thread of their own, the runs whose
+    count is unknown left out (an engine that keeps such reads off says why at its first read, once: it decides for
+    its whole run)."""
+    if len({after[t]["conc_lines"] > 0 for t in tags if after[t].get("conc_lines") is not None}) > 1:
+        return ("Flag (reported, not judged by decision 0004): the runs differ in the concurrent read of decision 0005: "
+                + ", ".join(f"{t} {fmt(after[t].get('conc_lines'))} lines"
+                            + (f", kept off beside {after[t]['conc_off']}" if after[t].get("conc_off") not in
+                               (None, "no such line") else "") for t in tags) + ".")
+    return None
+
+
 def stability(after: dict, rec: dict, arm: dict) -> tuple[list, list, list]:
     """(not clean, cannot tell, notes) for one run."""
     a, dirty, unknown, notes = after, [], [], []
@@ -653,6 +671,16 @@ def evaluate(tags: list, results: Path, remeasured: list | None = None, robust: 
         i = info[t]
         o.append(f"| {t} | {i.get('resident') or '?'}% | {i.get('slots') or '?'} | {i.get('pcie') or '?'} | "
                  f"{i.get('complement') or '?'} |")
+    o += ["", "Concurrent reads (STRATA_PIPED_CONCURRENT, decision 0005): the engine's lines for the stretches of prompts "
+          "it read on a thread of its own during each run, those with slots decoding meanwhile, and the reason it gave, "
+          "if any, for keeping such reads off.", "",
+          "| run | concurrent-read lines | with slots decoding | kept off beside |", "|---|---:|---:|---|"]
+    for t in shown:
+        a = after.get(t) or {}
+        o.append(f"| {t} | {fmt(a.get('conc_lines'))} | {fmt(a.get('conc_beside'))} | {a.get('conc_off') or '?'} |")
+    flag = concurrent_flag(chrono, after)
+    if flag:
+        o += ["", flag]
     try:
         want = deployed()
     except Exception as e:                           # noqa: BLE001 - any failure to read it is "cannot be evaluated"

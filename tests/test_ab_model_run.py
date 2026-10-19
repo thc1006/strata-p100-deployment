@@ -45,6 +45,8 @@ EXPECTED = [
     'after record: journal: system; lines during the run: 1',
     'after record: journal done lines during the run: 98 \\(length,cancel=False 44, stop,cancel=False 54\\)',
     'after record: kernel lines during the run: 1',
+    'after record: ^concurrent read lines during the run: 2, with slots decoding: 1$',
+    'after record: ^concurrent read off beside: no such line$',
     'journal: the slot leak kept, the slot wait left out',
     'kernel: the Xid kept',
     'every host name redacted, in any case, the short netbird label too',
@@ -81,6 +83,7 @@ EXPECTED = [
     'run_robustness.sh got the tag',
     'the perf set did not run',
     'an engine started again during the run is not the same',
+    'an engine that keeps the concurrent read off: no reads, and its reason',
 ]
 
 

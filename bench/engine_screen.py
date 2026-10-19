@@ -23,12 +23,13 @@ show apart:
            steady decode, with no long prompt read in the measured time (the summed engine decode rate)
   eval4    four users in the evaluation's mode at once: thinking on (effort high), temperature 1.0, top_p 0.95,
            top_k 20, a fixed seed per request, 1,536 tokens each, once: sampled decoding of reasoning text, which
-           keeps fewer drafts than greedy decoding
-  admit28  admit with a 28K-token joiner: a heavier read beside the decoders (the slots the read borrows, the
-           decoders' CPU fallback)
-Requests "sent at once" (four users, the admission's decoders, decode4, eval4) go out STAGGER seconds apart: sent in
-the same instant, which one the engine takes first (the solo path, with its MTP drafts) varied from run to run, and a
-greedy answer differs between the solo path and a slot (2026-10-19, c1-3), so the order is fixed.  --texts PATH also
+           keeps drafts at another rate than greedy decoding (78% of the MTP proposals in m1-1's eval4, 54-55% in
+           its decode4)
+  admit28  admit with a 28K-token joiner: a longer read beside the decoders
+Requests "sent at once" (four users, the admission's decoders, decode4, eval4) go out STAGGER seconds apart.  Sent
+in the same instant, the admission's decoders got their first tokens in an order that varied from run to run, and in
+the two runs of 2026-10-19 where the third was first (c1-3, c0-4), two of them answered otherwise; staggered, the
+order was the same in every round of m0-1 and m1-1.  --texts PATH also
 writes every answer's text there, to find where two arms' answers part.
 One JSON line per request (per admission, per conversation) to --json, each with the tag, the phase, the answer's
 sha256, the corpus's sha256 (the prompts are cut from it) and the phases of the screen.  The last line of the
@@ -64,21 +65,20 @@ ZH_TOPICS = ["機械錶如何計時", "燈塔與它們的透鏡的歷史", "為�
 # the evaluation's thinking-mode sampling (~/dev/p100-q3-eval/driver2.py), every field sent
 SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "presence_penalty": 0.0,
             "frequency_penalty": 0.0, "repetition_penalty": 1.0}
-# four questions of the evaluation's kinds, written for this screen (not from a benchmark)
+# four questions of the evaluation's kinds, written for this screen (not from a benchmark) and hard, so that the
+# thinking reaches the 1536-token cap and the four requests decode the same amount (screen 2026-10-19b's questions
+# ended after 98 to 874 tokens).  Answers: 2177; C (0.2934); B (2040); 884.
 EVAL_QUESTIONS = [
-    "A train leaves a station at 09:40 and reaches the next city at 13:05, covering 287 km with one 15-minute stop. "
-    "What was its average speed while moving, in km/h? Think it through, then end with a line 'Answer: <number>'.",
-    "Which statement about a ball thrown straight up (no air resistance) is correct?\n\nA) Its acceleration is zero at "
-    "the top.\nB) Its velocity and acceleration both point up on the way up.\nC) Its acceleration is the same at every "
-    "point of the flight.\nD) It takes longer to come down than to go up.\n\nThe last line of your answer must be "
-    "'Answer: X' with X one of A, B, C, D.",
-    "請回答以下單選題，最後一行只寫「答案：X」，X 為 A、B、C、D 其中之一。請先逐步思考再作答。\n\n某公司以 120 萬元購入設備，"
-    "估計耐用年限 5 年、殘值 20 萬元，採直線法提列折舊。第三年底該設備的帳面價值為多少？\n\nA) 60 萬元\nB) 72 萬元\n"
-    "C) 80 萬元\nD) 100 萬元",
-    "一個水池有甲、乙兩個進水管與一個排水管。甲管單獨注滿要 6 小時，乙管單獨注滿要 9 小時，排水管單獨排空滿池要 12 小時。"
-    "三管同時打開，從空池開始幾小時可以注滿？請逐步推理，最後一行只寫「最終答案：」加上數字。"]
+    "How many permutations (p1, p2, ..., p10) of the numbers 1 to 10 satisfy |p_i - i| <= 2 for every i? Think it "
+    "through, then end with a line 'Answer: <number>'.",
+    "A fair six-sided die is rolled repeatedly and the results are added up until the total first exceeds 10. What is "
+    "the probability that the final total is exactly 11, to four decimal places?\n\nA) 0.2419\nB) 0.2857\nC) 0.2934\n"
+    "D) 0.3333\n\nThe last line of your answer must be 'Answer: X' with X one of A, B, C, D.",
+    "請回答以下單選題，最後一行只寫「答案：X」，X 為 A、B、C、D 其中之一。請先逐步思考再作答。\n\n把一個 5×5 方格的每一格塗成"
+    "黑色或白色，使每一列與每一行都恰好有兩格黑色。共有幾種塗法？\n\nA) 1800 種\nB) 2040 種\nC) 2160 種\nD) 2520 種",
+    "求方程 x + 2y + 3z = 100 的非負整數解 (x, y, z) 共有幾組。請逐步推理，最後一行只寫「最終答案：」加上數字。"]
 SENT = [0]          # requests this screen sent
-SCREEN = "2026-10-19b"                  # the screen's version (staggered sends); the summary compares only one
+SCREEN = "2026-10-19c"                  # the screen's version (eval4's questions); the summary compares only one
 STAGGER = 0.3
 TEXTS: list = []    # (label, text) of every answer when --texts is given
 FOLLOW_UP = "Now list, in one sentence each, the three most important points of your answer."

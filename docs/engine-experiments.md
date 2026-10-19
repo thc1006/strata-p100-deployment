@@ -53,6 +53,19 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
 - 2026-10-19 08:00, after screen 2: the maintainer decided to adopt the switches that work well, C1 and C3. The two
   together are confirmed against C0 in the order K0, K1, K1, K0 (`bench/arms-combo.json`), and the confirmed
   combination is then deployed.
+- 2026-10-19 08:27, before the combination's runs: K1 (C1 and C3) is confirmed against K0 (C0) when every run
+  is usable and, in each K1 run against each K0 run:
+  - every prompt size is read faster, with a mean gain over the three sizes of at least 5% (C1's rule);
+  - the decoders' longest gap while a 16K prompt joins is shorter, and the four requests' makespan at most 5% longer
+    (C3's rule);
+  - the requests that run alone (the prefill, decode and turns phases) get K0's answers, as both switches left them
+    in screen 2. A difference stops the deployment until it is understood.
+
+  The other metrics are reported against K0, among them the joining prompt's TTFT and the four users' rate, which C3
+  alone made 11.0% and 5.2% worse. The runs use the phases prefill, decode, four, decode4, eval4, admit, admit28 and
+  turns, and screen version 2026-10-19c. Its eval4 asks harder questions, so that the thinking runs to the
+  1536-token cap; the first questions ended after 98 to 874 tokens (m0-1 and m1-1 in `results/engine-screen.jsonl`).
+
 ## Results
 
 ### Screen 1: GROUP_SORT, 04:25-05:23

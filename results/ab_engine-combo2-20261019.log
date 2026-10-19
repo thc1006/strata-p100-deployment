@@ -1,0 +1,44 @@
+[11:04:41] ab_engine: === k0-3 (K0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[11:12:18] ab_engine: strata-ab-engine loaded after 440 s
+[11:12:18] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[11:17:29] ab_engine: measuring k0-3
+[11:28:44] ab_engine: done k0-3: screen exit 0, same engine yes
+[11:28:44] ab_engine: === k1-3 (K1: /home/thc1006/dev/strata-0.1.45/cfg-gs1-pc1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[11:36:18] ab_engine: strata-ab-engine loaded after 436 s
+[11:36:18] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[11:41:27] ab_engine: measuring k1-3
+[11:52:00] ab_engine: done k1-3: screen exit 0, same engine yes
+[11:52:00] ab_engine: === k1-4 (K1: /home/thc1006/dev/strata-0.1.45/cfg-gs1-pc1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[11:59:37] ab_engine: strata-ab-engine loaded after 440 s
+[11:59:37] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[12:04:46] ab_engine: measuring k1-4
+[12:15:22] ab_engine: done k1-4: screen exit 0, same engine yes
+[12:15:22] ab_engine: === k0-4 (K0: /home/thc1006/dev/strata-0.1.45/cfg-gs0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[12:22:57] ab_engine: strata-ab-engine loaded after 438 s
+[12:22:57] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[12:28:07] ab_engine: measuring k0-4
+[12:39:27] ab_engine: done k0-4: screen exit 0, same engine yes
+[12:39:27] ab_engine: all steps done
+[12:39:27] ab_engine: finishing (exit 0): stopping the test unit, starting strata-q3
+[12:46:59] ab_engine: strata-q3.service loaded after 2 s
+[12:46:59] ab_engine: strata-q3: active

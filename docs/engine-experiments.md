@@ -189,3 +189,36 @@ M1 answered 3 of the 44 requests otherwise than M0, each late in the answer: a f
 `results/m1-1-texts.jsonl`). Upstream measured the pull request exact with the settings of its "Exactness" section,
 which the deployed configuration does not use; with the default settings, it says, outputs drift apart after some
 tokens (`docs/BATCHING.md` of the pull request). The pull request is open, not merged (2026-10-19).
+
+### The combination: K0, K1, K1, K0, 11:05-12:39
+
+Four runs in this order: k0-3, k1-3, k1-4, k0-4, with the fixed driver and screen version 2026-10-19c (the first run of
+this confirmation is set aside, see the changes to the plan). All were usable. Source: `results/SCREEN-combo.md`.
+
+| Metric (0.1.45, deployed configuration) | K0 (k0-3, k0-4) | K1 (k1-3, k1-4) |
+|---|---:|---:|
+| 1.2K / 4K / 16K prompt: engine read tok/s | 205.15 / 389.35 / 694.20 | +17.4% / +10.7% / +9.1% |
+| 16K prompt alone: TTFT s | 23.13 | -8.3% |
+| 1 user: engine decode tok/s | 39.50 | +0.5% |
+| 4 users: total tok/s (prompts' reading included) | 30.65 | +2.7% |
+| 16K joining 3 decoders: the joiner's TTFT s | 22.54 | +1.1% |
+| ... the decoders' longest gap s | 22.73 | 0.55 s |
+| ... the four requests' makespan s | 62.01 | -5.6% |
+| 28K joining 3 decoders: the joiner's TTFT s | 35.55 | +0.6% |
+| ... the decoders' longest gap s | 35.81 | 0.59 s |
+| ... the four requests' makespan s | 75.52 | -8.3% |
+| 4 users decoding, short prompts: all four's tokens per wall second | 103.44 | +0.4% |
+
+K1 is confirmed by each criterion fixed at 08:27. In each K1 run against each K0 run, every prompt size was read
+faster, by 12.2% to 12.6% on average over the three sizes; the decoders' longest gap while a 16K prompt joined was
+0.55 s against 22.72 and 22.74 s; and the four requests finished 4.2% to 7.0% sooner. The 16 requests that ran alone
+got the answers both K0 runs gave.
+
+With the faster read, the joining prompt's first token comes 1.1% later, where C3 alone made it 11.0% later, and four
+users sent together get 2.7% more tokens per second. eval4 says nothing here: between the two K0 runs, with the same
+answers but one, its rates differed by 26.3% (the server's per-request rates, summed) and 11.1% (per wall second), more
+than between the arms.
+
+Of the 51 requests both K0 runs answered alike, K1 answered 23 otherwise, all in the phases where requests decode
+beside a read (four 8, eval4 3, admit 6, admit28 6), and the two K1 runs answered 19 requests otherwise than each other
+(four 4, eval4 4, admit 5, admit28 6). The two K0 runs differed in one answer, a sampled eval4 request.

@@ -8,7 +8,9 @@
 #                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"],
 #                             "engaged": ["<regex an engine line of the screen must match>"], "never": ["<regex>"]}}}
 # (engaged / never are judged by bench/ab_engine_summary.py on <tag>-engine-lines.txt: a switch that acts only on some
-# requests shows only then.)  The arms' configs must be equal but for exe, cwd, log, their env keys and args_add.
+# requests shows only then.)  config, env ({} for none) and must are required, the others optional; an unknown field
+# is refused, so a misspelt check is not skipped.  The arms' configs must be equal but for exe, cwd, log, their env
+# keys and args_add.
 # Before anything is stopped: strata-q3 must be active and loaded (one still loading is waited for; a failed or
 # stopped one is someone else's state and is refused), the GPUs must hold no process but its engine, no measurement or
 # evaluation may run (it would share the CPUs), and no command line may make strata-preflight.sh refuse the restart.
@@ -67,7 +69,18 @@ s = json.load(open(sys.argv[1]))
 what = sys.argv[2:]
 tree = s["tree"]
 if what == ["check"]:
+  try:
     assert os.path.isfile(os.path.join(tree, "engine-cuda12", "strata")), f"no engine in {tree}"
+    lists = ("must", "must_not", "engaged", "never", "args_add")
+    for name, a in s["arms"].items():
+        assert set(a) <= {"config", "env", *lists}, f"{name}: unknown fields {sorted(set(a) - {'config', 'env', *lists})}"
+        assert isinstance(a.get("config"), str) and a["config"], f"{name}: no config"
+        assert isinstance(a.get("env"), dict) and all(isinstance(v, str) for v in a["env"].values()), \
+            f"{name}: env must be an object of strings ({{}} for none)"
+        for k in lists:
+            assert isinstance(a.get(k, []), list) and all(isinstance(x, str) and x for x in a.get(k, [])), \
+                f"{name}: {k} must be a list of strings"
+        assert a.get("must"), f"{name}: must names no start-up line (at least the engine's version)"
     assert os.path.isfile(os.path.join(tree, "serve", "server.py")), f"no server.py in {tree}"
     rest = {}
     for name, a in s["arms"].items():
@@ -84,14 +97,17 @@ if what == ["check"]:
         rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
                                  "env": env, "args": args}, sort_keys=True)
     assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log, the arms' env keys and args_add"
-    print("ok")
+  except AssertionError as e:
+    print(e)
+    sys.exit(1)
+  print("ok")
 elif what[0] == "tree":
     print(tree)
 elif what[0] == "num":
     print(s.get(what[1], {"settle_s": 300, "screen_n": 3}[what[1]]))
-else:                                   # arm NAME FIELD
+else:                                   # arm NAME FIELD (the check made every field what it should be; a missing one is empty)
     a = s["arms"][what[1]]
-    v = a[what[2]] if what[2] != "config" else os.path.join(tree, a["config"])
+    v = os.path.join(tree, a["config"]) if what[2] == "config" else a.get(what[2], {} if what[2] == "env" else [])
     if isinstance(v, dict):
         print("\n".join(f"{k}={x}" for k, x in v.items()))
     elif isinstance(v, list):
@@ -173,7 +189,10 @@ strays() {        # every process the preflight would take for a second engine, 
 wait_idle() {     # up to $1 (default IDLE_WAIT_S) seconds for the service to serve nothing; 1 when it does not get there
   for _ in $(seq 1 $(( (${1:-$IDLE_WAIT_S} + 9) / 10 ))); do
     curl -fsS -m 10 "$URL/metrics" 2>/dev/null | python3 -c 'import json,sys
-l = json.load(sys.stdin)["live"]
+try:
+    l = json.load(sys.stdin)["live"]
+except Exception:                       # no answer (a server still loading does not listen) or not this server
+    sys.exit(1)
 sys.exit(0 if l.get("state") == "idle" and not l.get("running") and not l.get("queued") else 1)' && return 0
     # nothing answers: idle only when neither unit runs (a server that is still loading does not listen yet)
     if ! curl -fsS -m 5 "$URL/health" > /dev/null 2>&1 && ! systemctl is-active -q strata-q3.service &&
@@ -231,7 +250,11 @@ finish() {
   rm -rf "$TMP"
   say "finishing (exit $rc): stopping the test unit, starting strata-q3"
   if systemctl is-active -q "$UNIT"; then
-    wait_idle 60 || say "the test unit is still serving a reply after 60 s; stopping it"
+    if curl -fsS -m 5 "$URL/health" > /dev/null 2>&1; then
+      wait_idle 60 || say "the test unit is still serving a reply after 60 s; stopping it"
+    else
+      say "the test unit does not answer (still loading, or stuck): stopping it"
+    fi
   fi
   sudo -n systemctl stop "$UNIT" 2>/dev/null
   if ! systemctl is-active -q strata-q3.service; then
@@ -299,7 +322,7 @@ for step in "$@"; do
   ticks0=$(awk '{print $22}' "/proc/$pid/stat")
   # another client on the port is served by the test unit: wait until it serves nothing, then count from there
   wait_idle || { say "the test unit has been busy for $IDLE_WAIT_S s (another client's request)"; exit 1; }
-  total0=$(curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json,sys; print(json.load(sys.stdin)["totals"]["requests"])') ||
+  total0=$(curl -fsS -m 10 "$URL/metrics" | python3 -c 'import json,sys; print(json.load(sys.stdin)["totals"]["requests"])' 2>/dev/null) ||
     { say "no /metrics"; exit 1; }
   python3 "$D/bench/engine_screen.py" --url "$URL" "${SCREEN_ARGS[@]}" --warm-up > "$TMP/warm" 2>&1 & child=$!
   wait "$child" || { say "the warm-up read failed: $(tail -1 "$TMP/warm")"; exit 1; }

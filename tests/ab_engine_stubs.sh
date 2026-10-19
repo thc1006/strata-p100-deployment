@@ -72,7 +72,8 @@ case "$1" in
          [ "$2" = strata-q3.service ] || exit 1
          # the preflight: any (sandbox) process with an engine's command line refuses the start
          if pgrep -f "^$SB/[^ ]*engine-cuda12/strata --serve" > /dev/null; then echo "preflight refused" >> "$SB/actions"; exit 1; fi
-         setsid python3 "$SB/prod/serve/server.py" --engine strata --config "$SB/prod/prod.json" --port "$PORT" > /dev/null 2>&1 &
+         # systemd starts a unit with its own environment: the fake load delay is the test unit's only
+         setsid env -u FAKE_LOAD_S python3 "$SB/prod/serve/server.py" --engine strata --config "$SB/prod/prod.json" --port "$PORT" > /dev/null 2>&1 &
          echo $! > "$SB/units/strata-q3.service.pid" ;;
   *) echo "systemctl stub: unexpected: $*" >&2; exit 99 ;;
 esac
@@ -418,6 +419,44 @@ python3 -B "$SB/repo/bench/ab_engine_summary.py" --results "$R" --baseline C0 c0
 [ $rc = 0 ] && grep -qE "^requests counted by /metrics: 45  sent: 45$" "$R/c0-25-after.txt" && grep -q "^screen phases: prefill,decode,four,admit,turns,decode4,eval4,admit28" "$R/c0-25-arm.txt" &&
   [ $src = 0 ] && grep -q "4 users decoding, short prompts" "$SB/sum-ext.out" && pass "a screen with the opt-in phases is counted and summarized" ||
   fail "opt-in phases: exit $rc, summary $src, $(grep 'requests counted' "$R/c0-25-after.txt" 2>/dev/null)"
+up
+
+# 26. the arms file's fields: a missing must or env, or a misspelt field, is refused before anything is stopped; an arm
+# without the optional must_not runs, with no error output (it once printed a KeyError and checked nothing more)
+python3 - "$SB" <<'PYEOF'
+import json, sys
+sb = sys.argv[1]
+a = json.load(open(f"{sb}/arms.json"))
+def variant(name, edit):
+    b = json.loads(json.dumps(a)); edit(b["arms"]["C1"]); json.dump(b, open(f"{sb}/arms-{name}.json", "w"))
+variant("nomust", lambda c: c.pop("must"))
+variant("noenv", lambda c: c.pop("env"))
+variant("typo", lambda c: c.__setitem__("must-not", c.pop("must_not")))
+variant("nomustnot", lambda c: c.pop("must_not"))
+PYEOF
+for v in nomust noenv typo; do
+  before=$(prod_pid)
+  drive "spec-$v" "$SB/arms-$v.json" c1-26:C1; rc=$?
+  [ $rc = 2 ] && grep -q "does not check out: C1: " "$SB/spec-$v.out" && [ "$(prod_pid)" = "$before" ] &&
+    pass "an arms file with $v is refused, strata-q3 untouched" || fail "arms $v: exit $rc, $(tail -2 "$SB/spec-$v.out")"
+done
+drive nomustnot "$SB/arms-nomustnot.json" c1-26:C1; rc=$?
+[ $rc = 0 ] && ! grep -q Traceback "$SB/nomustnot.out" && grep -q "^arm check: ok" "$R/c1-26-arm.txt" &&
+  pass "an arm without must_not runs, with no error output" || fail "no must_not: exit $rc, $(grep -m1 -A2 Traceback "$SB/nomustnot.out")"
+up
+
+# 27. an interrupt while the test unit is still loading (not listening): it is stopped at once, with no error output,
+# and strata-q3 comes back (it once waited 60 s for a reply that could not exist, printing a traceback per poll)
+n0=$(grep -c '^systemd-run strata-ab-engine' "$SB/actions" 2>/dev/null)
+( for _ in $(seq 300); do [ "$(grep -c '^systemd-run strata-ab-engine' "$SB/actions")" -gt "${n0:-0}" ] && break; sleep 0.1; done
+  sleep 2; pkill -TERM -f "^bash $SB/repo/bench/ab_engine[.]sh" ) &      # the test unit started, still loading
+t0=$(date +%s)
+FAKE_LOAD_S=30 drive loading "$SB/arms.json" c0-27:C0; rc=$?
+took=$(( $(date +%s) - t0 )); wait
+[ $rc = 130 ] && grep -q "does not answer (still loading" "$SB/loading.out" && ! grep -q Traceback "$SB/loading.out" &&
+  [ "$took" -lt 45 ] && PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service &&
+  pass "an interrupt during the load stops the test unit at once, with no error output" ||
+  fail "interrupt during the load: exit $rc, ${took} s, $(grep -m1 -E 'Traceback|still serving' "$SB/loading.out")"
 up
 
 echo "$fails failed"

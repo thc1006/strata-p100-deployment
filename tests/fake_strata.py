@@ -14,7 +14,7 @@ use, nothing behind it.  Standard library only; no GPU, no model.
   config's "log", started with the config's "env", as server.py starts the engine.  This server writes the engine's
   start-up lines to that log, as 0.1.45 does: the verify line every start prints ("upload no error, sync no error"),
   and the GROUP_SORT plan line when the env asks for it (the engine plans the MMQ sort at start-up).
-FAKE_FAIL=<n> cuts the n-th reply off (no finish, no usage) to test failure handling; FAKE_NO_GS=1 leaves the
+FAKE_LOAD_S=<s> listens only after s seconds (a model still loading); FAKE_FAIL=<n> cuts the n-th reply off (no finish, no usage) to test failure handling; FAKE_NO_GS=1 leaves the
 GROUP_SORT line out whatever the env says (a switch that did not take); FAKE_EXTRA=1 counts one more reply at the
 first chat request (another client's request inside a measurement); FAKE_BUSY=1 reports a reply in flight forever;
 FAKE_ENV_DROP=<name> starts the engine without that variable of the config's env (a server.py that lost it), while
@@ -162,6 +162,7 @@ def main() -> None:
         def log_message(self, *args):
             pass
 
+    time.sleep(float(os.environ.get("FAKE_LOAD_S", "0")))     # a server still loading does not listen yet
     http.server.ThreadingHTTPServer(("127.0.0.1", a.port), H).serve_forever()
 
 

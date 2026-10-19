@@ -11,7 +11,7 @@ fails=0
 pass() { echo "PASS $*"; }
 fail() { echo "FAIL $*"; fails=$((fails + 1)); }
 killall_sb() { for f in "$SB"/units/*.pid; do [ -e "$f" ] && kill -- -"$(cat "$f")" 2>/dev/null; done; rm -f "$SB"/units/*.pid
-               pkill -f "^$SB/stray/engine-cuda12/strata" 2>/dev/null; }
+               pkill -f "^$SB/stray/engine-cuda12/strata" 2>/dev/null; pkill -f "$SB/bin/nvidia-smi dmon" 2>/dev/null; }
 cleanup() { killall_sb; rm -rf "$SB"; }
 trap cleanup EXIT
 [ -n "${KEEP_SB:-}" ] && trap killall_sb EXIT

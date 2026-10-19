@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Engine experiments (the scheduling work, after decision 0004): each arm is a config of a Strata tree, run in a
+# Engine experiments (the scheduling work, before decision 0004's A/B): each arm is a config of a Strata tree, run in a
 # transient unit with the deployed unit's limits instead of strata-q3, measured with bench/engine_screen.py.
 #   bench/ab_engine.sh ARMS.json TAG:ARM [TAG:ARM ...]        e.g.  ... c0-1:C0 c1-1:C1 c0-2:C0
 # ARMS.json: {"tree": "<Strata tree>", "settle_s": 300, "screen_n": 3,
@@ -345,7 +345,8 @@ for step in "$@"; do
   } | redact > "$R/$tag-arm.txt"
   [ -z "$bad" ] || { say "STOP: $tag is not the arm $arm${bad}"; exit 1; }
   say "measuring $tag"
-  nvidia-smi dmon -s um -d 1 -o T > "$R/$tag-gpu.txt" 2>&1 & dmon=$!
+  # at most two hours: a driver killed outright (SIGKILL) cannot stop it, and the rescue timer does not know it
+  timeout 7200 nvidia-smi dmon -s um -d 1 -o T > "$R/$tag-gpu.txt" 2>&1 & dmon=$!
   python3 "$D/bench/engine_screen.py" --url "$URL" "${SCREEN_ARGS[@]}" --tag "$tag" --json "$R/engine-screen.jsonl" --n "$N" \
     --texts "$R/$tag-texts.jsonl" > "$R/$tag-screen.txt" 2>&1 &
   child=$!; wait "$child"; src=$?; child=""

@@ -158,8 +158,10 @@ character for character. Source: `results/SCREEN-pmtp.md`.
 | 1.2K / 4K / 16K prompt: engine read tok/s | 205.75 / 390.85 / 694.95 | +0.1% / -0.2% / -0.3% |
 | 1 user: engine decode tok/s | 39.60 | -0.3% |
 | 4 users: total tok/s (prompts' reading included) | 30.70 | +4.8% |
-| 4 users decoding, short prompts: summed engine decode tok/s | 121.33 | +7.8% |
-| 4 users, thinking, sampled: summed engine decode tok/s | 105.10 | +17.1% |
+| 4 users decoding, short prompts: each user's engine decode tok/s, summed | 121.33 | +7.8% |
+| ... all four's tokens per wall second | 103.80 | +7.3% |
+| 4 users, thinking, sampled: each user's engine decode tok/s, summed | 105.10 | +17.1% |
+| ... all four's tokens per wall second | 51.13 | +10.3% |
 | 16K joining 3 decoders: the joiner's TTFT s | 22.52 | 0.0% |
 | ... the decoders' longest gap s | 22.70 | +0.1% |
 | ... the four requests' makespan s | 61.99 | -8.9% |
@@ -169,9 +171,11 @@ M1's engine printed its plan at start ("the 4 pipelined slot groups draft up to 
 decode4 and 78% in eval4 (`results/m1-1-engine-lines.txt`).
 
 By the rule fixed before the results, M1 does not go on: its target, the four users' total rate, rose 4.8%, below the
-5% a screen asks. That rate includes the reading of the four 1.5K-token prompts, which M1 leaves as it is. Where four
-users only decode, M1 was 7.8% faster with greedy decoding and 17.1% faster in the evaluation's sampled thinking mode,
-and the admission test's four requests finished 8.9% sooner. No metric was more than 0.3% worse.
+5% a screen asks. That rate includes the reading of the four 1.5K-token prompts, which M1 leaves as it is. With short
+prompts, four users got 7.3% more tokens per wall second with greedy decoding and 10.3% more in the evaluation's
+sampled thinking mode. The server's per-request decode rates, summed, rose 7.8% and 17.1%; that sum counts every
+request alike, whatever the length of its answer. The admission test's four requests finished 8.9% sooner. No
+metric was more than 0.3% worse.
 
 M1 answered 3 of the 44 requests otherwise than M0, each late in the answer: a four-user translation from character
 486 of 769, and two admission essays from characters 6,829 and 6,617 of about 6,800 (`results/m0-1-texts.jsonl`,

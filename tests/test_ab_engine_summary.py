@@ -81,7 +81,8 @@ class Summary(unittest.TestCase):
                       "the 32 requests the baseline's runs answer alike (0 left out)", out)
         self.assertIn("- C0: 32 requests; differ between its own 2 runs: 0", out)
         # the opt-in phases did not run: no rows for them
-        self.assertNotIn("summed engine decode", out)
+        self.assertNotIn("engine decode tok/s, summed", out)
+        self.assertNotIn("tokens per wall second", out)
         self.assertNotIn("28K joining", out)
 
     def test_an_arm_that_changes_the_answers(self):
@@ -105,6 +106,26 @@ class Summary(unittest.TestCase):
         # the request C0 answers two ways is C0's, not C1's (C1 has one run): it is left out of the comparison
         self.assertIn("- C1: 32 requests; differ between its own runs: n/a (one run); differ from the baseline on 0 of "
                       "the 31 requests the baseline's runs answer alike (1 left out)", out)
+
+    def test_the_concurrent_phases_give_both_rates(self):
+        def b(r):
+            for tag, arm, at in RUNS:
+                write(r, tag, arm, at)
+                fast = arm == "C1"           # each user 50% faster, the phase only 10% shorter
+                with open(r / "engine-screen.jsonl", "a") as f:
+                    for phase, summed, tokens, wall in (("decode4", 120.0, 3600, 30.0), ("eval4", 100.0, 6000, 60.0)):
+                        f.write(json.dumps({"tag": tag, "phase": phase, "round": 0, "corpus_sha": "c0rpus",
+                                            "sum_engine_decode_tok_s": summed * (1.5 if fast else 1.0),
+                                            "tokens": tokens, "wall_s": wall / (1.1 if fast else 1.0),
+                                            "requests": [{"text_sha": f"{phase}{j}"} for j in range(4)]}) + "\n")
+        status, out = run(b)
+        self.assertEqual(status, 0, out)
+        self.assertIn("| 4 users decoding, short prompts: each user's engine decode tok/s, summed (higher is better) | "
+                      "120.00 (120.00, 120.00); spread +0.0% | 180.00 (180.00): +50.0% (+50.0%) |", out)
+        self.assertIn("| ... all four's tokens per wall second (higher is better) | 120.00 (120.00, 120.00); spread +0.0% | "
+                      "132.00 (132.00): +10.0% (+10.0%) |", out)
+        self.assertIn("| ... all four's tokens per wall second (higher is better) | 100.00 (100.00, 100.00); spread +0.0% | "
+                      "110.00 (110.00): +10.0% (+10.0%) |", out)
 
     def test_a_change_within_the_baselines_spread_is_marked(self):
         def b(r):

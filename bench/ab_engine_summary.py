@@ -46,14 +46,27 @@ METRICS = [
     ("join_ttft", "16K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if admit_ok(r) else None),
     ("join_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if admit_ok(r) else None),
     ("join_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if admit_ok(r) else None),
-    ("decode4", "4 users decoding, short prompts: summed engine decode tok/s", True,
+    # the server's per-request decode rates (timings.predicted_per_second: the engine's clock over all of a request's
+    # legs), summed, count every request alike whatever its length; the wall rate is all four's tokens over the
+    # phase's time, prompts included.  Answers that differ between arms are different work
+    ("decode4", "4 users decoding, short prompts: each user's engine decode tok/s, summed", True,
      lambda r: r.get("sum_engine_decode_tok_s") if r["phase"] == "decode4" else None),
-    ("eval4", "4 users, thinking, sampled: summed engine decode tok/s", True,
+    ("decode4_wall", "... all four's tokens per wall second", True, lambda r: wall_rate(r, "decode4")),
+    ("eval4", "4 users, thinking, sampled: each user's engine decode tok/s, summed", True,
      lambda r: r.get("sum_engine_decode_tok_s") if r["phase"] == "eval4" else None),
+    ("eval4_wall", "... all four's tokens per wall second", True, lambda r: wall_rate(r, "eval4")),
     ("join28_ttft", "28K joining 3 decoders: TTFT s", False, lambda r: r.get("joiner_ttft_s") if admit_ok(r, "admit28") else None),
     ("join28_gap", "... the decoders' longest gap s", False, lambda r: r.get("longest_gap_s") if admit_ok(r, "admit28") else None),
     ("join28_makespan", "... the four requests' makespan s", False, lambda r: r.get("makespan_s") if admit_ok(r, "admit28") else None),
 ]
+
+
+def wall_rate(r: dict, phase: str):
+    """A concurrent phase's tokens over its wall time (None for other phases or a record without both)."""
+    t, w = r.get("tokens"), r.get("wall_s")
+    if r["phase"] != phase or isinstance(t, bool) or not isinstance(t, int) or not isinstance(w, (int, float)) or w <= 0:
+        return None
+    return t / w
 
 
 def admit_ok(r: dict, phase: str = "admit") -> bool:

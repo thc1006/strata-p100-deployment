@@ -77,7 +77,8 @@ redact() { sed "${redact_args[@]}"; }
 main=$(systemctl show -p MainPID --value $UNIT)
 [[ "$main" =~ ^[1-9][0-9]*$ ]] || refuse "$UNIT has no main process"
 [ "$(systemctl show -p ActiveState --value $UNIT)" = active ] || refuse "$UNIT is not active"
-engine() { pgrep -P "$1" -f "^$STRATA/engine-cuda12/strata --serve" | head -1; }
+# written [e]ngine: the command line of this pgrep does not hold the text strata-preflight.sh's pgrep looks for
+engine() { pgrep -P "$1" -f "^$STRATA/[e]ngine-cuda12/strata --serve" | head -1; }
 pid=$(engine "$main")
 [ -n "$pid" ] && [ "$(readlink -f "/proc/$pid/exe")" = "$STRATA/engine-cuda12/strata" ] ||
   refuse "no engine under $UNIT's main process $main"

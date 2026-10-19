@@ -291,5 +291,10 @@ grep -q "^concurrent read lines during the run: 0, with slots decoding: 0$" "$R/
   pass "an engine that keeps the concurrent read off: no reads, and its reason" ||
   fail "concurrent read off: $(grep concurrent "$R/t-conc-off-after.txt" 2>/dev/null || cat "$SB/t-conc-off.out")"
 
+# 11. no command the wrapper runs holds the text strata-preflight.sh's pgrep looks for (its own pgrep writes [e]ngine)
+if grep -v '^[[:space:]]*#' "$W/bench/ab_model_run.sh" | grep 'engine-cuda12/strata[ ]--serve' | grep -qv '\[e\]ngine'; then
+  fail "a command line of bench/ab_model_run.sh holds the preflight's text"
+else pass "no command line of the wrapper holds the preflight's text"; fi
+
 echo "$fails failed"
 exit $((fails > 0))

@@ -84,6 +84,7 @@ EXPECTED = [
     'the perf set did not run',
     'an engine started again during the run is not the same',
     'an engine that keeps the concurrent read off: no reads, and its reason',
+    "no command line of the wrapper holds the preflight's text",
 ]
 
 

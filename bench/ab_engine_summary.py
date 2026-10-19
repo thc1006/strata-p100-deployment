@@ -21,7 +21,7 @@ no larger than that spread is marked "within the baseline's spread".
 Answers: every request's answer sha256 across the runs: within an arm (does the engine repeat itself; "n/a" for an
 arm with one run), and against the baseline, counted only on requests that every baseline run answered alike (the
 others, which the baseline answers in more than one way or not in every run, are left out, and the report says how
-many).
+many), with the phases the differences are in.
 Exit status: 0 the runs are usable, 2 a run is not (the report says which).  The screen decides nothing on its own:
 a candidate goes on to the ABBA confirmation, whose criteria are fixed before it runs.
 """
@@ -246,9 +246,14 @@ def evaluate(tags: list, baseline: str, results: Path, arms: dict | None = None)
         else:
             line = f"- {a}: {len(by_label)} requests; differ between its own runs: n/a (one run)"
         if a != baseline and base_runs:
-            vs = sum(1 for lb, ref in agreed.items() if any(t in by_label[lb] and by_label[lb][t] != ref for t in runs))
-            line += (f"; differ from the baseline on {vs} of the {len(agreed)} requests the baseline's runs answer"
+            diff = [lb for lb, ref in agreed.items() if any(t in by_label[lb] and by_label[lb][t] != ref for t in runs)]
+            line += (f"; differ from the baseline on {len(diff)} of the {len(agreed)} requests the baseline's runs answer"
                      f" alike ({len(by_label) - len(agreed)} left out)")
+            per: dict = {}                # a label starts with its phase: which phases the differences are in
+            for lb in diff:
+                per[lb.split()[0]] = per.get(lb.split()[0], 0) + 1
+            if per:
+                line += "; by phase: " + ", ".join(f"{p} {n}" for p, n in per.items())
         o.append(line)
     if status:
         o += ["", "Not every run is usable: the numbers above use only the usable ones."]

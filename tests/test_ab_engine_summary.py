@@ -86,6 +86,12 @@ class Summary(unittest.TestCase):
         self.assertEqual(status, 0, out)
         self.assertIn("differ from the baseline on 9 of the 32 requests", out)
 
+    def test_the_differences_are_given_by_phase(self):
+        status, out = run(lambda r: three(r, sha_salt="x", salt_one=9))     # every prefill answer and decode #0
+        self.assertEqual(status, 0, out)
+        self.assertIn("differ from the baseline on 10 of the 32 requests the baseline's runs answer alike (0 left out); "
+                      "by phase: prefill 9, decode 1", out)
+
     def test_a_request_the_baseline_answers_two_ways_is_counted_apart(self):
         def b(r):
             for tag, arm, at in RUNS:

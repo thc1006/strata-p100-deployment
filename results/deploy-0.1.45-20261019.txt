@@ -1,0 +1,154 @@
+Deployment of Strata 0.1.45 with STRATA_MMQ_GROUP_SORT=1 and STRATA_PIPED_CONCURRENT=1 (decision 0005), 2026-10-19
+live checkout ~/dev/p100-q3-deployment: 7d542b3 Deploy Strata 0.1.45 with its grouped prompt sort and concurrent prompt reads
+tree ~/dev/strata: 477ac13cbe8e582c20484871ce459d20d82df09d (worktree of ~/dev/strata-git); 0.1.43.1 kept at ~/dev/strata-0.1.43.1
+engine sha256 00869ac7b733d821, libstrata_kq.so 937244cf786147b6
+
+--- the window (times from this session's commands)
+20:52  origin/main 9bd75d5..7d542b3 pushed; CI test.yml run 39255463609 success (20:53:55)
+20:55:55  strata-q3-health.timer stopped
+20:56  live checkout: git pull --ff-only origin main -> 7d542b3; scripts/test.sh: 127 tests OK (1 skipped), all checks passed
+21:03  scripts/install-system-files.sh: strata-q3.service and zfs-arc-max.service installed, daemon-reload; zfs-arc-max.service restarted: zfs_arc_max 2147483648
+21:03:26  strata-q3 stopped (live: idle, 0 running, 0 queued); GPUs 0 MiB each, no engine
+21:03:34  ~/dev/strata -> ~/dev/strata-0.1.43.1; 'git -C ~/dev/strata-git worktree move strata-0.1.45-prod strata' moved the new worktree to ~/dev/strata-git/strata (the relative target is read from -C's directory), and the copies of .venv and the config into ~/dev/strata failed
+21:03:49  'git -C ~/dev/strata-git worktree move ~/dev/strata-git/strata ~/dev/strata' (absolute paths): the worktree is at ~/dev/strata
+21:04:11  .venv and strata-iq3_xxs.json copied from ~/dev/strata-0.1.43.1; HEAD 477ac13cb, tracked files clean; server.py imports with the venv
+21:04  tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json --profile deployed: --conversation-cache-min-free-mib 8192 -> 6144, STRATA_RESIDENT_HEADROOM_GIB 8 -> 6, STRATA_MMQ_GROUP_SORT 1, STRATA_MMQ_RESIDENT_SORT_NE 0, STRATA_PIPED_CONCURRENT 1; the result equals config/strata-iq3_xxs.deployed.json byte for byte; the preflight's dry run: no change, no critical change
+21:04  scripts/check-drift.sh: no drift
+21:04:43  strata-preflight: ok: 4 GPUs, 58 GiB usable, config matches (--profile deployed) in everything that decides memory and placement
+21:12:18  strata-wait-ready: loaded after 455 s; strata-q3 active; strata-q3-health.timer started
+
+--- the engine's start-up lines (selected)
+[strata] 2026-10-19 21:04:44 engine started: ~/dev/strata/engine-cuda12/strata --serve --pack ~/dev/Strata-data/packs/iq3_xxs --native ~/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --ple-gguf ~/dev/
+strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,26,38)
+strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+strata generate: PLE table locked in RAM (--ple-io ram) in 7.0 s
+strata generate: layer split: CUDA1 loads the dense weights of layers 13-25 only
+strata generate: layer split: CUDA1 PCIe probe 11.3 GB/s (best of 10.9 11.1 11.1 11.3) -> pcie_frac 0.31
+strata generate: layer split: CUDA1 holds its weights; 14.64 GiB free (its session follows the split search)
+strata generate: layer split: CUDA2 loads the dense weights of layers 26-37 only
+strata generate: layer split: CUDA2 PCIe probe 11.4 GB/s (best of 11.2 11.4 11.4 11.4) -> pcie_frac 0.31
+strata generate: layer split: CUDA2 holds its weights; 14.67 GiB free (its session follows the split search)
+strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+strata generate: layer split: CUDA3 PCIe probe 11.4 GB/s (best of 11.1 11.2 11.0 11.4) -> pcie_frac 0.31
+strata generate: layer split: CUDA3 holds its weights; 14.81 GiB free (its session follows the split search)
+strata generate: layer split: CUDA1 holds its weights, session [13, 26); 14.49 GiB free
+strata generate: layer split: CUDA2 holds its weights, session [26, 38); 14.52 GiB free
+strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.26 GiB free
+strata generate: --batch-groups auto: 4 groups of 1 slot
+strata generate: --batch 4: the slot sessions take 0.62 GiB of VRAM on CUDA0 that the expert cache would otherwise hold
+strata generate: expert cache auto: 13.80 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 5671 slots
+strata: prompt MMQ sorts the full expert groups (STRATA_MMQ_GROUP_SORT=1): 48 of 48 layers
+strata generate: expert cache 6656 slots, 9.41 GiB of VRAM; policy is
+strata generate: layer split, CUDA1: 13.86 GiB free of 15.89, room for experts 12.27 GiB
+strata generate: layer split: CUDA1 runs layers 13-25, expert cache 6656 slots (9.88 GiB), 6656 of its 6656 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA2: 13.90 GiB free of 15.89, room for experts 12.31 GiB
+strata generate: layer split: CUDA2 runs layers 26-37, expert cache 6144 slots (11.43 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA3: 12.85 GiB free of 15.89, room for experts 11.25 GiB
+strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (9.25 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+strata generate: layer split: CUDA0 runs layers 0-12
+strata generate: session is up (engine 0.1.45)
+strata serve: layer split: 100% of the experts resident, the prompt path's streamed ring 96 slots
+strata serve: lend sizing: the prompt path borrows 604 slots (ring 96 slots at chunk 2048), 604 of them keep their experts in RAM too
+strata serve: layer split: layers 0-12 (CUDA0), 13-25 (CUDA1), 26-37 (CUDA2), 38-47 (CUDA3), one hand-off per window
+strata serve: adaptive overlap: off: not on a layer split
+strata batch (pipelined, 4 groups of 1): 41 group-steps, 41 rows in 2409 ms = 17.0 rows/s (admissions included)
+strata batch (pipelined, 4 groups of 1): 2 group-steps, 2 rows in 80 ms = 24.9 rows/s (admissions included)
+
+--- a request alone, then a 852-token prompt read 3 s after another request began decoding (temperature 0)
+smoke: 0.7 s, finish stop, 2 tokens, 'ready'; decoder: 5.7 s, stop, 131 tokens; joiner: 5.0 s, stop, 15 tokens
+strata batch: read 852 tokens on a thread of its own in 3793 ms (concurrent, to 852 of 859); the slots decoded 40 rows meanwhile (10.5 rows/s; stage 1: 40 windows, 0.0 ms host each; stage 2: 40 windows, 0.0 ms host each; stage 3: 40 windows, 0.0 ms host each; stage 4: 40 windows, 0.0 ms host each)
+
+--- scripts/check-deployment.sh
+
+== service ==
+strata-q3.service          active / enabled
+strata-q3-health.timer     active / enabled
+zfs-arc-max.service        active / enabled
+
+== API ==
+{"status":"ok","loaded":true,"model":"qwen3.8-flash-next-iq3_xxs","max_context":32768}
+qwen3.8-flash-next-iq3_xxs
+{"engine":"0.1.45","concurrency":{"serving":4,"requested":4},"context":32768,"activity":{"requests":3,"in_flight":0,"last_request_at":1792415566}}
+
+== engine log (last start) ==
+[strata] 2026-10-19 21:04:44 engine started: ~/dev/strata/engine-cuda12/strata --serve --pack ~/dev/Strata-data/packs/iq3_xxs --native ~/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gg
+strata generate: layer split across 4 GPUs: CUDA0, then CUDA1,2,3 (split 13,26,38)
+strata generate: layer split: CUDA0 loads the dense weights of layers 0-12 only
+strata generate: PLE table locked in RAM (--ple-io ram) in 7.0 s
+strata generate: layer split: CUDA1 loads the dense weights of layers 13-25 only
+strata generate: layer split: CUDA1 PCIe probe 11.3 GB/s (best of 10.9 11.1 11.1 11.3) -> pcie_frac 0.31
+strata generate: layer split: CUDA1 holds its weights; 14.64 GiB free (its session follows the split search)
+strata generate: layer split: CUDA2 loads the dense weights of layers 26-37 only
+strata generate: layer split: CUDA2 PCIe probe 11.4 GB/s (best of 11.2 11.4 11.4 11.4) -> pcie_frac 0.31
+strata generate: layer split: CUDA2 holds its weights; 14.67 GiB free (its session follows the split search)
+strata generate: layer split: CUDA3 loads the dense weights of layers 38-47 only
+strata generate: layer split: CUDA3 PCIe probe 11.4 GB/s (best of 11.1 11.2 11.0 11.4) -> pcie_frac 0.31
+strata generate: layer split: CUDA3 holds its weights; 14.81 GiB free (its session follows the split search)
+strata generate: layer split: CUDA1 holds its weights, session [13, 26); 14.49 GiB free
+strata generate: layer split: CUDA2 holds its weights, session [26, 38); 14.52 GiB free
+strata generate: layer split: CUDA3 holds its weights, session [38, 48) and the head; 14.26 GiB free
+strata generate: --batch-groups auto: 4 groups of 1 slot
+strata generate: --batch: 4 slot sessions on CUDA0 (0.16 GiB each); 13.80 GiB free
+strata generate: --batch: 4 slot sessions on CUDA1 (0.16 GiB each); 13.86 GiB free
+strata generate: --batch: 4 slot sessions on CUDA2 (0.15 GiB each); 13.90 GiB free
+strata generate: --batch: 4 slot sessions on CUDA3 (0.15 GiB each); 13.67 GiB free
+strata generate: --batch 4: the slot sessions take 0.62 GiB of VRAM on CUDA0 that the expert cache would otherwise hold
+strata generate: 6 pool workers on logical processors 1,2,3,4,5,6, the host thread on 0 (draining too) (--host-core first)
+strata aux cpus: threads that are neither pool workers nor the host go to CPUs 7 (off at start; a request's aux_cpus=1 turns it on)
+strata generate: expert cache auto: 13.80 GiB free, 1536 MiB reserved (+0 MiB for the draft head) -> 5671 slots
+strata generate: expert cache 6656 slots, 9.41 GiB of VRAM; policy is
+strata generate: layer split, CUDA1: 13.86 GiB free of 15.89, room for experts 12.27 GiB
+strata generate: layer split: CUDA1 runs layers 13-25, expert cache 6656 slots (9.88 GiB), 6656 of its 6656 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA2: 13.90 GiB free of 15.89, room for experts 12.31 GiB
+strata generate: layer split: CUDA2 runs layers 26-37, expert cache 6144 slots (11.43 GiB), 6144 of its 6144 profiled pairs; slot 0 verified
+strata generate: layer split, CUDA3: 12.85 GiB free of 15.89, room for experts 11.25 GiB
+strata generate: layer split: CUDA3 runs layers 38-47, expert cache 5120 slots (9.25 GiB), 5120 of its 5120 profiled pairs; slot 0 verified
+strata generate: layer split: CUDA0 runs layers 0-12
+strata generate: R4 hit path ON - resident experts are computed on the GPU
+strata generate: 6 expert-pool workers + the host thread
+strata generate: token graph hit path: 24576 resident experts, decided on the device
+FileExpertSource: mapped pinned cache complement ready: resident 1.12 GiB, pinned 1.12 GiB in 6 s; 1.12 GiB page-locked after taking the pages in steps; 
+strata generate: resident RAM mode: 1.12 GiB of experts in RAM (page-locked), 6656 in the GPU cache; adaptive swaps exchange them with the GPU cache (no file reads)
+strata verify: window up to 6 tokens, 69.4 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: window up to 6 tokens, 69.4 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: window up to 6 tokens, 69.4 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: window up to 6 tokens, 69.4 MiB of device buffers (100% VRAM resident: zero-doorbell graph)
+strata verify: layers [26, 38) are 100% VRAM resident again: the zero-doorbell graph
+-- requests since this start, errors/warnings in their lines:
+   prompt lines: 5
+   error or warning lines: 0
+
+== GPU ==
+0, 13472 MiB, 16384 MiB, 0 %, 40, 1189 MHz, 34.06 W
+1, 13788 MiB, 16384 MiB, 0 %, 38, 1189 MHz, 33.06 W
+2, 14206 MiB, 16384 MiB, 0 %, 38, 1189 MHz, 34.27 W
+3, 14360 MiB, 16384 MiB, 0 %, 38, 1189 MHz, 32.62 W
+
+== RAM / ARC / swap ==
+MemTotal:       65846904 kB
+MemAvailable:   28058848 kB
+Mlocked:        28125136 kB
+SwapTotal:       2097148 kB
+SwapFree:         987240 kB
+ARC max:  2.00 GiB
+ARC size: 2.01 GiB
+VmLck:	28125136 kB
+VmPin:	       0 kB
+VmRSS:	32493288 kB
+engine memlock limit: unlimited unlimited
+
+== health checks and service events (last 2 h; needs sudo for the system journal) ==
+ 十  19 20:48:28 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  19 20:50:38 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  19 20:50:38 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  19 20:52:48 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  19 20:52:48 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  19 20:54:58 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  19 20:54:58 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+ 十  19 21:04:43 <host> strata-preflight.sh[3404888]: strata-preflight: ok: 4 GPUs, 58 GiB usable, config matches (--profile deployed) in everything that decides memory and placement
+ 十  19 21:12:18 <host> strata-wait-ready.sh[3404931]: strata-wait-ready: loaded after 455 s
+ 十  19 21:12:18 <host> systemd[1]: Started Strata Qwen3.8-Flash-Next GSQ-RCO (the model in config/profile.conf) on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080).
+ 十  19 21:12:22 <host> systemd[1]: Starting Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh)...
+ 十  19 21:12:22 <host> systemd[1]: Finished Strata health check (server.py reload, try-restart, or retry after a failed state; see scripts/strata-health.sh).
+
+no problems found

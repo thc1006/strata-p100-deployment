@@ -6,7 +6,7 @@
   - Steps 3 and 4 (the config for the new tree, `ab_versions.sh` and `ab_summary.py`): used on 2026-10-16 to evaluate 0.1.44.1 (the files were in `deploy/` at the time).
   - `bench/build-engine.sh`: run on 2026-10-18 against the 0.1.45 tree, which was already built; no files needed recompiling.
   - The 0.1.45 A/B on 2026-10-17 compared the hint on and off, the patch, `--ple-io mmap`, and the per-layer embedding (PLE) file on ext4. It had no 0.1.43.1 arm.
-  - *No actual switch to a new release has been done yet*. Step 6 is a list based on what is known now.
+  - Step 6: done on 2026-10-19 to switch from 0.1.43.1 to 0.1.45, with the commands below (`results/deploy-0.1.45-20261019.txt`).
 
 ## Steps
 
@@ -36,16 +36,42 @@
      The title in `ab_summary.py` is hard-coded on line 72. Change it to the new version number first.
    - When the script ends (also when it fails), it starts the production service again. After the test, run `sudo systemctl start strata-q3-health.timer`, and check that `strata-q3` is active.
 5. Decide: add a decision record in `docs/decisions/` (whether to upgrade, and the reasons), and add an entry to `CHANGELOG.md`.
-6. Switch over (not yet done in practice):
-   - `serve/server.py` must be replaced together with the engine, so switch the whole tree as one unit. Do not replace only the engine.
-   - The recommended way is to put the new tree at `~/dev/strata` (rename the old tree and keep it). If you do not, you must change every place that hard-codes `~/dev/strata` (on 2026-10-18 this command found 16 files, in `systemd/`, `scripts/`, `tests/` and `bench/`):
-     ```bash
-     grep -rnE 'dev/strata([/"[:space:]}]|$)|"dev" / "strata"' scripts systemd tests tools bench
-     ```
+6. Switch over (done on 2026-10-19 for 0.1.45):
+   - `serve/server.py` must be replaced together with the engine, so switch the whole tree as one unit. Do not replace only the engine. Put the new tree at `~/dev/strata` and keep the old one: every place in `scripts/`, `systemd/`, `tests/`, `tools/` and `bench/` that names `~/dev/strata` then stays right (`grep -rnE 'dev/strata([/"[:space:]}]|$)|"dev" / "strata"' scripts systemd tests tools bench`).
    - `tools/configure_strata_q3.py` names the release its assumptions about `setup.py`, `serve/server.py` and the engine's options were checked against (the Audited source in the docstring, and `SOURCE_COMMIT`: `477ac13cb`, 0.1.45, since 2026-10-19). Check them against the new release first, then change these two places, and run `scripts/test.sh`.
-   - Regenerate the config with `tools/configure_strata_q3.py`, update the two snapshots in `config/` and `config/deployed-artifacts.sha256`, run `scripts/install-system-files.sh`, and then run `sudo systemctl restart strata-q3`.
-   - Run `scripts/check-drift.sh` and `scripts/check-deployment.sh`.
+   - In a commit: the tool's changes, `config/strata-iq3_xxs.deployed.json` (the tool's output from `config/strata-iq3_xxs.setup.json`), and in `config/deployed-artifacts.sha256` the engine, every file next to it, and the config. Its preflight refuses the old config, so deploy it by hand ([deploy.md](deploy.md)), in the same window as the switch.
+   - Before the window, a clean worktree of the release, with the engine directory of the tree that was measured (the same binary):
+     ```bash
+     git -C ~/dev/strata-git worktree add --detach ~/dev/strata-<version>-prod <commit>
+     cp -a ~/dev/strata-<version>/engine-cuda12 ~/dev/strata-<version>-prod/
+     cp -a ~/dev/strata-<version>/third_party/llama.cpp ~/dev/strata-<version>-prod/third_party/   # for bench/build-engine.sh
+     ```
+   - The window. `git worktree move` reads a relative target from the directory `-C` names, so give absolute paths:
+     ```bash
+     sudo systemctl stop strata-q3-health.timer
+     git -C ~/dev/p100-q3-deployment pull --ff-only origin main && ~/dev/p100-q3-deployment/scripts/test.sh
+     ~/dev/p100-q3-deployment/scripts/install-system-files.sh       # when systemd/ changed; then restart a changed oneshot
+     sudo systemctl stop strata-q3                                   # when /metrics says idle
+     mv ~/dev/strata ~/dev/strata-<old version>
+     git -C ~/dev/strata-git worktree move ~/dev/strata-<version>-prod ~/dev/strata
+     cp -a ~/dev/strata-<old version>/.venv ~/dev/strata/.venv       # the same path as before
+     cp -p ~/dev/strata-<old version>/strata-iq3_xxs.json ~/dev/strata/
+     cd ~/dev/p100-q3-deployment && python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json --profile deployed
+     cmp ~/dev/strata/strata-iq3_xxs.json config/strata-iq3_xxs.deployed.json && scripts/check-drift.sh
+     sudo systemctl start strata-q3 && sudo systemctl start strata-q3-health.timer
+     scripts/check-deployment.sh
+     ```
+     Expected: `no drift` before the start, `no problems found` after it. The engine's start-up lines show the new version.
 
 ## Rollback
 
-Keep the old tree; do not delete it. Rename the old tree back to `~/dev/strata` (or point the paths back to the old tree), restore `config/`, `systemd/` and `tools/` with git and install them again, and then run `sudo systemctl restart strata-q3`.
+Keep the old tree; do not delete it. The deployed commit's preflight refuses the old tree's config, so the commit goes
+back with the tree:
+
+1. `sudo systemctl stop strata-q3-health.timer strata-q3`
+2. `git -C ~/dev/strata-git worktree move ~/dev/strata ~/dev/strata-<version>-prod` and `mv ~/dev/strata-<old version> ~/dev/strata`
+3. Revert the deployment commit on GitHub (`git revert <commit>` in a clone, then push), wait for its `test` run, and run
+   `git -C ~/dev/p100-q3-deployment pull --ff-only origin main` and `scripts/install-system-files.sh` (the old units).
+   To start sooner, check out the previous commit here first (`git -C ~/dev/p100-q3-deployment switch --detach <previous commit>`),
+   and switch back to `main` once the revert is pulled; `scripts/deploy.sh` refuses a checkout off `main`.
+4. `sudo systemctl start strata-q3 strata-q3-health.timer`, then `scripts/check-drift.sh` and `scripts/check-deployment.sh`.

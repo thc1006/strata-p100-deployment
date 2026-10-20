@@ -299,23 +299,24 @@ Amended at 12:10 the same day, before any of these runs, after a review of the p
   by more than 5% beyond the spread and by more than 0.25 s; the K1 runs' gaps are about half a second.
 - **The phases** are set for every step: `ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns`.
 
-Amended at 17:25 the same day: the first run of this screen, 16:24-17:19, is not used. During its first two steps,
-other work ran on the machine (8 vCPUs):
-- during s-k0-1's measurement (16:39-16:51): `scripts/test.sh` from 16:43:59 to 16:45:18, over both decode4 rounds and
-  the start of eval4, and a `scripts/check-drift.sh` run, hashes of the CUDA libraries, and scans and removals in /tmp;
-- during s-k1-1's (17:05-17:17): two unit test runs of about 8 s each, over decode4's second round and eval4's first,
-  and a few shorter commands.
-
-s-k0-1's first decode4 round served 102.0 tokens per second in total, s-k1-1's 108.5 (`results/s-k0-1-screen.txt`,
-`results/s-k1-1-screen.txt`). The maintainer stopped the screen during s-p4-1's load and chose to run all eight steps
-again, in the same order, under the tags s2-k0-1, s2-k1-1, s2-p4-1, s2-p6-1, s2-r-1, s2-c2-1, s2-k1-2 and s2-k0-2.
-While they run, nothing else runs on the machine but the remote evaluation's driver, on CPU 7 as before. The criteria
-do not change.
 - **R's arm check** must also show CUDA2's cache above 6300 slots ("CUDA2 runs layers 25-37, expert cache 63xx
   slots"), the reserve's effect where it matters.
 - The driver is changed before these runs: it refuses an `args_set` whose other arms hold the flag with different
   values and an `args_add` that repeats a flag the config holds, and it stops before a step when the arms file or a
   config changed since the check at the start.
+
+Amended at 17:25 the same day: the first run of this screen, 16:24-17:19, is not used. During its first two steps,
+other work ran on the machine (8 vCPUs):
+- during s-k0-1's measurement (16:39-16:51): `scripts/test.sh` from 16:43:59 to 16:45:18, over both decode4 rounds and
+  the start of eval4, and a `scripts/check-drift.sh` run, hashes of the CUDA libraries, and scans and removals in /tmp;
+- during s-k1-1's (17:05-17:17): two unit test runs of about 8 s each, over decode4's second round and eval4, and a
+  few shorter commands.
+
+In s-k0-1's first decode4 round, the four users' engine decode rates summed to 102.0 tokens per second, in s-k1-1's
+to 108.5 (`results/s-k0-1-screen.txt`, `results/s-k1-1-screen.txt`). The maintainer stopped the screen during s-p4-1's load and chose to run all eight steps
+again, in the same order, under the tags s2-k0-1, s2-k1-1, s2-p4-1, s2-p6-1, s2-r-1, s2-c2-1, s2-k1-2 and s2-k0-2.
+While they run, nothing else runs on the machine but the remote evaluation's driver, on CPU 7 as before. The criteria
+do not change.
 
 ### IQ3_S screen: K0, K1, P4, P6, R, C2, K1, K0, 17:28-20:57
 
@@ -339,22 +340,31 @@ Against K1, with the spread between the two K1 runs:
   spread, and no other metric moves against them by more than 5% beyond its spread (eval4 is reported only). P4 gives the
   requests that run alone the answers of both K1 runs on all 12 that the two K1 runs answer alike (the prefill and
   decode phases). The turns phase cannot test this: both K1 runs, and both K0 runs, answered all four of its requests
-  differently from each other.
+  differently from each other. On IQ3_XXS it repeated itself: two runs of the same arm gave all four the same answers
+  (runs k0-3 and k0-4, k1-3 and k1-4, m0-1 and m0-2 of 2026-10-19).
 - **R does not go on**: +3.1% and +2.3% on its target metrics.
 - **C2** reads 1.2K and 4K prompts 10.7% and 8.7% faster, and four users get 13.7% more tokens per second; no other
-  metric moves against it by more than 5% beyond its spread. It answers 9 of the 21 requests that the two K1 runs
-  answer alike differently (prefill 2, decode 3, four 4).
+  metric moves against it by more than 5% beyond its spread.
+- **Answers**, counted on the 21 requests that the two K1 runs answer alike: P4 answers 3 of them otherwise than K1
+  (all in the four phase), P6 5 (four 4, decode 1), R 7 (four 4, decode 3), C2 9 (prefill 2, decode 3, four 4) and K0
+  4 (four 4).
 - **K1 against K0**, by the criteria of 2026-10-19 08:27: `STRATA_PIPED_CONCURRENT=1` passes: while a 16K prompt joins
   three decoders, their longest gap is 0.72 and 0.83 s in the K1 runs against 23.27 and 23.20 s in the K0 runs, and the
   four requests' makespan is 1.9% shorter (28K: 0.74 against 36.57 s); the joining prompt's first token comes 8.4%
   later (28K: 8.2%). `STRATA_MMQ_GROUP_SORT=1` fails: on IQ3_S, K1 reads prompts at K0's rate (-0.4%, +0.1% and +0.3%
-  at 1.2K, 4K and 16K), where on IQ3_XXS the switch read them 9-17% faster.
+  at 1.2K, 4K and 16K), where on IQ3_XXS the two switches together read them 9-17% faster (`results/SCREEN-combo.md`).
+  Four users get 2.1% more tokens per second with K1, and K1 answers 7 of the 24 requests that both K0 runs answer
+  alike otherwise than K0, all in the four phase (`results/SCREEN-iq3s-k1-vs-k0.md`). As the criteria of 08:27 judge
+  K1 as a whole, K1 fails them, and the plan leaves the decision to the maintainer.
 
 The maintainer decided after these results: P4 and P6 are confirmed together as the plan says (P6's switches against K1, A B B A,
 with the 10% threshold, since P6 is not exact); C2 is adopted and confirmed; `STRATA_MMQ_GROUP_SORT=1` stays deployed
 (no cost was measured; removing it would take a restart). The confirmations run after the review fixes are verified.
 
-Fixed before these confirmations run: when a candidate went on on more than one metric, each of those metrics must be
-better in each B run than in each A run, and the mean of its B runs must beat the mean of its A runs by the threshold.
-For P6's switches these are one user's decode and four users' total rate (10%); for C2, the read rates of 1.2K and 4K
-prompts (10%). The other criteria of the plan stand.
+Written after the screen's results, before the confirmations run (first in commit f5f147b, then made stricter after a
+review, the same evening): the plan does not say how a candidate that went on on more than one metric is judged, and
+of the readings, the strictest for the candidate is taken. Each metric on which it went on must be better in each B run
+than in each A run, and on each of them the mean of the B runs must beat the mean of the A runs by the threshold. For
+P6's switches these are one user's decode and four users' total rate, with 10%. For C2 they are the read rates of 1.2K
+and 4K prompts, with 10%; and, as this file put it for the same switch on 2026-10-19 (screen 2), its mean gain over
+the three prompt sizes must reach 10% too. The other criteria of the plan stand.

@@ -72,6 +72,14 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
   loaded, which showed a second defect: the restore waited 60 s for a reply that could not exist, printing a traceback
   at each poll. Both are fixed and tested (`tests/ab_engine_stubs.sh`, cases 26 and 27), and the confirmation runs
   again as k0-3, k1-3, k1-4, k0-4, with the same arms, screen and criteria.
+- 2026-10-20 10:45: the driver read each step's journal lines, the test unit's and the kernel's, with
+  `journalctl --after-cursor` and a filter, from a cursor at the journal's last entry. With a filter, systemd 249's
+  journalctl skips the first matching line after such a cursor (`results/journalctl-after-cursor-20261020.txt`), so a
+  step lost the first of those lines whenever the entry its cursor pointed at was not one of them. Which lines were
+  lost cannot be read again without sudo: the system journal holds them. The driver is fixed and tested
+  (`tests/ab_engine_stubs.sh`, cases 28 and 29). By the maintainer's rule the results below are not used for a new
+  decision, and the two deployed switches (K1) are confirmed again with the fixed driver, on the model that decision
+  0004 keeps; that plan is written here before its runs.
 
 ## Results
 

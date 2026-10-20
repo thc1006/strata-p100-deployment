@@ -102,13 +102,25 @@ echo "systemd-run $unit $*" >> "$SB/actions"
 setsid env "${envs[@]}" "$@" > /dev/null 2>&1 &
 echo $! > "$SB/units/$unit.pid"
 EOF
+# logger writes the driver's mark; journalctl -t finds it (not with STUB_NO_MARK).  A step's windows: from the mark
+# with --cursor, every line; with --after-cursor, as systemd 249 does after a cursor whose entry does not match the
+# filter, all but the first
+cat > "$SB/bin/logger" <<'EOF'
+#!/bin/bash
+[ "$1" = -t ] && [ "$3" = -- ] && [ $# = 4 ] || { echo "logger stub: unexpected: $*" >&2; exit 99; }
+[ -n "${STUB_NO_MARK:-}" ] || echo "$2" >> "$SB/marks"
+EOF
 cat > "$SB/bin/journalctl" <<'EOF'
 #!/bin/bash
-case "$*" in *--after-cursor*) [ -e "$SB/journal_fail" ] && exit 1 ;; esac
+mark_ok() { grep -qxF "${1#s=MARK;}" "$SB/marks" 2>/dev/null; }
+case "$*" in *" --cursor "*|*" --after-cursor "*) [ -e "$SB/journal_fail" ] && exit 1 ;; esac
 case "$*" in
-  *--show-cursor*) echo "x"; echo "-- cursor: s=CUR1" ;;
-  *"-u strata-ab-engine --after-cursor s=CUR1"*) cat "$SB/journal.txt" 2>/dev/null; exit 0 ;;
-  *"-k --after-cursor s=CUR1"*) cat "$SB/kernel.txt" 2>/dev/null; exit 0 ;;
+  "-t "*" -n 1 --show-cursor --no-pager -q")
+    grep -qxF "$2" "$SB/marks" 2>/dev/null && { echo "x"; echo "-- cursor: s=MARK;$2"; } ;;
+  "-u strata-ab-engine --cursor "*" --no-pager -q") mark_ok "$4" || exit 1; cat "$SB/journal.txt" 2>/dev/null; exit 0 ;;
+  "-k --cursor "*" --no-pager -q") mark_ok "$3" || exit 1; cat "$SB/kernel.txt" 2>/dev/null; exit 0 ;;
+  "-u strata-ab-engine --after-cursor "*" --no-pager -q") mark_ok "$4" || exit 1; tail -n +2 "$SB/journal.txt" 2>/dev/null; exit 0 ;;
+  "-k --after-cursor "*" --no-pager -q") mark_ok "$3" || exit 1; tail -n +2 "$SB/kernel.txt" 2>/dev/null; exit 0 ;;
   *) echo "journalctl stub: unexpected: $*" >&2; exit 99 ;;
 esac
 EOF
@@ -457,6 +469,31 @@ took=$(( $(date +%s) - t0 )); wait
   [ "$took" -lt 45 ] && PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service &&
   pass "an interrupt during the load stops the test unit at once, with no error output" ||
   fail "interrupt during the load: exit $rc, ${took} s, $(grep -m1 -E 'Traceback|still serving' "$SB/loading.out")"
+up
+
+# 28. the test unit's journal lines and the kernel's, from the driver's own mark in the journal: the step's first lines
+# are kept (--after-cursor lost them)
+printf '%s\n' " 十  20 01:00:01 testhost-machine python[2]: [strata] 500 the step's first journal line" \
+              " 十  20 01:00:02 testhost-machine python[2]: [strata] 503 the step's second journal line" > "$SB/journal.txt"
+printf '%s\n' " 十  20 01:00:03 testhost-machine kernel: NVRM: Xid (PCI:0000:3b:00): 79, the step's first kernel line" \
+              " 十  20 01:00:04 testhost-machine kernel: NVRM: Xid (PCI:0000:3b:00): 79, the step's second kernel line" > "$SB/kernel.txt"
+drive window "$SB/arms.json" c0-28:C0; rc=$?
+rm -f "$SB/journal.txt" "$SB/kernel.txt"
+w=$(sed -n "/the test unit's journal lines/,\$p" "$R/c0-28-after.txt" 2>/dev/null)
+grep -q "500 the step's first journal line" <<< "$w" && grep -q "503 the step's second journal line" <<< "$w" &&
+  grep -q "the step's first kernel line" <<< "$w" && grep -q "the step's second kernel line" <<< "$w" &&
+  pass "the step's journal and kernel lines are read from the driver's own mark: the first ones kept" ||
+  fail "the step's windows: exit $rc, $w"
+up
+
+# 29. no mark of its own in the journal: the step stops before the test unit starts, and strata-q3 comes back
+n0=$(grep -c '^systemd-run strata-ab-engine' "$SB/actions" 2>/dev/null)
+STUB_NO_MARK=1 drive nomark "$SB/arms.json" c0-29:C0; rc=$?
+[ $rc = 1 ] && grep -q "cannot mark the journal" "$SB/nomark.out" &&
+  [ "$(grep -c '^systemd-run strata-ab-engine' "$SB/actions")" = "${n0:-0}" ] &&
+  PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service &&
+  pass "no mark in the journal: the step stops before the test unit starts, strata-q3 comes back" ||
+  fail "no mark: exit $rc, $(tail -3 "$SB/nomark.out")"
 up
 
 echo "$fails failed"

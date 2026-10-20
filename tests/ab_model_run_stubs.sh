@@ -67,13 +67,25 @@ cat > "$SB/bin/curl" <<'EOF'
 case "${@: -1}" in */health) cat "$SB/health" ;; */metrics) cat "$SB/metrics" ;; *) exit 7 ;; esac
 EOF
 printf '#!/bin/bash\n[ "$1" = -n ] && shift\nexec "$@"\n' > "$SB/bin/sudo"
+# logger writes the wrapper's mark; journalctl -t finds it (not with STUB_NO_MARK).  The windows of the run: from the
+# mark with --cursor, every line; with --after-cursor, as systemd 249 does after a cursor whose entry does not match
+# the filter, all but the first
+cat > "$SB/bin/logger" <<'EOF'
+#!/bin/bash
+[ "$1" = -t ] && [ "$3" = -- ] && [ $# = 4 ] || { echo "logger stub: unexpected: $*" >&2; exit 99; }
+[ -n "${STUB_NO_MARK:-}" ] || echo "$2" >> "$SB/marks"
+EOF
 cat > "$SB/bin/journalctl" <<'EOF'
 #!/bin/bash
+mark_ok() { grep -qxF "${1#s=MARK;}" "$SB/marks" 2>/dev/null; }
 case "$*" in
-  "-n 1 --show-cursor --no-pager -q") echo " 十  19 01:00:00 testhost-machine kernel: x"; echo "-- cursor: s=CURSOR42" ;;
   "-n 1 --no-pager -q") echo " 十  19 01:00:00 testhost-machine kernel: x" ;;
-  "-u strata-q3.service --after-cursor s=CURSOR42 --no-pager -q") cat "$SB/journal.txt" ;;
-  "-k --after-cursor s=CURSOR42 --no-pager -q") cat "$SB/kernel.txt" ;;
+  "-t "*" -n 1 --show-cursor --no-pager -q")
+    grep -qxF "$2" "$SB/marks" 2>/dev/null && { echo " 十  19 01:00:00 testhost-machine $2[1]: start"; echo "-- cursor: s=MARK;$2"; } ;;
+  "-u strata-q3.service --cursor "*" --no-pager -q") mark_ok "$4" && cat "$SB/journal.txt" ;;
+  "-k --cursor "*" --no-pager -q") mark_ok "$3" && cat "$SB/kernel.txt" ;;
+  "-u strata-q3.service --after-cursor "*" --no-pager -q") mark_ok "$4" && tail -n +2 "$SB/journal.txt" ;;
+  "-k --after-cursor "*" --no-pager -q") mark_ok "$3" && tail -n +2 "$SB/kernel.txt" ;;
   *) echo "journalctl stub: unexpected: $*" >&2; exit 99 ;;
 esac
 EOF
@@ -131,8 +143,9 @@ reset() {  # a clean state: the service idle, the journal and kernel log of a cl
   echo 1 > "$SB/ready_s"; rm -f "$SB/hostunits_rc"
   # the ARC cap the sandbox's systemd/zfs-arc-max.service writes, as protocol step 1 deploys it
   grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' "$SB/repo/systemd/zfs-arc-max.service" | cut -d' ' -f2 > "$AB_ARC_FILE"
-  { echo " 十  19 01:00:01 testhost-machine python[1]: [strata] parallel: a request has waited 104 s for a free slot (busy: [0, 1, 2, 3], in use: [0, 1, 2, 3], ending: []) (issue #1603)"
-    for i in $(seq 54); do echo " 十  19 01:00:02 testhost-machine python[1]: [strata] done: 100 tokens in 5 s (20.0 tok/s) (stop, cancel=False)"; done
+  # the run's first line is a done line: a window that loses it counts 97
+  { for i in $(seq 54); do echo " 十  19 01:00:02 testhost-machine python[1]: [strata] done: 100 tokens in 5 s (20.0 tok/s) (stop, cancel=False)"; done
+    echo " 十  19 01:00:01 testhost-machine python[1]: [strata] parallel: a request has waited 104 s for a free slot (busy: [0, 1, 2, 3], in use: [0, 1, 2, 3], ending: []) (issue #1603)"
     for i in $(seq 44); do echo " 十  19 01:00:02 testhost-machine python[1]: [strata] done: 512 tokens in 15 s (34.0 tok/s) (length, cancel=False)"; done
     echo " 十  19 01:00:03 NBNAME python[1]: [strata] parallel: slot(s) 2 were marked busy with no request using them (issue #1603); freed, the waiting request goes on"
   } > "$SB/journal.txt"
@@ -230,6 +243,7 @@ reset; echo 8589934592 > "$AB_ARC_FILE"; check_refusal t-arc 1 "the ZFS ARC cap 
 start_service 8 6144; reset; check_refusal t-headroom 1 "STRATA_RESIDENT_HEADROOM_GIB 8 and"
 start_service 6 8192; reset; check_refusal t-park 1 "conversation-cache-min-free-mib 8192,"
 start_service
+reset; check_refusal t-nomark 1 "cannot mark the journal" STUB_NO_MARK=1
 reset; MODE=bogus check_refusal t-mode 2 "usage: bench/ab_model_run.sh"
 
 # 5. other traffic: more requests counted, a request in flight at the end

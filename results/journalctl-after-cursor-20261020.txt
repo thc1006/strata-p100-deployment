@@ -1,0 +1,62 @@
+# systemd 249 (249.11-0ubuntu3.23)
+== part 1: the service's journal at the start of ab2-iq3s-robust
+cursor: the last entry this user can read before the run, seqnum 0x536938 (not a line of strata-q3)
+-- journalctl -u strata-q3.service --after-cursor CURSOR (first 3 lines):
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (4819) e
+ 十  20 08:45:37 <host> python[532713]: [strata] reading the prompt: 2,048 of 27,942 tokens, 8 s so far
+ 十  20 08:45:39 <host> python[532713]: [strata] reading the prompt: 4,096 of 27,942 tokens, 10 s so far
+-- journalctl -u strata-q3.service --cursor CURSOR (first 3 lines):
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (32768) 
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (4819) e
+ 十  20 08:45:37 <host> python[532713]: [strata] reading the prompt: 2,048 of 27,942 tokens, 8 s so far
+-- journalctl --after-cursor CURSOR, no filter, the lines of strata-q3's process (first 3):
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (32768) 
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (4819) e
+ 十  20 08:45:37 <host> python[532713]: [strata] reading the prompt: 2,048 of 27,942 tokens, 8 s so far
+== part 2: a mark of one's own, then two probe lines
+-- journalctl -t PROBE --after-cursor MARK -o cat:
+probe line two
+-- journalctl -t PROBE --cursor MARK -o cat:
+probe line one
+probe line two
+-- journalctl -t MARK-ID --cursor MARK -o cat (the mark itself, which a filter that matches it shows):
+mark
+== journal_cursor_probe.sh
+#!/bin/bash
+# systemd 249's journalctl --after-cursor with a filter (-u, -k, -t) against --cursor at an entry of one's own.
+# Part 1 reads the service's journal at the start of decision 0004's robustness run ab2-iq3s-robust (2026-10-20
+# 08:45:27) from a cursor at the last entry this user can read before the run.  That entry is not a line of strata-q3,
+# and neither was the one bench/ab_model_run.sh took its cursor from: its window lost the first of the run's two 400
+# lines (results/ab2-iq3s-robust-journal-errors.txt has only the second).  Part 2 writes three entries of its own with
+# logger, a mark and then two probe lines, and reads them back each way.  No sudo: this user's entries are readable.
+set -u
+names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+args=(); while IFS= read -r n; do args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+red() { sed "${args[@]}" | cut -c1-150; }
+seq_of() { tr ';' '\n' <<< "$1" | sed -n 's/^i=//p'; }
+echo "# $(systemctl --version | head -1)"
+echo "== part 1: the service's journal at the start of ab2-iq3s-robust"
+cur=$(journalctl --since "2026-10-20 08:45:27" --until "2026-10-20 08:45:27.2" --no-pager -o json 2>/dev/null |
+      python3 -c 'import json, sys; print([json.loads(l) for l in sys.stdin][-1]["__CURSOR"])')
+echo "cursor: the last entry this user can read before the run, seqnum 0x$(seq_of "$cur") (not a line of strata-q3)"
+echo "-- journalctl -u strata-q3.service --after-cursor CURSOR (first 3 lines):"
+journalctl -u strata-q3.service --after-cursor "$cur" --no-pager -q 2>/dev/null | head -3 | red
+echo "-- journalctl -u strata-q3.service --cursor CURSOR (first 3 lines):"
+journalctl -u strata-q3.service --cursor "$cur" --no-pager -q 2>/dev/null | head -3 | red
+echo "-- journalctl --after-cursor CURSOR, no filter, the lines of strata-q3's process (first 3):"
+journalctl --after-cursor "$cur" --no-pager -q 2>/dev/null | grep -F 'python[532713]' | head -3 | red
+echo "== part 2: a mark of one's own, then two probe lines"
+id=cursor-probe.$$; probe=$id.probe
+logger -t "$id" -- "mark"
+for _ in $(seq 100); do
+  mark=$(journalctl -t "$id" -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p'); [ -n "$mark" ] && break; sleep 0.1
+done
+[ -n "${mark:-}" ] || { echo "the mark did not reach the journal"; exit 1; }
+logger -t "$probe" -- "probe line one"; logger -t "$probe" -- "probe line two"
+for _ in $(seq 100); do [ "$(journalctl -t "$probe" --no-pager -q -o cat 2>/dev/null | wc -l)" -ge 2 ] && break; sleep 0.1; done
+echo "-- journalctl -t PROBE --after-cursor MARK -o cat:"; journalctl -t "$probe" --after-cursor "$mark" --no-pager -q -o cat
+echo "-- journalctl -t PROBE --cursor MARK -o cat:"; journalctl -t "$probe" --cursor "$mark" --no-pager -q -o cat
+echo "-- journalctl -t MARK-ID --cursor MARK -o cat (the mark itself, which a filter that matches it shows):"
+journalctl -t "$id" --cursor "$mark" --no-pager -q -o cat
+echo "== journal_cursor_probe.sh"
+cat "$0"

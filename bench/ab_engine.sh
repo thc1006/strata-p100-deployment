@@ -30,7 +30,8 @@
 #                             phases for every step of the call)
 #   results/<tag>-after.txt   whether the same engine answered, the screen's exit status, the requests counted once
 #                             the unit served nothing, the engine's error lines after the warm-up, the test unit's
-#                             journal lines and the kernel's (Xid, OOM) during the step ("unreadable" if not read)
+#                             journal lines and the kernel's (Xid, OOM) during the step, from an entry the driver
+#                             writes to the journal before the step starts the unit ("unreadable" if not read)
 #   results/<tag>-engine-lines.txt   the engine's per-request lines (prompt and decode rates, loans, reads)
 #   results/<tag>-texts.jsonl   every answer's text (the screen's --texts), to see where two arms' answers part
 #   results/<tag>-gpu.txt     each GPU's SM and memory use once a second during the screen (nvidia-smi dmon, the same
@@ -61,6 +62,21 @@ names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'le
         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
 redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
 redact() { sed "${redact_args[@]}"; }
+# the journal's position before a step: an entry of the driver's own, written with logger, and its cursor once
+# journald has it.  The step's windows start there with --cursor, which keeps every line after it.  --after-cursor did
+# not: with -u or -k, systemd 249's journalctl skips the first matching entry after a cursor whose own entry does not
+# match, and each step lost its first line (results/journalctl-after-cursor-20261020.txt)
+mark() {
+  local id i c
+  id=ab_engine.$$.$(date +%s%N)
+  logger -t "$id" -- "$1" 2>/dev/null || return 1
+  for i in $(seq 100); do
+    c=$(sudo -n journalctl -t "$id" -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p')
+    [ -n "$c" ] && { printf '%s\n' "$c"; return 0; }
+    sleep 0.1
+  done
+  return 1
+}
 
 # the spec, checked whole before anything is stopped
 spec() { python3 - "$SPEC" "$@" <<'EOF'
@@ -303,8 +319,8 @@ for step in "$@"; do
   rescue 45min || exit 1                    # the stop, the load (at most 30 min) and the settle
   stop_all || exit 1
   systemctl is-active -q strata-q3.service && { say "strata-q3 is running again (someone started it): stopping here"; exit 1; }
-  cur=$(sudo -n journalctl -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p')
-  [ -n "$cur" ] || { say "cannot read the journal's cursor"; exit 1; }
+  cur=$(mark "start of $tag")
+  [ -n "$cur" ] || { say "cannot mark the journal (an entry written with logger did not show up in it within 10 s)"; exit 1; }
   OFF=$(stat -c %s "$LOG" 2>/dev/null || echo 0)
   sudo -n systemd-run --unit="$UNIT" --collect --uid=thc1006 --gid=thc1006 \
     -p WorkingDirectory="$TREE" -p LimitMEMLOCK=infinity -p LimitNOFILE=65536 -p OOMScoreAdjust=500 \
@@ -400,11 +416,11 @@ for step in "$@"; do
       printf '%s\n' "$errs" | grep . | head -20 | sed 's/^/  /'
     else echo "engine log error lines: unknown (the log shrank)"; fi
     echo "--- the test unit's journal lines"
-    if j=$(sudo -n journalctl -u "$UNIT" --after-cursor "$cur" --no-pager -q 2>/dev/null); then
+    if j=$(sudo -n journalctl -u "$UNIT" --cursor "$cur" --no-pager -q 2>/dev/null); then
       grep -a -i -E '\[strata\] [45][0-9]{2}\b|Traceback|ERROR|error:|refused|restart|had stopped|non-?finite|repeated|said nothing|marked busy with no request|cancel=True|Failed with result|Main process exited|code=killed' <<< "$j" || true
     else echo "unreadable"; fi
     echo "--- kernel lines"
-    if k=$(sudo -n journalctl -k --after-cursor "$cur" --no-pager -q 2>/dev/null); then
+    if k=$(sudo -n journalctl -k --cursor "$cur" --no-pager -q 2>/dev/null); then
       grep -a -i -E 'NVRM: Xid|Out of memory|oom-kill|segfault|BUG:|soft lockup|hung_task|blocked for more than' <<< "$k" || true
     else echo "unreadable"; fi
   } | redact > "$R/$tag-after.txt"

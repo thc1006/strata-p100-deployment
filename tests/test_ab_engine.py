@@ -74,6 +74,8 @@ EXPECTED = [
     'an arms file with typo is refused, strata-q3 untouched',
     'an arm without must_not runs, with no error output',
     'an interrupt during the load stops the test unit at once, with no error output',
+    "the step's journal and kernel lines are read from the driver's own mark: the first ones kept",
+    'no mark in the journal: the step stops before the test unit starts, strata-q3 comes back',
 ]
 
 

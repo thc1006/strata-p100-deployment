@@ -67,6 +67,7 @@ EXPECTED = [
     'refuses: the ZFS ARC cap is 8589934592',
     'refuses: STRATA_RESIDENT_HEADROOM_GIB 8 and',
     'refuses: conversation-cache-min-free-mib 8192,',
+    'refuses: cannot mark the journal',
     'refuses: usage: bench/ab_model_run.sh',
     'a 99th request is counted',
     'a request in flight at the end is recorded',

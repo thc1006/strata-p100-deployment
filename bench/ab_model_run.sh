@@ -26,7 +26,8 @@
 #                     counters
 #   <tag>-engine-errors.txt, <tag>-journal-errors.txt, <tag>-kernel-errors.txt   the lines of the engine log, of the
 #                     service journal (systemd's own lines included) and of the kernel log that may tell of a fault,
-#                     from exactly the run (journal cursors); the summary sorts them into faults and other traffic
+#                     from exactly the run (from an entry the wrapper writes to the journal); the summary sorts them
+#                     into faults and other traffic
 # Every name of this host (hostname, -f, -A and the first label of each), in any case, is written as <host>.
 # Usage: bench/ab_model_run.sh <tag> <arm letter> [robustness]
 # (Test hook: AB_ARC_FILE replaces /sys/module/zfs/parameters/zfs_arc_max.)
@@ -133,7 +134,21 @@ metrics() {
 d = json.load(sys.stdin); l = d["live"]; c = d.get("conversation_cache") or {}
 print(l.get("state"), l.get("running"), l.get("queued"), d["totals"]["requests"], c.get("parked", "unknown"), c.get("bytes", "unknown"))'
 }
-cursor() { sudo -n journalctl -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p'; }
+# the journal's position at the start of the run: an entry of the wrapper's own, written with logger, and its cursor
+# once journald has it.  The windows start there with --cursor, which keeps every line after it.  --after-cursor did
+# not: with -u or -k, systemd 249's journalctl skips the first matching entry after a cursor whose own entry does not
+# match, and each run lost its first line (results/journalctl-after-cursor-20261020.txt)
+mark() {
+  local id i c
+  id=ab_model_run.$$.$(date +%s%N)
+  logger -t "$id" -- "$1" 2>/dev/null || return 1
+  for i in $(seq 100); do
+    c=$(sudo -n journalctl -t "$id" -n 1 --show-cursor --no-pager -q 2>/dev/null | sed -n 's/^-- cursor: //p')
+    [ -n "$c" ] && { printf '%s\n' "$c"; return 0; }
+    sleep 0.1
+  done
+  return 1
+}
 
 health=$(curl -fsS -m 10 "$URL/health") || refuse "/health does not answer"
 grep -q '"loaded": true' <<< "$health" || refuse "the model is not loaded"
@@ -171,8 +186,8 @@ placement=$(awk '/^\[strata\] .*engine started: / { k = 0; stop = 0; on = 1; nex
 commit=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null) || commit=unknown
 changed=$(git -C "$CHECKOUT" status --porcelain --untracked-files=no 2>/dev/null | awk '{print $NF}' | tr '\n' ' ') || changed=unknown
 profile=$(grep -v '^[[:space:]]*#' "$CHECKOUT/config/profile.conf" 2>/dev/null | grep -v '^[[:space:]]*$' | tr '\n' ' ')
-cur=$(cursor)
-[ -n "$cur" ] || refuse "cannot read the journal's cursor"
+cur=$(mark "start of $TAG")
+[ -n "$cur" ] || refuse "cannot mark the journal (an entry written with logger did not show up in it within 10 s)"
 
 # from the arm record on, an interrupt (INT, TERM, HUP) no longer ends this script: it stops the set (or keeps it
 # from starting), and the after record is still written
@@ -249,7 +264,7 @@ conc_off=$(awk '/^\[strata\] .*engine started: / { off = "" }
                 /^strata batch: STRATA_PIPED_CONCURRENT is off beside / && off == "" {
                   off = $0; sub(/^strata batch: STRATA_PIPED_CONCURRENT is off beside /, "", off) }
                 END { print (off == "" ? "no such line" : off) }' "$LOG" 2>/dev/null)
-if sudo -n journalctl -u $UNIT --after-cursor "$cur" --no-pager -q > "$TMP/journal" 2>/dev/null; then
+if sudo -n journalctl -u $UNIT --cursor "$cur" --no-pager -q > "$TMP/journal" 2>/dev/null; then
   grep -a -i -E '\[strata\] [45][0-9]{2}\b|Traceback|ERROR|error:|refused|restart|had stopped|non-?finite|repeated|said nothing|marked busy with no request|cancel=True|Failed with result|Main process exited|code=killed|Scheduled restart|Stopping|Stopped|Starting|Started' "$TMP/journal" |
     redact > "$R/$TAG-journal-errors.txt"
   journal_errors=$(wc -l < "$R/$TAG-journal-errors.txt")
@@ -259,7 +274,7 @@ if sudo -n journalctl -u $UNIT --after-cursor "$cur" --no-pager -q > "$TMP/journ
 else
   : > "$R/$TAG-journal-errors.txt"; journal_errors=unknown; done_lines=unknown; done_finish=
 fi
-if sudo -n journalctl -k --after-cursor "$cur" --no-pager -q > "$TMP/kernel" 2>/dev/null; then
+if sudo -n journalctl -k --cursor "$cur" --no-pager -q > "$TMP/kernel" 2>/dev/null; then
   grep -a -i -E 'NVRM: Xid|out of memory|oom-kill|oom_reaper|segfault|general protection|BUG:|soft lockup|hung_task|blocked for more than' "$TMP/kernel" |
     redact > "$R/$TAG-kernel-errors.txt"
   kernel_errors=$(wc -l < "$R/$TAG-kernel-errors.txt")

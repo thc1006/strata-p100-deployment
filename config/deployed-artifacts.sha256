@@ -1,13 +1,13 @@
-# Deployed artifacts, 2026-10-19 - sha256
+# Deployed artifacts, 2026-10-20 - sha256
 # strata source pin: 477ac13cbe8e582c20484871ce459d20d82df09d (v0.1.45), engine strata 0.1.45, BUILD.json src git-477ac13cb (the binary the engine experiments ran)
 00869ac7b733d8214216d25004dbb1dd2fa878a4848d8af555a42c84f679e304  strata/engine-cuda12/strata
 937244cf786147b6a6c3d107b0400e068a8b71fbae8138a356738cf268dfb13e  strata/engine-cuda12/libstrata_kq.so
-05539a70a4866c86575edb3c18f4aa4b269503e9b242bc5eedb481c59e4719e7  strata/strata-iq3_xxs.json
+e3e5a7b4e22e72c19d52892d60d15b886f2d907f0f8363011a728627801418c5  strata/strata-iq3_xxs.json
 8f59b4aa8873209dff11c11e37bcda9529a1335b724a1afeea37bf6388975baf  strata/data/expert-profile.bin
 c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a  Strata-data/mtp/rt/dense.bin
 b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91  Strata-data/mtp/rt/draft_vocab.bin
 09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f  Strata-data/mtp/rt/experts.bin
-1afe12b36cd2d13bf122b741fa0e81e1f751319cc3c451e54ba75524d825f148  Strata-data/packs/iq3_xxs/index.txt
-# model shards (verified against the Hugging Face LFS hashes at download):
-219ea929900dfa9ef091f3aa473fdba6874b65fcb36526d7d851ac9e95856d15  Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
-316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113  Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+b2a014878c3b61d6a6f915e194055a5e68ede34f9465dd1cb13249d902f008ac  Strata-data/packs/iq3_s/index.txt
+# model shards (verified against the Hugging Face LFS hashes at download; IQ3_S's shard 2 is a hard link of IQ3_XXS's, the same file):
+4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3  Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113  Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf

@@ -1,6 +1,6 @@
-# Deployment record: Strata with Qwen3.8-Flash-Next IQ3_XXS on 4× Tesla P100 (ZFS root)
+# Deployment record: Strata with Qwen3.8-Flash-Next on 4× Tesla P100 (ZFS root)
 
-Last updated: 2026-10-19. Runs Strata 0.1.45 (commit `477ac13cb`) since 2026-10-19; the measurements in section 3 were made on 0.1.43.1 (commit `a0116b2`) unless a section says otherwise. CUDA 12.9.1, NVIDIA driver 535.230.02.
+Last updated: 2026-10-20. Runs GSQ-RCO IQ3_S since 2026-10-20 ([decision 0004](decisions/0004-iq3-s.md)) and Strata 0.1.45 (commit `477ac13cb`) since 2026-10-19; the measurements in section 3 were made with IQ3_XXS on 0.1.43.1 (commit `a0116b2`) unless a section says otherwise. CUDA 12.9.1, NVIDIA driver 535.230.02.
 
 Deployment date: 2026-10-16 (all times in this document are Taiwan time, UTC+8). Machine: VMware VM (8 vCPU E5-2696 v4, 62.8 GiB RAM, 4× Tesla P100-PCIE-16GB, driver 535.230.02, ZFS root).
 
@@ -23,11 +23,11 @@ Sources of numbers: each number is labeled with the configuration it came from (
 | Item | Details |
 |---|---|
 | API | `http://127.0.0.1:8080/v1` (OpenAI-compatible), `/v1/messages` (Anthropic-compatible). Listens only on 127.0.0.1. No API key is set (see section 5). |
-| Model | `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF` IQ3_XXS, revision `ed59f92`. The SHA-256 of both shards matches the Hugging Face LFS hashes (`deployed-artifacts.sha256`). |
+| Model | `ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF` IQ3_S, revision `ed59f92`, since 2026-10-20 (IQ3_XXS before; section 3.9). The SHA-256 of both shards matches the Hugging Face LFS hashes (`deployed-artifacts.sha256`); shard 2, the PLE table, is IQ3_XXS's file. |
 | Engine | Strata 0.1.45, commit `477ac13cbe8e582c20484871ce459d20d82df09d`, built locally with CUDA 12.9 for `sm_60` (`engine-cuda12/BUILD.json`), with `STRATA_MMQ_GROUP_SORT=1` and `STRATA_PIPED_CONCURRENT=1` ([decision 0005](decisions/0005-strata-0.1.45-group-sort-concurrent-read.md)). Until 2026-10-19: 0.1.43.1 (`a0116b2`), kept at `~/dev/strata-0.1.43.1`. |
 | Services | `strata-q3.service` (starts at boot), `strata-q3-health.timer` (runs the watchdog every 2 minutes, except while the service is starting), `zfs-arc-max.service` (ZFS Adaptive Replacement Cache (ARC) limit 2 GiB; 8 GiB until 2026-10-19, decision 0004) |
 | Concurrent serving | 4 slots (`concurrency.serving=4` in `/v1/status`), 32K context per user, INT8 key-value (KV) cache |
-| Startup time | In 12 measured service starts, the service took 428–542 s to become ready (`results/service-load-times.txt`; during this time `systemctl status` shows `activating`). A full machine reboot was not measured. |
+| Startup time | With IQ3_S, `systemctl restart` took 550–560 s in the 6 restarts of decision 0004's runs (`results/ab2-iq3s-*-switch.txt`, `results/ab3-iq3s-*-switch.txt`); the first start after the download read the experts at 60 MB/s and took more than 900 s (`results/ab-iq3s-1-switch.txt`). With IQ3_XXS, 12 measured starts took 428–542 s to become ready (`results/service-load-times.txt`). During a start `systemctl status` shows `activating`. A full machine reboot was not measured. |
 
 Quick check: `scripts/check-deployment.sh`
 
@@ -183,6 +183,10 @@ limits (`docs/engine-experiments.md`). Against 0.1.45 without them, two runs eac
 read beside three decoders, their longest stop was 0.55 s instead of 22.73 s, and the joining prompt's first token came
 1.1% later; four users with 1.5K prompts got 2.7% more tokens per second; one user's decode did not change (+0.5%).
 
+### 3.9 GSQ-RCO IQ3_S [A/B]
+
+Decision 0004's runs, on 0.1.45 with this configuration: two runs of each model in the order IQ3_XXS, IQ3_S, IQ3_S, IQ3_XXS, each after a restart, then a robustness run on IQ3_S (`results/AB-iq3s-ab3.md`). Every run was clean. Against IQ3_XXS, IQ3_S read 4.4K-token prompts 13.16% slower and 32K-token prompts 9.61% slower, served 1.92%, 6.47% and 6.53% fewer tokens per second with 1, 2 and 4 clients, and a 16K prompt that joined three decoders got its first token 9.62% later. It keeps 2% of the experts in page-locked RAM (5.46 GiB against 1.12 GiB), and in the runs the least free VRAM was 1094 MiB against 1938 MiB and the least MemAvailable 16.8 GiB against 21.6 GiB. In the robustness run every card kept at least 1094 MiB free and MemAvailable stayed at or above 17.08 GiB.
+
 ---
 
 ## 4. Problems found in this deployment, by impact
@@ -202,6 +206,7 @@ read beside three decoders, their longest stop was 0.55 s instead of 22.73 s, an
 
 ## 5. Known limits to share with lab members
 
+- Since 2026-10-20 the service runs GSQ-RCO IQ3_S instead of IQ3_XXS: its answers agree with the 8-bit reference (Q8_0) more often, and it reads prompts 9.61–13.16% slower and gives 1 to 4 clients 1.92–6.53% fewer tokens per second (section 3.9).
 - Long documents pause other users for about half a second (since 2026-10-19, `STRATA_PIPED_CONCURRENT=1`). While a 16K document was read, three users who were generating stopped for at most 0.55 s, against 22.73 s without the switch; with a 28K document, 0.59 s against 35.81 s (section 3.8). The document's own first token comes about 1% later. A request answered while a document is read can get another answer than it would alone, and another answer each time. When four users send long documents at the same time, the last one waited about 1.6–2.4 minutes on 0.1.43.1 (94 s at 16K each, 143 s at about 27K each); this was not measured on 0.1.45.
 - Requests that send no sampling settings are sampled with the model card's settings since 2026-10-19 (0.1.45's `serve/server.py`): temperature 1.0, top_p 0.95 and top_k 20 with thinking; temperature 0.7, top_p 0.8, top_k 20 and presence_penalty 1.5 without. Before, they were decoded greedily. Send `temperature: 0` for greedy answers.
 - Capacity: with the same document-heavy mixed load (short questions, 2K/8K/16K documents), the strict SLO met rate was 73% (22/30) at 3 requests per minute, 23% (7/30, TTFT p95 57 s) at 6 per minute, and 23% (7/30, TTFT p95 175 s) at 12 per minute. Above capacity, queuing grows, but there were never errors during testing. Actual capacity depends on document length and on how many requests arrive at the same time.

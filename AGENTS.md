@@ -1,7 +1,7 @@
 # Instructions for coding agents
 
 This repository is the configuration and operations code of a production LLM inference service: Strata serving
-Qwen3.8-Flash-Next IQ3_XXS on 4× Tesla P100. The checkout at `/home/thc1006/dev/p100-q3-deployment` is the live
+Qwen3.8-Flash-Next GSQ-RCO IQ3_S on 4× Tesla P100. The checkout at `/home/thc1006/dev/p100-q3-deployment` is the live
 deployment. `strata-q3.service` runs `scripts/strata-preflight.sh` and `scripts/strata-wait-ready.sh` from it, and the
 preflight runs `tools/configure_strata_q3.py`. A change to `scripts/`, `tools/` or `config/profile.conf` takes effect
 at the next start of the service. Other people use the service.
@@ -22,7 +22,7 @@ at the next start of the service. Other people use the service.
 ## Never, unless the maintainer asks for it in this session
 
 - Start, stop, restart or reset `strata-q3.service` or `strata-q3-health.timer`, or kill the engine or `server.py`.
-  A start takes 7–9 minutes, and a stop during the load leaves the service failed.
+  A start takes about 9 minutes, and a stop during the load leaves the service failed.
 - Run anything in `bench/`. The A/B scripts stop and restart the production service, the tracing scripts use `sudo`,
   and the load tests keep the GPUs busy for up to an hour.
 - Run `sudo`, `scripts/install-system-files.sh`, or anything that writes to `/etc`, `/usr/local/sbin` or `~/dev/strata`.

@@ -72,6 +72,9 @@ open(f"{sb}/strata/strata-iq3_xxs.json", "w").write(
     json.dumps(c, indent=2).replace(data, f"{sb}/data").replace(tree, f"{sb}/strata") + "\n")
 EOF
 grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' "$SB/repo/systemd/zfs-arc-max.service" | cut -d' ' -f2 > "$SB/arc_want"
+# the profile.conf every case starts from: the committed file's comments and IQ3_XXS's arguments, whichever model the
+# checkout deploys (the cases start on IQ3_XXS)
+{ grep '^#' "$W/config/profile.conf"; echo '--profile deployed'; } > "$SB/profile.base"
 cp "$SB/arc_want" "$SB/zfs_arc_max"
 
 # --- the stubs
@@ -174,10 +177,10 @@ sums() { sha256sum "$SB/repo/config/profile.conf" "$CFG" | cut -c1-64 | tr '\n' 
 restarts() { grep -c '^restart$' "$SB/actions" 2>/dev/null; }
 engines() { pgrep -f "^$SB/strata/engine-cuda12/strata --serve" | wc -l; }
 health_model() { curl -fsS -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | python3 -c 'import json, sys; print(json.load(sys.stdin)["model"])' 2>/dev/null; }
-reset() {   # the service up on IQ3_XXS, profile.conf as committed, no fault set
+reset() {   # the service up on IQ3_XXS, profile.conf as profile.base, no fault set
   rm -f "$SB/state" "$SB/job" "$SB/nosudo" "$SB/fail_models" "$SB/hang_models" "$SB/rc1_models" "$SB/fail_leaves_stray" \
         "$SB/deploy_fail_models" "$SB/deploy_hang_models" "$SB/fake_env"
-  cp "$W/config/profile.conf" "$SB/repo/config/profile.conf"; cp "$SB/arc_want" "$SB/zfs_arc_max"
+  cp "$SB/profile.base" "$SB/repo/config/profile.conf"; cp "$SB/arc_want" "$SB/zfs_arc_max"
   python3 -B "$SB/repo/tools/configure_strata_q3.py" "$CFG" --profile deployed --model iq3_xxs > /dev/null || echo "reset: the tool failed" >&2
   ctl reset-failed strata-q3.service > /dev/null 2>&1
   ctl restart strata-q3.service > /dev/null 2>&1 || echo "reset: the stub service did not come up" >&2
@@ -282,7 +285,7 @@ echo iq3_xxs > "$SB/deploy_fail_models"
 refused deploy-before 1 "scripts/check-deployment.sh finds a problem now" iq3_s "$R/r.txt"; rm -f "$SB/deploy_fail_models"
 printf '%s\n' '--profile deployed --reserve-mib 2048' > "$SB/repo/config/profile.conf"
 refused profile-args 1 "config/profile.conf holds '--profile deployed --reserve-mib 2048'" iq3_s "$R/r.txt"
-cp "$W/config/profile.conf" "$SB/repo/config/profile.conf"
+cp "$SB/profile.base" "$SB/repo/config/profile.conf"
 P=$SB/data/packs/iq3_s
 mv "$P/index.txt" "$SB/x/index.txt"; refused nopack 1 "missing or empty: [^ ]*/packs/iq3_s/index.txt" iq3_s "$R/r.txt"; mv "$SB/x/index.txt" "$P/index.txt"
 S1=$SB/data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf

@@ -5,12 +5,15 @@
 # ARMS.json: {"tree": "<Strata tree>", "settle_s": 300, "screen_n": 3,
 #             "arms": {"C0": {"config": "<config.json in the tree>", "env": {"STRATA_X": "0"},
 #                             "args_add": ["--flag", "value"],      (optional: engine arguments only this arm has)
+#                             "args_set": {"--flag": "value"},      (optional: this arm's value of a flag every config
+#                                                                    holds once)
 #                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"],
 #                             "engaged": ["<regex an engine line of the screen must match>"], "never": ["<regex>"]}}}
 # (engaged / never are judged by bench/ab_engine_summary.py on <tag>-engine-lines.txt: a switch that acts only on some
 # requests shows only then.)  config, env ({} for none) and must are required, the others optional; an unknown field
 # is refused, so a misspelt check is not skipped.  The arms' configs must be equal but for exe, cwd, log, their env
-# keys and args_add.
+# keys, args_add (a flag the config does not hold otherwise) and the values args_set gives; the arms that do not set
+# a flag hold it with one value.  A step does not run if the arms file or a config changed since this check.
 # Before anything is stopped: strata-q3 must be active and loaded (one still loading is waited for; a failed or
 # stopped one is someone else's state and is refused), the GPUs must hold no process but its engine, no measurement or
 # evaluation may run (it would share the CPUs), and no command line may make strata-preflight.sh refuse the restart.
@@ -89,7 +92,11 @@ if what == ["check"]:
     assert os.path.isfile(os.path.join(tree, "engine-cuda12", "strata")), f"no engine in {tree}"
     lists = ("must", "must_not", "engaged", "never", "args_add")
     for name, a in s["arms"].items():
-        assert set(a) <= {"config", "env", *lists}, f"{name}: unknown fields {sorted(set(a) - {'config', 'env', *lists})}"
+        assert set(a) <= {"config", "env", "args_set", *lists}, \
+            f"{name}: unknown fields {sorted(set(a) - {'config', 'env', 'args_set', *lists})}"
+        aset = a.get("args_set", {})
+        assert isinstance(aset, dict) and all(k.startswith("--") and isinstance(v, str) and v and not v.startswith("--")
+                                              for k, v in aset.items()), f"{name}: args_set must map flags to values"
         assert isinstance(a.get("config"), str) and a["config"], f"{name}: no config"
         assert isinstance(a.get("env"), dict) and all(isinstance(v, str) for v in a["env"].values()), \
             f"{name}: env must be an object of strings ({{}} for none)"
@@ -99,6 +106,8 @@ if what == ["check"]:
         assert a.get("must"), f"{name}: must names no start-up line (at least the engine's version)"
     assert os.path.isfile(os.path.join(tree, "serve", "server.py")), f"no server.py in {tree}"
     rest = {}
+    set_flags = {k for a in s["arms"].values() for k in a.get("args_set", {})}
+    unset_vals = {}                           # flag -> the values of the arms that do not set it
     for name, a in s["arms"].items():
         c = json.load(open(os.path.join(tree, a["config"])))
         assert c["exe"] == os.path.join(tree, "engine-cuda12", "strata"), f"{name}: the config's exe is not the tree's"
@@ -110,15 +119,35 @@ if what == ["check"]:
             at = [i for i in range(len(args) - len(add) + 1) if args[i:i + len(add)] == add]
             assert len(at) == 1, f"{name}: the config's args hold its args_add {add} {len(at)} times, not once"
             args = args[:at[0]] + args[at[0] + len(add):]
+            for f in (x for x in add if x.startswith("--")):
+                assert f not in args, f"{name}: its args_add's {f} is in the config's args once more"
+        for flag in sorted(set_flags):
+            at = [i for i, x in enumerate(args) if x == flag]
+            assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
+            want = a.get("args_set", {}).get(flag)
+            assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+            if want is None:
+                unset_vals.setdefault(flag, set()).add(args[at[0] + 1])
+            args = args[:at[0] + 1] + ["<set>"] + args[at[0] + 2:]
         rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
                                  "env": env, "args": args}, sort_keys=True)
-    assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log, the arms' env keys and args_add"
+    for flag, vals in sorted(unset_vals.items()):
+        assert len(vals) == 1, f"the arms that do not set {flag} hold it with different values: {sorted(vals)}"
+    assert len(set(rest.values())) == 1, \
+        "the arms' configs differ in more than exe, cwd, log, the arms' env keys, args_add and the flags args_set names"
   except AssertionError as e:
     print(e)
     sys.exit(1)
   print("ok")
 elif what[0] == "tree":
     print(tree)
+elif what[0] == "digest":               # the arms file and every arm's config, to see that none changed since the check
+    import hashlib
+    h = hashlib.sha256(open(sys.argv[1], "rb").read())
+    for name in sorted(s["arms"]):
+        c = os.path.join(tree, s["arms"][name]["config"])
+        h.update(c.encode() + b"\0" + open(c, "rb").read())
+    print(h.hexdigest()[:16])
 elif what[0] == "num":
     print(s.get(what[1], {"settle_s": 300, "screen_n": 3}[what[1]]))
 else:                                   # arm NAME FIELD (the check made every field what it should be; a missing one is empty)
@@ -133,6 +162,7 @@ else:                                   # arm NAME FIELD (the check made every f
 EOF
 }
 ok=$(spec check) && [ "$ok" = ok ] || { say "refusing: the arms file does not check out: $ok"; exit 2; }
+DIGEST=$(spec digest) && [ -n "$DIGEST" ] || { say "refusing: cannot read the arms file and its configs again"; exit 2; }
 TREE=$(spec tree); SETTLE=$(spec num settle_s); N=$(spec num screen_n)
 seen=" "
 for step in "$@"; do
@@ -315,6 +345,8 @@ for step in "$@"; do
   CFG=$(spec arm "$arm" config)
   LOG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["log"])' "$CFG")
   say "=== $tag ($arm: $CFG)"
+  [ "$(spec digest 2>/dev/null)" = "$DIGEST" ] ||
+    { say "STOP: the arms file or an arm's config changed since the check at the start"; exit 1; }
   wait_idle || { say "refusing: the service has been busy for $IDLE_WAIT_S s (someone's request is still running)"; exit 1; }
   rescue 45min || exit 1                    # the stop, the load (at most 30 min) and the settle
   stop_all || exit 1

@@ -76,6 +76,15 @@ EXPECTED = [
     'an interrupt during the load stops the test unit at once, with no error output',
     "the step's journal and kernel lines are read from the driver's own mark: the first ones kept",
     'no mark in the journal: the step stops before the test unit starts, strata-q3 comes back',
+    "an arm's declared args_set is accepted, and its engine gets the value",
+    'an args_set with value is refused, strata-q3 untouched',
+    'an args_set with absent is refused, strata-q3 untouched',
+    'an args_set with noflag is refused, strata-q3 untouched',
+    'an args_set with twice is refused, strata-q3 untouched',
+    'an args_set with unsetdiffer is refused, strata-q3 untouched',
+    'an args_set with elsewhere is refused, strata-q3 untouched',
+    'an args_set with addrepeat is refused, strata-q3 untouched',
+    'a config changed during an earlier step stops the next step, strata-q3 comes back',
 ]
 
 

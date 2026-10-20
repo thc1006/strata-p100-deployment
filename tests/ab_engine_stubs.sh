@@ -496,5 +496,66 @@ STUB_NO_MARK=1 drive nomark "$SB/arms.json" c0-29:C0; rc=$?
   fail "no mark: exit $rc, $(tail -3 "$SB/nomark.out")"
 up
 
+# 30. an arm that sets the value of a flag every config holds once (args_set): accepted, and its engine gets the value.
+# Refused before anything is stopped: its config holds another value; a config does not hold the flag, or holds it
+# twice; the key is not a flag; an arm that does not set the flag holds another value than the others that do not;
+# the configs differ elsewhere too; an args_add repeats a flag its config holds otherwise
+python3 - "$SB" <<'PYEOF'
+import json, sys
+sb = sys.argv[1]
+def cfg(name, args):
+    c = json.load(open(f"{sb}/tree/cfg-gs1.json")); c["args"] = args; json.dump(c, open(f"{sb}/tree/{name}.json", "w"))
+cfg("cfg-gs1b", ["--batch", "2"])
+cfg("cfg-gs1twice", ["--batch", "2", "--batch", "2"])
+cfg("cfg-gs1else", ["--batch", "2", "--prefill", "1024"])
+cfg("cfg-gs1add", ["--batch", "2", "--prefill", "1024", "--prefill", "512"])
+c = json.load(open(f"{sb}/tree/cfg-gs0.json")); c["args"] = ["--batch", "3"]; json.dump(c, open(f"{sb}/tree/cfg-gs0c.json", "w"))
+a = json.load(open(f"{sb}/arms.json")); a["arms"]["C1"]["config"] = "cfg-gs1b.json"
+def variant(name, aset, edit=None):
+    b = json.loads(json.dumps(a)); b["arms"]["C1"]["args_set"] = aset
+    if edit:
+        edit(b)
+    json.dump(b, open(f"{sb}/arms-set-{name}.json", "w"))
+variant("ok", {"--batch": "2"})
+variant("value", {"--batch": "3"})
+variant("absent", {"--batch": "2", "--prefill": "1024"})
+variant("noflag", {"batch": "2"})
+variant("twice", {"--batch": "2"}, lambda b: b["arms"]["C1"].__setitem__("config", "cfg-gs1twice.json"))
+variant("unsetdiffer", {"--batch": "2"}, lambda b: b["arms"].__setitem__("C2", {**b["arms"]["C0"], "config": "cfg-gs0c.json"}))
+variant("elsewhere", {"--batch": "2"}, lambda b: b["arms"]["C1"].__setitem__("config", "cfg-gs1else.json"))
+variant("addrepeat", {"--batch": "2"}, lambda b: b["arms"]["C1"].update(config="cfg-gs1add.json", args_add=["--prefill", "512"]))
+PYEOF
+FAKE_ENGINE_ARGS=1 drive setok "$SB/arms-set-ok.json" c1-30:C1; rc=$?
+[ $rc = 0 ] && grep -q '"tag": "c1-30"' "$R/engine-screen.jsonl" && grep -q -- "--serve --batch 2 *$" "$R/c1-30-arm.txt" &&
+  pass "an arm's declared args_set is accepted, and its engine gets the value" ||
+  fail "args_set: exit $rc, $(grep 'engine args' "$R/c1-30-arm.txt" 2>/dev/null; tail -2 "$SB/setok.out")"
+up
+for v in "value:C1: the config's --batch is 2, not 3" "absent:C0: the config's args hold --prefill 0 times" \
+         "noflag:C1: args_set must map flags to values" "twice:C1: the config's args hold --batch 2 times" \
+         "unsetdiffer:the arms that do not set --batch hold it with different values" \
+         "elsewhere:the arms' configs differ in more than" \
+         "addrepeat:C1: its args_add's --prefill is in the config's args once more"; do
+  n=${v%%:*}; before=$(prod_pid)
+  drive "set-$n" "$SB/arms-set-$n.json" c1-30r:C1; rc=$?
+  [ $rc = 2 ] && grep -q -- "${v#*:}" "$SB/set-$n.out" && [ "$(prod_pid)" = "$before" ] &&
+    pass "an args_set with $n is refused, strata-q3 untouched" || fail "args_set $n: exit $rc, $(tail -2 "$SB/set-$n.out")"
+done
+up
+
+# 31. an arm's config changed while an earlier step ran: the next step stops before it starts, nothing of it is
+# measured, and strata-q3 comes back
+cp "$SB/tree/cfg-gs1b.json" "$SB/cfg-gs1b.saved"
+( for _ in $(seq 600); do grep -q '"tag": "c0-31"' "$R/engine-screen.jsonl" 2>/dev/null && break; sleep 0.1; done
+  python3 -c 'import json, sys; p = sys.argv[1]; c = json.load(open(p)); c["model_name"] = "changed"; json.dump(c, open(p, "w"))' \
+    "$SB/tree/cfg-gs1b.json" ) &
+drive changed "$SB/arms-set-ok.json" c0-31:C0 c1-31:C1; rc=$?
+wait
+[ $rc = 1 ] && grep -q "STOP: the arms file or an arm's config changed since the check at the start" "$SB/changed.out" &&
+  ! grep -q '"tag": "c1-31"' "$R/engine-screen.jsonl" && PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service &&
+  pass "a config changed during an earlier step stops the next step, strata-q3 comes back" ||
+  fail "changed config: exit $rc, $(tail -3 "$SB/changed.out")"
+cp "$SB/cfg-gs1b.saved" "$SB/tree/cfg-gs1b.json"
+up
+
 echo "$fails failed"
 exit $((fails > 0))

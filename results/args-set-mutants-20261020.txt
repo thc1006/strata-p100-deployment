@@ -1,0 +1,335 @@
+# bench/ab_engine.sh's args_set (an arm's own value of a flag every config holds once) against broken copies of
+# its check, 2026-10-20.
+#
+# Each copy has one deliberate change, made by the text replacements in the runner at the end of this file; its
+# diff against the script is below.  tests/ab_engine_stubs.sh runs on a copy of the worktree that holds it, through
+# tests/harness_run.py; "killed" means that the harness failed, and the checks that failed are listed.
+# Machine: <host>, Ubuntu 22.04.5 LTS, Python 3.10.12, bash 5.1.16(1)-release.  Temporary directories are written <tmp>.
+# Inputs (sha256): bench/ab_engine.sh 00b705b1176d958e7db4a9eb64b39464589a60676329350359c159285bdce00d
+#                  tests/ab_engine_stubs.sh 2a5adb6433b9f60baf5c46755aaba57b63153c39d2d7d86b79df938c8ec95a74
+#                  tests/harness_run.py 6b6da2fd514f01ca1abc4c8a3e5652ab908ba8e2931e5b85ead5b76eb428ce1f
+
+== bench/ab_engine.sh: 9 of 9 killed   (python3 -B mutate_args_set.py <worktree>)
+
+-- the script before args_set (HEAD): killed, 9 failed checks
+FAIL args_set: exit 2, [15:59:20] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+FAIL args_set value: exit 2, [15:59:20] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+FAIL args_set absent: exit 2, [15:59:20] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+FAIL args_set noflag: exit 2, [15:59:20] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+FAIL args_set twice: exit 2, [15:59:20] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+FAIL args_set unsetdiffer: exit 2, [15:59:21] ab_engine: refusing: the arms file does not check out: C1: unknown fields ['args_set']
+... and 3 more
+--- bench/ab_engine.sh
++++ copy: the script before args_set (HEAD)
+@@ -5,15 +5,12 @@
+ # ARMS.json: {"tree": "<Strata tree>", "settle_s": 300, "screen_n": 3,
+ #             "arms": {"C0": {"config": "<config.json in the tree>", "env": {"STRATA_X": "0"},
+ #                             "args_add": ["--flag", "value"],      (optional: engine arguments only this arm has)
+-#                             "args_set": {"--flag": "value"},      (optional: this arm's value of a flag every config
+-#                                                                    holds once)
+ #                             "must": ["<regex the start-up lines must match>"], "must_not": ["<regex>"],
+ #                             "engaged": ["<regex an engine line of the screen must match>"], "never": ["<regex>"]}}}
+ # (engaged / never are judged by bench/ab_engine_summary.py on <tag>-engine-lines.txt: a switch that acts only on some
+ # requests shows only then.)  config, env ({} for none) and must are required, the others optional; an unknown field
+ # is refused, so a misspelt check is not skipped.  The arms' configs must be equal but for exe, cwd, log, their env
+-# keys, args_add (a flag the config does not hold otherwise) and the values args_set gives; the arms that do not set
+-# a flag hold it with one value.  A step does not run if the arms file or a config changed since this check.
++# keys and args_add.
+ # Before anything is stopped: strata-q3 must be active and loaded (one still loading is waited for; a failed or
+ # stopped one is someone else's state and is refused), the GPUs must hold no process but its engine, no measurement or
+ # evaluation may run (it would share the CPUs), and no command line may make strata-preflight.sh refuse the restart.
+@@ -92,11 +89,7 @@
+     assert os.path.isfile(os.path.join(tree, "engine-cuda12", "strata")), f"no engine in {tree}"
+     lists = ("must", "must_not", "engaged", "never", "args_add")
+     for name, a in s["arms"].items():
+-        assert set(a) <= {"config", "env", "args_set", *lists}, \
+-            f"{name}: unknown fields {sorted(set(a) - {'config', 'env', 'args_set', *lists})}"
+-        aset = a.get("args_set", {})
+-        assert isinstance(aset, dict) and all(k.startswith("--") and isinstance(v, str) and v and not v.startswith("--")
+-                                              for k, v in aset.items()), f"{name}: args_set must map flags to values"
++        assert set(a) <= {"config", "env", *lists}, f"{name}: unknown fields {sorted(set(a) - {'config', 'env', *lists})}"
+         assert isinstance(a.get("config"), str) and a["config"], f"{name}: no config"
+         assert isinstance(a.get("env"), dict) and all(isinstance(v, str) for v in a["env"].values()), \
+             f"{name}: env must be an object of strings ({{}} for none)"
+@@ -106,8 +99,6 @@
+         assert a.get("must"), f"{name}: must names no start-up line (at least the engine's version)"
+     assert os.path.isfile(os.path.join(tree, "serve", "server.py")), f"no server.py in {tree}"
+     rest = {}
+-    set_flags = {k for a in s["arms"].values() for k in a.get("args_set", {})}
+-    unset_vals = {}                           # flag -> the values of the arms that do not set it
+     for name, a in s["arms"].items():
+         c = json.load(open(os.path.join(tree, a["config"])))
+         assert c["exe"] == os.path.join(tree, "engine-cuda12", "strata"), f"{name}: the config's exe is not the tree's"
+@@ -119,35 +110,15 @@
+             at = [i for i in range(len(args) - len(add) + 1) if args[i:i + len(add)] == add]
+             assert len(at) == 1, f"{name}: the config's args hold its args_add {add} {len(at)} times, not once"
+             args = args[:at[0]] + args[at[0] + len(add):]
+-            for f in (x for x in add if x.startswith("--")):
+-                assert f not in args, f"{name}: its args_add's {f} is in the config's args once more"
+-        for flag in sorted(set_flags):
+-            at = [i for i, x in enumerate(args) if x == flag]
+-            assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
+-            want = a.get("args_set", {}).get(flag)
+-            assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+-            if want is None:
+-                unset_vals.setdefault(flag, set()).add(args[at[0] + 1])
+-            args = args[:at[0] + 1] + ["<set>"] + args[at[0] + 2:]
+         rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
+                                  "env": env, "args": args}, sort_keys=True)
+-    for flag, vals in sorted(unset_vals.items()):
+-        assert len(vals) == 1, f"the arms that do not set {flag} hold it with different values: {sorted(vals)}"
+-    assert len(set(rest.values())) == 1, \
+-        "the arms' configs differ in more than exe, cwd, log, the arms' env keys, args_add and the flags args_set names"
++    assert len(set(rest.values())) == 1, "the arms' configs differ in more than exe, cwd, log, the arms' env keys and args_add"
+   except AssertionError as e:
+     print(e)
+     sys.exit(1)
+   print("ok")
+ elif what[0] == "tree":
+     print(tree)
+-elif what[0] == "digest":               # the arms file and every arm's config, to see that none changed since the check
+-    import hashlib
+-    h = hashlib.sha256(open(sys.argv[1], "rb").read())
+-    for name in sorted(s["arms"]):
+-        c = os.path.join(tree, s["arms"][name]["config"])
+-        h.update(c.encode() + b"\0" + open(c, "rb").read())
+-    print(h.hexdigest()[:16])
+ elif what[0] == "num":
+     print(s.get(what[1], {"settle_s": 300, "screen_n": 3}[what[1]]))
+ else:                                   # arm NAME FIELD (the check made every field what it should be; a missing one is empty)
+@@ -162,7 +133,6 @@
+ EOF
+ }
+ ok=$(spec check) && [ "$ok" = ok ] || { say "refusing: the arms file does not check out: $ok"; exit 2; }
+-DIGEST=$(spec digest) && [ -n "$DIGEST" ] || { say "refusing: cannot read the arms file and its configs again"; exit 2; }
+ TREE=$(spec tree); SETTLE=$(spec num settle_s); N=$(spec num screen_n)
+ seen=" "
+ for step in "$@"; do
+@@ -345,8 +315,6 @@
+   CFG=$(spec arm "$arm" config)
+   LOG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["log"])' "$CFG")
+   say "=== $tag ($arm: $CFG)"
+-  [ "$(spec digest 2>/dev/null)" = "$DIGEST" ] ||
+-    { say "STOP: the arms file or an arm's config changed since the check at the start"; exit 1; }
+   wait_idle || { say "refusing: the service has been busy for $IDLE_WAIT_S s (someone's request is still running)"; exit 1; }
+   rescue 45min || exit 1                    # the stop, the load (at most 30 min) and the settle
+   stop_all || exit 1
+
+-- args_set's value not compared: killed, 1 failed check
+FAIL args_set value: exit 0, [15:59:48] ab_engine: strata-q3.service loaded after 4 s
+--- bench/ab_engine.sh
++++ copy: args_set's value not compared
+@@ -125,7 +125,6 @@
+             at = [i for i, x in enumerate(args) if x == flag]
+             assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
+             want = a.get("args_set", {}).get(flag)
+-            assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+             if want is None:
+                 unset_vals.setdefault(flag, set()).add(args[at[0] + 1])
+             args = args[:at[0] + 1] + ["<set>"] + args[at[0] + 2:]
+
+-- a flag held twice or not at all taken: killed, 2 failed checks
+FAIL args_set absent: exit 0, [15:59:48] ab_engine: strata-q3.service loaded after 4 s
+FAIL args_set twice: exit 2, [15:59:49] ab_engine: refusing: the arms file does not check out: the arms' configs differ in more than exe, cwd, log, the arm
+--- bench/ab_engine.sh
++++ copy: a flag held twice or not at all taken
+@@ -123,7 +123,7 @@
+                 assert f not in args, f"{name}: its args_add's {f} is in the config's args once more"
+         for flag in sorted(set_flags):
+             at = [i for i, x in enumerate(args) if x == flag]
+-            assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
++            if not at: continue
+             want = a.get("args_set", {}).get(flag)
+             assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+             if want is None:
+
+-- a flag held twice taken as once: killed, 1 failed check
+FAIL args_set twice: exit 2, [16:06:14] ab_engine: refusing: the arms file does not check out: the arms' configs differ in more than exe, cwd, log, the arm
+--- bench/ab_engine.sh
++++ copy: a flag held twice taken as once
+@@ -123,7 +123,7 @@
+                 assert f not in args, f"{name}: its args_add's {f} is in the config's args once more"
+         for flag in sorted(set_flags):
+             at = [i for i, x in enumerate(args) if x == flag]
+-            assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
++            assert len(at) >= 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
+             want = a.get("args_set", {}).get(flag)
+             assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+             if want is None:
+
+-- the other arms' values not compared: killed, 1 failed check
+FAIL args_set unsetdiffer: exit 0, [16:06:28] ab_engine: strata-q3.service loaded after 4 s
+--- bench/ab_engine.sh
++++ copy: the other arms' values not compared
+@@ -132,7 +132,7 @@
+         rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
+                                  "env": env, "args": args}, sort_keys=True)
+     for flag, vals in sorted(unset_vals.items()):
+-        assert len(vals) == 1, f"the arms that do not set {flag} hold it with different values: {sorted(vals)}"
++        pass
+     assert len(set(rest.values())) == 1, \
+         "the arms' configs differ in more than exe, cwd, log, the arms' env keys, args_add and the flags args_set names"
+   except AssertionError as e:
+
+-- every argument left out of the comparison: killed, 1 failed check
+FAIL args_set elsewhere: exit 0, [16:06:51] ab_engine: strata-q3.service loaded after 4 s
+--- bench/ab_engine.sh
++++ copy: every argument left out of the comparison
+@@ -128,7 +128,7 @@
+             assert want is None or args[at[0] + 1] == want, f"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}"
+             if want is None:
+                 unset_vals.setdefault(flag, set()).add(args[at[0] + 1])
+-            args = args[:at[0] + 1] + ["<set>"] + args[at[0] + 2:]
++            args = ["<set>"]
+         rest[name] = json.dumps({**{k: v for k, v in c.items() if k not in ("exe", "cwd", "log", "env", "args")},
+                                  "env": env, "args": args}, sort_keys=True)
+     for flag, vals in sorted(unset_vals.items()):
+
+-- any key taken for a flag: killed, 1 failed check
+FAIL args_set noflag: exit 2, [16:12:40] ab_engine: refusing: the arms file does not check out: C0: the config's args hold batch 0 times, not once
+--- bench/ab_engine.sh
++++ copy: any key taken for a flag
+@@ -95,7 +95,7 @@
+         assert set(a) <= {"config", "env", "args_set", *lists}, \
+             f"{name}: unknown fields {sorted(set(a) - {'config', 'env', 'args_set', *lists})}"
+         aset = a.get("args_set", {})
+-        assert isinstance(aset, dict) and all(k.startswith("--") and isinstance(v, str) and v and not v.startswith("--")
++        assert isinstance(aset, dict) and all(isinstance(v, str) and v
+                                               for k, v in aset.items()), f"{name}: args_set must map flags to values"
+         assert isinstance(a.get("config"), str) and a["config"], f"{name}: no config"
+         assert isinstance(a.get("env"), dict) and all(isinstance(v, str) for v in a["env"].values()), \
+
+-- an args_add that repeats a flag taken: killed, 1 failed check
+FAIL args_set addrepeat: exit 2, [16:12:54] ab_engine: refusing: the arms file does not check out: the arms' configs differ in more than exe, cwd, log, the
+--- bench/ab_engine.sh
++++ copy: an args_add that repeats a flag taken
+@@ -120,7 +120,7 @@
+             assert len(at) == 1, f"{name}: the config's args hold its args_add {add} {len(at)} times, not once"
+             args = args[:at[0]] + args[at[0] + len(add):]
+             for f in (x for x in add if x.startswith("--")):
+-                assert f not in args, f"{name}: its args_add's {f} is in the config's args once more"
++                pass
+         for flag in sorted(set_flags):
+             at = [i for i, x in enumerate(args) if x == flag]
+             assert len(at) == 1 and at[0] + 1 < len(args), f"{name}: the config's args hold {flag} {len(at)} times, not once"
+
+-- no check of the files before a step: killed, 1 failed check
+FAIL changed config: exit 0, [16:13:38] ab_engine: finishing (exit 0): stopping the test unit, starting strata-q3
+--- bench/ab_engine.sh
++++ copy: no check of the files before a step
+@@ -345,7 +345,7 @@
+   CFG=$(spec arm "$arm" config)
+   LOG=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["log"])' "$CFG")
+   say "=== $tag ($arm: $CFG)"
+-  [ "$(spec digest 2>/dev/null)" = "$DIGEST" ] ||
++  true ||
+     { say "STOP: the arms file or an arm's config changed since the check at the start"; exit 1; }
+   wait_idle || { say "refusing: the service has been busy for $IDLE_WAIT_S s (someone's request is still running)"; exit 1; }
+   rescue 45min || exit 1                    # the stop, the load (at most 30 min) and the settle
+
+== mutate_args_set.py
+"""Broken copies of bench/ab_engine.sh's args_set check against tests/ab_engine_stubs.sh, each in a copy of the
+worktree, run by tests/harness_run.py, three copies at a time.  Usage: python3 -B mutate_args_set.py <worktree>"""
+import concurrent.futures, difflib, hashlib, os, shutil, subprocess, sys, tempfile
+from pathlib import Path
+
+W = Path(sys.argv[1])
+sys.path.insert(0, str(W / "tests"))
+import harness_run as H  # noqa: E402
+
+E = "bench/ab_engine.sh"
+head = subprocess.run(["git", "-C", str(W), "show", f"HEAD:{E}"], capture_output=True, text=True, check=True).stdout
+M = [
+    ("the script before args_set (HEAD)", None, None),
+    ("args_set's value not compared",
+     "            assert want is None or args[at[0] + 1] == want, f\"{name}: the config's {flag} is {args[at[0] + 1]}, not {want}\"\n",
+     ""),
+    ("a flag held twice or not at all taken",
+     "            assert len(at) == 1 and at[0] + 1 < len(args), f\"{name}: the config's args hold {flag} {len(at)} times, not once\"\n",
+     "            if not at: continue\n"),
+    ("a flag held twice taken as once",
+     "assert len(at) == 1 and at[0] + 1 < len(args)", "assert len(at) >= 1 and at[0] + 1 < len(args)"),
+    ("the other arms' values not compared",
+     "        assert len(vals) == 1, f\"the arms that do not set {flag} hold it with different values: {sorted(vals)}\"\n",
+     "        pass\n"),
+    ("every argument left out of the comparison",
+     "            args = args[:at[0] + 1] + [\"<set>\"] + args[at[0] + 2:]", "            args = [\"<set>\"]"),
+    ("any key taken for a flag",
+     "all(k.startswith(\"--\") and isinstance(v, str) and v and not v.startswith(\"--\")",
+     "all(isinstance(v, str) and v"),
+    ("an args_add that repeats a flag taken",
+     "                assert f not in args, f\"{name}: its args_add's {f} is in the config's args once more\"\n",
+     "                pass\n"),
+    ("no check of the files before a step",
+     "  [ \"$(spec digest 2>/dev/null)\" = \"$DIGEST\" ] ||\n", "  true ||\n"),
+]
+
+
+def real_not_now():
+    """H.not_now(), but a driver inside another harness's sandbox (under the temp dir's stubs.* directories, the copies
+    the parallel mutants run) does not count: it starts the sandbox's stub service, not strata-q3."""
+    import tempfile
+    sandbox = os.path.join(tempfile.gettempdir(), "stubs.")
+    drivers = (b"bench/ab_engine.sh", b"bench/ab_model_run.sh", b"bench/switch_model.sh", b"ab-ops/switch_model.sh")
+    real = [pid for pid, cmd in H._cmdlines()
+            if any(part.endswith(d) and not part.startswith(sandbox.encode()) for part in cmd[:3] for d in drivers)]
+    if real:
+        return f"an experiment driver runs (pids {real})"
+    if H._active("strata-ab-rescue.timer"):
+        return "strata-ab-rescue.timer is armed"
+    r = subprocess.run(["systemctl", "is-active", "strata-q3.service"], capture_output=True, text=True, timeout=10)
+    if r.stdout.strip() in ("activating", "reloading"):
+        return "strata-q3 is starting"
+    return None
+
+
+def one(m):
+    name, old, new = m
+    src = (W / E).read_text()
+    if old is not None and src.count(old) != 1:
+        return m, None, [f"PATTERN found {src.count(old)} times"], ""
+    text = head if old is None else src.replace(old, new)
+    d = Path(tempfile.mkdtemp(prefix="muta."))
+    try:
+        for sub in ("bench", "scripts", "tools", "systemd", "config", "tests"):
+            shutil.copytree(W / sub, d / sub, ignore=shutil.ignore_patterns("__pycache__"))
+        (d / E).write_text(text)
+        why = real_not_now()         # a harness's fake engines would block a start of strata-q3
+        if why:
+            raise SystemExit(f"not now: {why}")
+        r = H.run(d / "tests/ab_engine_stubs.sh", d, 1500)
+        fails = [l[5:] for l in r["out"].splitlines() if l.startswith("FAIL ")]
+        killed = r["status"] != 0 or bool(fails)
+        diff = "".join(difflib.unified_diff(src.splitlines(True), text.splitlines(True), E, f"copy: {name}")).rstrip("\n")
+        return m, killed, [(x.splitlines() or [""])[0].replace(str(d), "<tmp>")[:150] for x in fails], diff
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+sha = lambda p: hashlib.sha256((W / p).read_bytes()).hexdigest()
+ver = lambda *c: subprocess.run(c, capture_output=True, text=True).stdout.split("\n")[0]
+print("# bench/ab_engine.sh's args_set (an arm's own value of a flag every config holds once) against broken copies of")
+print("# its check, 2026-10-20.")
+print("#")
+print("# Each copy has one deliberate change, made by the text replacements in the runner at the end of this file; its")
+print("# diff against the script is below.  tests/ab_engine_stubs.sh runs on a copy of the worktree that holds it, through")
+print("# tests/harness_run.py; \"killed\" means that the harness failed, and the checks that failed are listed.")
+print(f"# Machine: <host>, {ver('lsb_release', '-ds')}, {ver('python3', '-V')}, bash {ver('bash', '-c', 'echo $BASH_VERSION')}.  "
+      "Temporary directories are written <tmp>.")
+print("# Inputs (sha256): " + "\n#                  ".join(f"{p} {sha(p)}" for p in (E, "tests/ab_engine_stubs.sh", "tests/harness_run.py")))
+why = H.not_now()                    # the full check once, before any harness of this run starts
+if why:
+    raise SystemExit(f"not now: {why}")
+with concurrent.futures.ThreadPoolExecutor(3) as ex:
+    results = list(ex.map(one, M))
+print(f"\n== {E}: {sum(1 for x in results if x[1])} of {len(results)} killed   (python3 -B mutate_args_set.py <worktree>)")
+for (name, _, _), killed, fails, diff in results:
+    print(f"\n-- {name}: {'killed' if killed else 'SURVIVED'}, {len(fails)} failed check{'' if len(fails) == 1 else 's'}")
+    for x in fails[:6]:
+        print(f"FAIL {x}")
+    if len(fails) > 6:
+        print(f"... and {len(fails) - 6} more")
+    if diff:
+        print(diff)
+print("\n== mutate_args_set.py")
+print(Path(__file__).read_text(), end="")

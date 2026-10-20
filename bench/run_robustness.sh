@@ -12,6 +12,14 @@ mkdir -p "$R"
 for f in "$LOG" "$R/$TAG-robust-monitor.csv" "$R/$TAG-overload.json" "$R/$TAG-needles.json"; do
   [ -e "$f" ] && { echo "refusing: $f exists (pick a new tag)"; exit 2; }
 done
+# the log holds lines of the journal, and results write this host as <host>: every name of this host and the first
+# label of each, longest first, in any case (as bench/ab_model_run.sh)
+names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+[ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+        awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
 START_LINE=$(wc -l < "$ENGLOG")
 T_START=$(date '+%Y-%m-%d %H:%M:%S')
 python3 "$D/bench/monitor.py" record "$R/$TAG-robust-monitor.csv" --every 2 &
@@ -39,7 +47,7 @@ trap 'kill $MON 2>/dev/null' EXIT
   journalctl -u strata-q3.service --since "$T_START" --no-pager 2>/dev/null |
     grep -E '" (4|5)[0-9]{2} |\[strata\] (4|5)[0-9]{2} |ERR|error|refused|restart|had stopped' | tail -15
   echo "[$(date +%T)] done"
-} > "$LOG" 2>&1
+} 2>&1 | redact > "$LOG"
 kill $MON 2>/dev/null; wait $MON 2>/dev/null
 python3 "$D/bench/monitor.py" summary "$R/$TAG-robust-monitor.csv" > "$R/$TAG-robust-monitor-all.json"
 echo "finished $TAG robustness"

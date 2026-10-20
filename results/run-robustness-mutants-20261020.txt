@@ -1,0 +1,231 @@
+# bench/run_robustness.sh against broken copies of itself, 2026-10-20, after the fix that writes the host name as
+# <host> in its log (the script and its harness as committed with the fix).
+#
+# Each copy has one deliberate bug, made by the text replacements in the runner at the end of this file; its diff
+# against the script is below.  tests/run_robustness_stubs.sh runs the copy in its sandbox; "killed" means that at
+# least one of its checks failed, and the checks that failed are listed.  The copy that passes looks for the host's
+# names after it starts the monitor: when it then refuses, its EXIT trap stops the monitor, as the script's does.
+# Machine: <host>, Ubuntu 22.04.5 LTS, Python 3.10.12, bash 5.1.16(1)-release.  Temporary directories are written <tmp>.
+# Inputs (sha256): bench/run_robustness.sh 933cb03207fd26463bedb024e7647d141cd1f611d62192b65f2e45e56eafb4c9
+#                  tests/run_robustness_stubs.sh be46d4a2f3aa2fc5e9647f7f94db59fe8002de7d7a3c23b99f1012cab7e32051
+#                  the script before the fix (HEAD) c45470848e3430cd797e56020a3106e813face039053130a83ed141e7b79ef52
+
+== 7 of 8 killed   (python3 -B mutate_robust.py <worktree>)
+
+== the script before the fix (HEAD): killed, 4 failed checks
+FAIL the journal's lines:  十  20 08:45:29 testhost-machine python[1]: [strata] 400 invalid request: request exceeds the context window
+FAIL a host name is left: <tmp>/repo/results/t-run-robustness.log 
+FAIL engine log section: [10:06:20] engine log since this run: errors, refusals, watchdog, warnings
+FAIL without a host name: exit 0, finished t-nohost robustness
+--- bench/run_robustness.sh
++++ copy: the script before the fix (HEAD)
+@@ -12,14 +12,6 @@
+ for f in "$LOG" "$R/$TAG-robust-monitor.csv" "$R/$TAG-overload.json" "$R/$TAG-needles.json"; do
+   [ -e "$f" ] && { echo "refusing: $f exists (pick a new tag)"; exit 2; }
+ done
+-# the log holds lines of the journal, and results write this host as <host>: every name of this host and the first
+-# label of each, longest first, in any case (as bench/ab_model_run.sh)
+-names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+-[ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+-names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+-        awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+-redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+-redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+ START_LINE=$(wc -l < "$ENGLOG")
+ T_START=$(date '+%Y-%m-%d %H:%M:%S')
+ python3 "$D/bench/monitor.py" record "$R/$TAG-robust-monitor.csv" --every 2 &
+@@ -47,7 +39,7 @@
+   journalctl -u strata-q3.service --since "$T_START" --no-pager 2>/dev/null |
+     grep -E '" (4|5)[0-9]{2} |\[strata\] (4|5)[0-9]{2} |ERR|error|refused|restart|had stopped' | tail -15
+   echo "[$(date +%T)] done"
+-} 2>&1 | redact > "$LOG"
++} > "$LOG" 2>&1
+ kill $MON 2>/dev/null; wait $MON 2>/dev/null
+ python3 "$D/bench/monitor.py" summary "$R/$TAG-robust-monitor.csv" > "$R/$TAG-robust-monitor-all.json"
+ echo "finished $TAG robustness"
+
+== sed without -u: killed, 1 failed check
+FAIL the log of a stopped run: 
+--- bench/run_robustness.sh
++++ copy: sed without -u
+@@ -19,7 +19,7 @@
+ names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+ redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+-redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
++redact() { sed "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+ START_LINE=$(wc -l < "$ENGLOG")
+ T_START=$(date '+%Y-%m-%d %H:%M:%S')
+ python3 "$D/bench/monitor.py" record "$R/$TAG-robust-monitor.csv" --every 2 &
+
+== no first labels: killed, 2 failed checks
+FAIL the journal's lines:  十  20 08:45:29 <host> python[1]: [strata] 400 invalid request: request exceeds the context window
+FAIL a host name is left: <tmp>/repo/results/t-run-robustness.log 
+--- bench/run_robustness.sh
++++ copy: no first labels
+@@ -16,7 +16,7 @@
+ # label of each, longest first, in any case (as bench/ab_model_run.sh)
+ names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+ [ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+-names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
++names=$({ printf '%s\n' "$names"; } | sort -u |
+         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+ redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+ redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+
+== case-sensitive: killed, 3 failed checks
+FAIL the journal's lines:  十  20 08:45:29 <host> python[1]: [strata] 400 invalid request: request exceeds the context window
+FAIL a host name is left: <tmp>/repo/results/t-run-robustness.log 
+FAIL engine log section: [10:06:34] engine log since this run: errors, refusals, watchdog, warnings
+--- bench/run_robustness.sh
++++ copy: case-sensitive
+@@ -18,7 +18,7 @@
+ [ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+ names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+-redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
++redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/g"); done <<< "$names"
+ redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+ START_LINE=$(wc -l < "$ENGLOG")
+ T_START=$(date '+%Y-%m-%d %H:%M:%S')
+
+== shortest name first: killed, 1 failed check
+FAIL the journal's lines:  十  20 08:45:29 <host> python[1]: [strata] 400 invalid request: request exceeds the context window
+--- bench/run_robustness.sh
++++ copy: shortest name first
+@@ -17,7 +17,7 @@
+ names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+ [ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+ names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+-        awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
++        awk '{print length, $0}' | sort -n | cut -d' ' -f2-)
+ redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+ redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+ START_LINE=$(wc -l < "$ENGLOG")
+
+== no refusal without a name: killed, 1 failed check
+FAIL without a host name: exit 0, sed: -e expression #1, char 12: cannot specify modifiers on empty regexp
+--- bench/run_robustness.sh
++++ copy: no refusal without a name
+@@ -15,7 +15,6 @@
+ # the log holds lines of the journal, and results write this host as <host>: every name of this host and the first
+ # label of each, longest first, in any case (as bench/ab_model_run.sh)
+ names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+-[ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }
+ names=$({ printf '%s\n' "$names"; printf '%s\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |
+         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+ redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+
+== the journal around the redaction: killed, 1 failed check
+FAIL the journal's lines:  十  20 08:45:29 <host> python[1]: [strata] 400 invalid request: request exceeds the context window
+--- bench/run_robustness.sh
++++ copy: the journal around the redaction
+@@ -44,10 +44,10 @@
+   tail -n +"$((START_LINE + 1))" "$ENGLOG" | grep -i -E 'error|refused slot|no progress|watchdog|out of memory|WARNING|restart' |
+     sed -E 's/[0-9]+(\.[0-9]+)?/N/g' | sort | uniq -c | sort -rn | head -20
+   echo "[$(date +%T)] server journal since this run: HTTP errors, refusals, restarts"
+-  journalctl -u strata-q3.service --since "$T_START" --no-pager 2>/dev/null |
++  journalctl >&3 -u strata-q3.service --since "$T_START" --no-pager 2>/dev/null |
+     grep -E '" (4|5)[0-9]{2} |\[strata\] (4|5)[0-9]{2} |ERR|error|refused|restart|had stopped' | tail -15
+   echo "[$(date +%T)] done"
+-} 2>&1 | redact > "$LOG"
++} 3>&1 2>&1 | redact > "$LOG"
+ kill $MON 2>/dev/null; wait $MON 2>/dev/null
+ python3 "$D/bench/monitor.py" summary "$R/$TAG-robust-monitor.csv" > "$R/$TAG-robust-monitor-all.json"
+ echo "finished $TAG robustness"
+
+== the names found after the monitor started: SURVIVED, 0 failed checks
+--- bench/run_robustness.sh
++++ copy: the names found after the monitor started
+@@ -12,6 +12,11 @@
+ for f in "$LOG" "$R/$TAG-robust-monitor.csv" "$R/$TAG-overload.json" "$R/$TAG-needles.json"; do
+   [ -e "$f" ] && { echo "refusing: $f exists (pick a new tag)"; exit 2; }
+ done
++START_LINE=$(wc -l < "$ENGLOG")
++T_START=$(date '+%Y-%m-%d %H:%M:%S')
++python3 "$D/bench/monitor.py" record "$R/$TAG-robust-monitor.csv" --every 2 &
++MON=$!
++trap 'kill $MON 2>/dev/null' EXIT
+ # the log holds lines of the journal, and results write this host as <host>: every name of this host and the first
+ # label of each, longest first, in any case (as bench/ab_model_run.sh)
+ names=$({ hostname; hostname -f; hostname -A; } 2>/dev/null | tr ' ' '\n' | grep -v '^$' | sort -u)
+@@ -20,11 +25,6 @@
+         awk '{print length, $0}' | sort -rn | cut -d' ' -f2-)
+ redact_args=(); while IFS= read -r n; do redact_args+=(-e "s/$(printf '%s' "$n" | sed 's/[.[\*^$/]/\\&/g')/<host>/gI"); done <<< "$names"
+ redact() { sed -u "${redact_args[@]}"; }      # -u: each line reaches the log when it is written, also in a stopped run
+-START_LINE=$(wc -l < "$ENGLOG")
+-T_START=$(date '+%Y-%m-%d %H:%M:%S')
+-python3 "$D/bench/monitor.py" record "$R/$TAG-robust-monitor.csv" --every 2 &
+-MON=$!
+-trap 'kill $MON 2>/dev/null' EXIT
+ {
+   python3 "$D/bench/stress_matrix.py" boundary disconnect multiturn budget qa --tag "$TAG" --out "$R/stress.jsonl"
+   echo "[$(date +%T)] overload: 8 and 12 clients on 4 slots"
+
+== mutate_robust.py
+"""Broken copies of bench/run_robustness.sh against tests/run_robustness_stubs.sh: each copy has one deliberate bug,
+made by a text replacement below, and the harness must fail on it.  Usage: python3 -B mutate_robust.py <worktree>"""
+import difflib, hashlib, re, subprocess, sys, tempfile
+from pathlib import Path
+
+root = Path(sys.argv[1])
+src = (root / "bench/run_robustness.sh").read_text()
+before = subprocess.run(["git", "-C", str(root), "show", "HEAD:bench/run_robustness.sh"],
+                        capture_output=True, text=True, check=True).stdout
+
+
+def rep(old, new, text=None):
+    text = src if text is None else text
+    assert text.count(old) == 1, old
+    return text.replace(old, new)
+
+
+mutants = {
+    "the script before the fix (HEAD)": before,
+    "sed without -u": rep('redact() { sed -u "${redact_args[@]}"; }', 'redact() { sed "${redact_args[@]}"; }'),
+    "no first labels": rep("""names=$({ printf '%s\\n' "$names"; printf '%s\\n' "$names" | cut -d. -f1 | awk 'length >= 4'; } | sort -u |""",
+                           """names=$({ printf '%s\\n' "$names"; } | sort -u |"""),
+    "case-sensitive": rep('/<host>/gI"', '/<host>/g"'),
+    "shortest name first": rep("awk '{print length, $0}' | sort -rn", "awk '{print length, $0}' | sort -n"),
+    "no refusal without a name": rep("""[ -n "$names" ] || { echo "refusing: no host name to redact"; exit 1; }\n""", ""),
+    "the journal around the redaction": rep('} 2>&1 | redact > "$LOG"', '} 3>&1 2>&1 | redact > "$LOG"',
+                                            rep("  journalctl -u strata-q3.service", "  journalctl >&3 -u strata-q3.service")),
+}
+start, end = src.index("# the log holds lines of the journal"), src.index("START_LINE=$(wc -l")
+mutants["the names found after the monitor started"] = rep(
+    "trap 'kill $MON 2>/dev/null' EXIT\n", "trap 'kill $MON 2>/dev/null' EXIT\n" + src[start:end], src[:start] + src[end:])
+
+def sha(p):
+    return hashlib.sha256((root / p).read_bytes()).hexdigest()
+
+ver = lambda *c: subprocess.run(c, capture_output=True, text=True).stdout.split("\n")[0]
+print("# bench/run_robustness.sh against broken copies of itself, 2026-10-20, after the fix that writes the host name as")
+print("# <host> in its log (the script and its harness as committed with the fix).")
+print("#")
+print("# Each copy has one deliberate bug, made by the text replacements in the runner at the end of this file; its diff")
+print("# against the script is below.  tests/run_robustness_stubs.sh runs the copy in its sandbox; \"killed\" means that at")
+print("# least one of its checks failed, and the checks that failed are listed.  The copy that passes looks for the host's")
+print("# names after it starts the monitor: when it then refuses, its EXIT trap stops the monitor, as the script's does.")
+print(f"# Machine: <host>, {ver('lsb_release', '-ds')}, {ver('python3', '-V')}, bash {ver('bash', '-c', 'echo $BASH_VERSION')}.  "
+      "Temporary directories are written <tmp>.")
+print(f"# Inputs (sha256): bench/run_robustness.sh {sha('bench/run_robustness.sh')}")
+print(f"#                  tests/run_robustness_stubs.sh {sha('tests/run_robustness_stubs.sh')}")
+print(f"#                  the script before the fix (HEAD) {hashlib.sha256(before.encode()).hexdigest()}")
+killed = 0
+out = []
+for name, text in mutants.items():
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "bench").mkdir()
+        (Path(d) / "bench/run_robustness.sh").write_text(text)
+        r = subprocess.run(["bash", str(root / "tests/run_robustness_stubs.sh"), d], capture_output=True, text=True,
+                           timeout=300)
+    fails = [re.sub(r"/tmp/robust\.\w+", "<tmp>", l.splitlines()[0])[:150] for l in r.stdout.splitlines() if l.startswith("FAIL ")]
+    killed += r.returncode != 0
+    out.append(f"\n== {name}: {'killed' if r.returncode else 'SURVIVED'}, {len(fails)} failed check{'' if len(fails) == 1 else 's'}")
+    out += fails
+    out.append("".join(difflib.unified_diff(src.splitlines(True), text.splitlines(True), "bench/run_robustness.sh",
+                                            f"copy: {name}")).rstrip("\n"))
+print(f"\n== {killed} of {len(mutants)} killed   (python3 -B mutate_robust.py <worktree>)")
+print("\n".join(out))
+print("\n== mutate_robust.py")
+print(Path(__file__).read_text(), end="")

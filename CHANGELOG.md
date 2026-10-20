@@ -18,6 +18,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Fixed
 
+- `bench/run_robustness.sh` copied the journal's lines into its log with the machine's host name in them; results write it as `<host>`. It now writes every name of the host as `<host>`, as `bench/ab_model_run.sh` does, refuses to run when it finds none, and writes the log line by line, so a stopped run keeps what it logged until then. `tests/run_robustness_stubs.sh` (12 checks) runs it against stubs. Seven of eight broken copies of the script fail it; the eighth looks for the names after it starts the monitor, which a refusal then stops (`results/run-robustness-mutants-20261020.txt`).
 - `bench/ab_model_run.sh` looked for the service's engine with a pgrep whose command line held the text `strata-preflight.sh`'s pgrep looks for, so a start of the service at that moment would have been refused. The pattern is now written `[e]ngine`, and the wrapper's test checks that no command line of it holds the text.
 
 ## 2026-10-19

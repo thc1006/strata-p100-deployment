@@ -230,3 +230,53 @@ than between the arms.
 Of the 51 requests both K0 runs answered alike, K1 answered 23 otherwise, all in the phases where requests decode
 beside a read (four 8, eval4 3, admit 6, admit28 6), and the two K1 runs answered 19 requests otherwise than each other
 (four 4, eval4 4, admit 5, admit28 6). The two K0 runs differed in one answer, a sampled eval4 request.
+
+## IQ3_S: decision 0005's switches again, and the next candidates
+
+Written 2026-10-20 at 11:10, before any of these runs, while decision 0004's `ab3-` runs were under way. The criteria
+below are fixed now and not changed after results are seen.
+
+These runs follow the `ab3-` runs and use the model decision 0004 keeps. If it keeps IQ3_XXS, this plan is written
+again for IQ3_XXS before any run. Every arm runs Strata 0.1.45, the deployed binary (sha256 `00869ac7…`, in the
+experiment tree `~/dev/strata-0.1.45`), with GSQ-RCO IQ3_S and the deployed configuration
+(`configure_strata_q3.py --profile deployed --model iq3_s`: cuts 13/25/38 and the 6 GiB floors; the ZFS ARC at 2 GiB).
+The arms run in `bench/ab_engine.sh`'s transient unit and are measured with `bench/engine_screen.py`, screen version
+2026-10-19c, with the phases prefill, decode, four, decode4, eval4, admit, admit28 and turns. Arms file:
+`bench/arms-iq3s.json`; configs: `cfg-s-*.json` in the tree.
+
+| Arm | Change against K1 | Exact by its source | Targets |
+|---|---|---|---|
+| K1 | none: `STRATA_MMQ_GROUP_SORT=1` and `STRATA_PIPED_CONCURRENT=1`, as deployed | - | the baseline |
+| K0 | both of decision 0005's switches off | - | decision 0005 again |
+| P4 | `STRATA_SIDE_MIXER=2`, `STRATA_FUSE_WAIT=2`, `STRATA_B6_MMVQ_ROWS=1`, `STRATA_GR_UP75=1` | yes: each one's source says its outputs are bitwise the default's | decode rates |
+| P6 | P4 with `STRATA_ADAPT_NOWAIT=1` and `STRATA_ADAPT_LAG=2`: 0.2.0-beta's sm_60 set without `STRATA_FUSE_DECODE`, which 0.1.45 does not have | no: the adaptive tier's swaps take effect at other windows | decode rates |
+| R | `--vram-reserve-mib 1280` instead of 1536, on every card (the later cards take the first card's reserve) | no: some experts move from the CPU to CUDA2 | decode rates |
+| C2 | `--prefill-pipe 768` with the 2048 cap | no | prompt read rate |
+
+R adds about 128 expert slots to CUDA2, which holds 6218 of its layers' 6656 profiled experts at 2.0 MiB a slot (the
+08:30 start's lines in the engine log); the other cards already hold all of theirs.
+
+The order is K0, K1, P4, P6, R, C2, K1, K0, with the tags s-k0-1, s-k1-1, s-p4-1, s-p6-1, s-r-1, s-c2-1, s-k1-2 and
+s-k0-2. Every step is a fresh engine start.
+
+Criteria:
+- **K1 against K0:** the criteria of 2026-10-19 08:27, with K1's runs at the second and seventh places and K0's at the
+  first and last. If K1 fails one of them on IQ3_S, the maintainer decides; the deployed switches stay until then.
+- **A candidate goes on** to the confirmation when its change on a target metric is larger than the spread between
+  the two K1 runs and at least 5% in its favour, and no other metric moves against it by more than 5% beyond that
+  spread. The target metrics of P4, P6 and R are one user's engine decode rate, four users' total rate and four users
+  decoding short prompts (all four's tokens per wall second); C2's is the engine's prompt read rate at each of the
+  three prompt sizes.
+- **Answers:** P4 must give the requests that run alone (the prefill, decode and turns phases) the answers both K1 runs
+  give; a difference is a finding and stops it. For every arm, the requests it answers otherwise than K1 are
+  reported, counted only where the two K1 runs agree.
+- **The confirmation** puts the candidates that went on, together, against K1 in the order A, B, B, A (A = K1). They
+  are adopted when every run is usable and, in each B run against each A run, the metrics on which they went on are
+  better, with a mean gain of at least 5% when all of them are exact (P4 alone) and at least 10% otherwise; no other
+  metric is worse by more than 5%; and, when all of them are exact, the requests that run alone get the A runs'
+  answers.
+- **C2** changes how prompts are rounded, so the maintainer decides on it with the screen's numbers; it is confirmed
+  only if the maintainer adopts it.
+- **An adopted R** is deployed only after a robustness run (`bench/ab_model_run.sh <tag> B robustness`) keeps every
+  card at least 700 MiB of VRAM free and MemAvailable at or above 6 GiB.
+- A run that is not usable is measured again under a new tag; it is not judged.

@@ -1,0 +1,13 @@
+tag ab2-iq3s-robust  ended at 2026-10-20 09:45:43  run_robustness exit 0  interrupted no
+engine pid 532725  start ticks 62668948
+same engine as before: yes
+idle at the end: yes
+metrics requests during the run: 380
+engine log lines during the run: 0
+journal: system; lines during the run: 5
+journal done lines during the run: 380 (disconnect,cancel=True 4, length,cancel=False 107, stop,cancel=False 269)
+kernel lines during the run: 0
+concurrent read lines during the run: 251, with slots decoding: 203
+concurrent read off beside: no such line
+perf log Traceback lines: 0
+gpu ecc (index, corrected, uncorrected): 0, [N/A], [N/A];1, [N/A], [N/A];2, [N/A], [N/A];3, [N/A], [N/A];

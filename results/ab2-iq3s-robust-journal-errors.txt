@@ -1,0 +1,5 @@
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (4819) exceeds the context (32768); requests are never truncated. Send a smaller max_tokens (at most 4818 here), or add "fit_max_tokens": true to the model's strata-<model>.json to shorten it to the room left (#545)
+ 十  20 08:46:05 <host> python[532713]: [strata] done: 3 tokens in 37 s (27.1 tok/s) (disconnect, cancel=True), expert cache 99.5% hit
+ 十  20 08:46:12 <host> python[532713]: [strata] done: 32 tokens in 7 s (23.0 tok/s) (disconnect, cancel=True), expert cache 100.0% hit
+ 十  20 08:57:27 <host> python[532713]: [strata] done: 2 tokens in 1 s (13.5 tok/s) (disconnect, cancel=True), expert cache 100.0% hit
+ 十  20 08:57:28 <host> python[532713]: [strata] done: 3 tokens in 0 s (19.7 tok/s) (disconnect, cancel=True), expert cache 100.0% hit

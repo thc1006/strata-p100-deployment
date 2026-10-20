@@ -1,0 +1,13 @@
+tag ab3-iq3xxs-1  ended at 2026-10-20 11:42:30  run_profile exit 0  interrupted no
+engine pid 847920  start ticks 63597430
+same engine as before: yes
+idle at the end: yes
+metrics requests during the run: 98
+engine log lines during the run: 0
+journal: system; lines during the run: 0
+journal done lines during the run: 98 (length,cancel=False 45, stop,cancel=False 53)
+kernel lines during the run: 0
+concurrent read lines during the run: 66, with slots decoding: 44
+concurrent read off beside: no such line
+perf log Traceback lines: 0
+gpu ecc (index, corrected, uncorrected): 0, [N/A], [N/A];1, [N/A], [N/A];2, [N/A], [N/A];3, [N/A], [N/A];

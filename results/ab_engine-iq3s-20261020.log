@@ -1,0 +1,29 @@
+[16:24:56] ab_engine: === s-k0-1 (K0: /home/thc1006/dev/strata-0.1.45/cfg-s-k0.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[16:34:13] ab_engine: strata-ab-engine loaded after 538 s
+[16:34:13] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[16:39:24] ab_engine: measuring s-k0-1
+[16:51:27] ab_engine: done s-k0-1: screen exit 0, same engine yes
+[16:51:27] ab_engine: === s-k1-1 (K1: /home/thc1006/dev/strata-0.1.45/cfg-s-k1.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[17:00:45] ab_engine: strata-ab-engine loaded after 540 s
+[17:00:45] ab_engine: settling 300 s
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+[17:05:56] ab_engine: measuring s-k1-1
+[17:17:37] ab_engine: done s-k1-1: screen exit 0, same engine yes
+[17:17:37] ab_engine: === s-p4-1 (P4: /home/thc1006/dev/strata-0.1.45/cfg-s-p4.json)
+Running timer as unit: strata-ab-rescue.timer
+Will run service as unit: strata-ab-rescue.service
+Running as unit: strata-ab-engine.service
+[17:19:58] ab_engine: interrupted
+[17:19:58] ab_engine: finishing (exit 130): stopping the test unit, starting strata-q3
+[17:19:58] ab_engine: the test unit does not answer (still loading, or stuck): stopping it
+[17:27:35] ab_engine: strata-q3.service loaded after 2 s
+[17:27:35] ab_engine: strata-q3: active

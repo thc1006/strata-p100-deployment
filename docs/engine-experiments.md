@@ -298,8 +298,63 @@ Amended at 12:10 the same day, before any of these runs, after a review of the p
 - **The decoders' longest gap** (16K and 28K joining three decoders) counts against a candidate only when it is worse
   by more than 5% beyond the spread and by more than 0.25 s; the K1 runs' gaps are about half a second.
 - **The phases** are set for every step: `ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns`.
+
+Amended at 17:25 the same day: the first run of this screen, 16:24-17:19, is not used. During its first two steps,
+other work ran on the machine (8 vCPUs):
+- during s-k0-1's measurement (16:39-16:51): `scripts/test.sh` from 16:43:59 to 16:45:18, over both decode4 rounds and
+  the start of eval4, and a `scripts/check-drift.sh` run, hashes of the CUDA libraries, and scans and removals in /tmp;
+- during s-k1-1's (17:05-17:17): two unit test runs of about 8 s each, over decode4's second round and eval4's first,
+  and a few shorter commands.
+
+s-k0-1's first decode4 round served 102.0 tokens per second in total, s-k1-1's 108.5 (`results/s-k0-1-screen.txt`,
+`results/s-k1-1-screen.txt`). The maintainer stopped the screen during s-p4-1's load and chose to run all eight steps
+again, in the same order, under the tags s2-k0-1, s2-k1-1, s2-p4-1, s2-p6-1, s2-r-1, s2-c2-1, s2-k1-2 and s2-k0-2.
+While they run, nothing else runs on the machine but the remote evaluation's driver, on CPU 7 as before. The criteria
+do not change.
 - **R's arm check** must also show CUDA2's cache above 6300 slots ("CUDA2 runs layers 25-37, expert cache 63xx
   slots"), the reserve's effect where it matters.
 - The driver is changed before these runs: it refuses an `args_set` whose other arms hold the flag with different
   values and an `args_add` that repeats a flag the config holds, and it stops before a step when the arms file or a
   config changed since the check at the start.
+
+### IQ3_S screen: K0, K1, P4, P6, R, C2, K1, K0, 17:28-20:57
+
+The second run of the screen, under the tags s2-* (the first, 16:24-17:19, is not used: see the amendment of 17:25
+above). Every run is usable: the arm checks passed, the same engine answered (sha256 `00869ac7…` in every arm record),
+each run's 53 requests were counted, and no admission round ran other than designed (`results/SCREEN-iq3s.md`, against
+K1; `results/SCREEN-iq3s-k1-vs-k0.md`, K1 against K0). The arm records give the experiment tree's commit as
+`2b7ffada` with a five-file diff: `~/dev/strata-pr2985` is a copy of that tree whose `.git` file names the same worktree
+entry, so git reports the branch the copy checked out. The binary each arm ran is the deployed one.
+
+Against K1, with the spread between the two K1 runs:
+
+| metric | K1 spread | P4 | P6 | R | C2 |
+|---|---:|---:|---:|---:|---:|
+| 1 user: engine decode tok/s | 1.6% | +5.3% | +6.2% | +3.1% | -0.6% |
+| 4 users: total tok/s | 1.3% | +5.8% | +6.2% | +2.3% | +13.7% |
+| 4 users decoding short prompts: tokens per wall second | 3.0% | -1.9% | +1.6% | -0.5% | -0.2% |
+| 1.2K / 4K / 16K prompt: engine read tok/s | 0.4% / 0.3% / 0.1% | +0.5% / +0.2% / +0.0% | +0.5% / +0.1% / +0.1% | +0.1% / +0.1% / -0.0% | +10.7% / +8.7% / -0.1% |
+
+- **P4 and P6 go on**: on one user's decode and four users' total rate, each gains at least 5% and more than its
+  spread, and no other metric moves against them by more than 5% beyond its spread (eval4 is reported only). P4 gives the
+  requests that run alone the answers of both K1 runs on all 12 that the two K1 runs answer alike (the prefill and
+  decode phases). The turns phase cannot test this: both K1 runs, and both K0 runs, answered all four of its requests
+  differently from each other.
+- **R does not go on**: +3.1% and +2.3% on its target metrics.
+- **C2** reads 1.2K and 4K prompts 10.7% and 8.7% faster, and four users get 13.7% more tokens per second; no other
+  metric moves against it by more than 5% beyond its spread. It answers 9 of the 21 requests that the two K1 runs
+  answer alike differently (prefill 2, decode 3, four 4).
+- **K1 against K0**, by the criteria of 2026-10-19 08:27: `STRATA_PIPED_CONCURRENT=1` passes: while a 16K prompt joins
+  three decoders, their longest gap is 0.72 and 0.83 s in the K1 runs against 23.27 and 23.20 s in the K0 runs, and the
+  four requests' makespan is 1.9% shorter (28K: 0.74 against 36.57 s); the joining prompt's first token comes 8.4%
+  later (28K: 8.2%). `STRATA_MMQ_GROUP_SORT=1` fails: on IQ3_S, K1 reads prompts at K0's rate (-0.4%, +0.1% and +0.3%
+  at 1.2K, 4K and 16K), where on IQ3_XXS the switch read them 9-17% faster.
+
+The maintainer decided after these results: P4 and P6 are confirmed together as the plan says (P6's switches against K1, A B B A,
+with the 10% threshold, since P6 is not exact); C2 is adopted and confirmed; `STRATA_MMQ_GROUP_SORT=1` stays deployed
+(no cost was measured; removing it would take a restart). The confirmations run after the review fixes are verified.
+
+Fixed before these confirmations run: when a candidate went on on more than one metric, each of those metrics must be
+better in each B run than in each A run, and the mean of its B runs must beat the mean of its A runs by the threshold.
+For P6's switches these are one user's decode and four users' total rate (10%); for C2, the read rates of 1.2K and 4K
+prompts (10%). The other criteria of the plan stand.

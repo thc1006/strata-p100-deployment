@@ -280,3 +280,26 @@ Criteria:
 - **An adopted R** is deployed only after a robustness run (`bench/ab_model_run.sh <tag> B robustness`) keeps every
   card at least 700 MiB of VRAM free and MemAvailable at or above 6 GiB.
 - A run that is not usable is measured again under a new tag; it is not judged.
+
+Amended at 12:10 the same day, before any of these runs, after a review of the plan, the arms file and the driver:
+- **What P6 measures.** In 0.1.45, `STRATA_ADAPT_NOWAIT=1` makes the adaptive tier skip its wait, and the lag is then
+  never read (`src/program/generate.cpp`, lines 14251 and 15621). With the layer split and the pipelined slot groups,
+  either switch also makes every verifier publish every activation (`set_always_publish`, lines 9606-9612). P6 against
+  P4 therefore measures `STRATA_ADAPT_NOWAIT=1` with that, not `STRATA_ADAPT_LAG=2`; upstream's P100 gain for the lag
+  came from a run without it.
+- **Where P4's switches act here.** `STRATA_SIDE_MIXER=2` acts only in one request's windows, not in a batch window
+  (`src/core/verify.cpp`, lines 1008-1016). `STRATA_FUSE_WAIT=2` acts only on a stage whose experts are not all
+  resident: CUDA2 when decoding (lines 1975-1984). `STRATA_B6_MMVQ_ROWS=1` acts on the Q6_K, Q4_K and IQ4_XS matrices
+  this model has, and `STRATA_GR_UP75=1` on windows of three or more tokens. The engine prints no line for any of the
+  six; the arm record shows only that the engine has the variables.
+- **The spread** that a candidate's change is held against is that metric's own spread between the two K1 runs.
+- **eval4's two metrics** are reported but do not stop a candidate: its two K0 runs differed by 26.3% and 11.1% on
+  2026-10-19 (`results/SCREEN-combo.md`).
+- **The decoders' longest gap** (16K and 28K joining three decoders) counts against a candidate only when it is worse
+  by more than 5% beyond the spread and by more than 0.25 s; the K1 runs' gaps are about half a second.
+- **The phases** are set for every step: `ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns`.
+- **R's arm check** must also show CUDA2's cache above 6300 slots ("CUDA2 runs layers 25-37, expert cache 63xx
+  slots"), the reserve's effect where it matters.
+- The driver is changed before these runs: it refuses an `args_set` whose other arms hold the flag with different
+  values and an `args_add` that repeats a flag the config holds, and it stops before a step when the arms file or a
+  config changed since the check at the start.

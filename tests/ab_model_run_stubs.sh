@@ -231,7 +231,9 @@ check_refusal() {  # check_refusal <tag> <want rc> <text> [env...]
   else fail "refusal '$text': exit $rc, $(cat "$SB/$tag.out")"; fi
 }
 reset; echo 120 > "$SB/ready_s"; check_refusal t-settle 1 "became ready 120 s ago" SETTLE_S=300
-reset; echo 1000 > "$SB/ready_s"; check_refusal t-young 1 "is younger than the service's ready time"
+# 60 s, not more: the stub computes the unit's start from the monotonic clock, which a runner fresh from its boot has
+# run for only minutes
+reset; echo 60 > "$SB/ready_s"; check_refusal t-young 1 "is younger than the service's ready time"
 reset; echo '{"live": {"state": "decoding", "running": 1, "queued": 0}, "totals": {"requests": 142}}' > "$SB/metrics"
 check_refusal t-busy 1 "the service is not idle"
 reset; echo '{"live": {"state": "idle", "running": 0, "queued": 0}}' > "$SB/metrics"; check_refusal t-nototal 1 "the service is not idle"

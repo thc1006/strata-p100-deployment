@@ -134,7 +134,10 @@ case "$*" in
   *compute-apps*) pgrep -f "^$SB/(tree|prod)/engine-cuda12/strata --serve"; cat "$SB/gpu_other" 2>/dev/null; exit 0 ;;
   *memory.used*) for i in 0 1 2 3; do if [ "$i" = 0 ] && [ -e "$SB/gpu_stuck" ]; then echo 500; else echo $used; fi; done ;;
   *memory.free*) for i in 0 1 2 3; do echo 900; done ;;
-  *dmon*) echo "#Time gpu sm mem"; while :; do for i in 0 1 2 3; do echo "$(date +%T) $i 50 10"; done; sleep 1; done ;;
+  # it waits with the builtin read on a FIFO that no one writes, not with sleep: a sleep it ran would outlive it
+  # when the driver ends it, and the harness would find it left behind
+  *dmon*) echo "#Time gpu sm mem"; [ -p "$SB/never" ] || mkfifo "$SB/never" 2> /dev/null; exec 9<> "$SB/never"
+          while :; do for i in 0 1 2 3; do echo "$(date +%T) $i 50 10"; done; read -r -t 1 -u 9 _ || :; done ;;
 esac
 EOF
 printf '#!/bin/bash\ncase "$*" in "") echo testhost-machine ;; -f) echo testhost-machine ;; -A) echo "nbname.netbird.cloud " ;; esac\n' > "$SB/bin/hostname"

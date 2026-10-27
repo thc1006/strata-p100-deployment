@@ -689,8 +689,14 @@ class Sandbox:
         u = self.unit()
         unit_env = dict(kv.split("=", 1) for kv in loaded_environment(self.spec["strata-q3.service"]) if "=" in kv)
         pw = pwd.getpwuid(os.getuid())
-        env = {**self.spec["__manager__"], **unit_env, "HOME": pw.pw_dir, "USER": pw.pw_name, "LOGNAME": pw.pw_name,
-               "SHELL": pw.pw_shell, "INVOCATION_ID": "0" * 32, **(server_env or {})}
+        # as systemd gives a service of its User: no HOME for a home of / or none, and no SHELL for a nologin one (the
+        # tests run as nobody in CI, whose shell is /usr/sbin/nologin)
+        nologin = {f"{d}/{n}" for d in ("/bin", "/sbin", "/usr/bin", "/usr/sbin") for n in ("nologin", "false", "true")}
+        env = {**self.spec["__manager__"], **unit_env,
+               "HOME": pw.pw_dir if pw.pw_dir.startswith("/") and pw.pw_dir != "/" else None,
+               "USER": pw.pw_name, "LOGNAME": pw.pw_name,
+               "SHELL": pw.pw_shell if pw.pw_shell.startswith("/") and pw.pw_shell not in nologin else None,
+               "INVOCATION_ID": "0" * 32, **(server_env or {})}
         env = {k: v for k, v in env.items() if v is not None}
         up = self.d / "up"
         up.unlink(missing_ok=True)

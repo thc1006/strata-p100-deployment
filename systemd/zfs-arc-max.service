@@ -9,7 +9,8 @@ Type=oneshot
 RemainAfterExit=yes
 # 2 GiB (was 8 until 2026-10-18): the box runs only this service; the engine reads the model files once at start
 # and then serves from VRAM and locked RAM, so a larger ARC held blocks nothing reread (the mmapped PLE table
-# was cached twice, in the page cache and the ARC: openzfs#16031).  The ARC minimum is 1/32 of RAM (1.96 GiB).
+# was cached twice, in the page cache and the ARC: openzfs#16031).  The ARC minimum is OpenZFS's default, 1/32 of
+# RAM: c_min 2107100928 B (1.96 GiB) of the 65846904 kB MemTotal (results/zfs-arc-20261025.txt).
 # zfs_arc_shrinker_limit=0 (OpenZFS's newer default): the ARC gives memory back without a per-call cap when the
 # kernel asks, so a sudden demand does not end in an OOM kill while the ARC is still large
 ExecStart=/bin/sh -ec 'echo 2147483648 > /sys/module/zfs/parameters/zfs_arc_max; echo 0 > /sys/module/zfs/parameters/zfs_arc_shrinker_limit'

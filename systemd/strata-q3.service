@@ -2,8 +2,9 @@
 Description=Strata Qwen3.8-Flash-Next GSQ-RCO (the model in config/profile.conf) on 4x P100 (OpenAI/Anthropic API on 127.0.0.1:8080)
 Wants=zfs-arc-max.service nvidia-persistenced.service
 After=zfs-arc-max.service nvidia-persistenced.service
-# a crash loop must not re-lock 27 GiB of RAM again and again.  The preflight waits for memory instead of failing fast,
-# so these starts are real attempts; when the limit is hit, strata-q3-health retries after 30 min (no silent outage).
+# a crash loop must not re-lock 27 GiB of RAM again and again (VmLck 28125136 kB: results/deploy-0.1.45-20261019.txt).
+# The preflight waits for memory instead of failing fast, so these starts are real attempts; when the limit is hit,
+# strata-q3-health retries after 30 min (no silent outage).
 StartLimitIntervalSec=1h
 StartLimitBurst=4
 
@@ -23,20 +24,24 @@ ExecStartPre=/home/thc1006/dev/p100-q3-deployment/scripts/strata-preflight.sh
 ExecStart=/home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/serve/server.py --engine strata --config /home/thc1006/dev/strata/strata-iq3_xxs.json --port 8080
 # "active" only once the model is loaded
 ExecStartPost=/home/thc1006/dev/p100-q3-deployment/scripts/strata-wait-ready.sh
-# the preflight may wait up to 25 min for memory and 2 min for the GPUs; a load takes ~9 min, wait-ready allows 30
+# the preflight may wait up to 25 min for memory and 2 min for the GPUs; a load takes ~9 min (538-548 s with IQ3_S:
+# results/ab2-iq3s-*-switch.txt, results/ab3-iq3s-*-switch.txt), wait-ready allows 30
 TimeoutStartSec=75min
-# --ple-io ram mlocks the ~26.8 GiB PLE table; the resident expert copy is page-locked too
+# --ple-io ram mlocks the ~26.8 GiB PLE table (results/iq3s-memory-budget-20261019.txt); the resident expert copy is
+# page-locked too
 LimitMEMLOCK=infinity
 LimitNOFILE=65536
-# under memory pressure this service is the one to go (it holds ~30 GiB), not another user's job; and none of it
-# goes to swap (measured: 428 MB of server.py/engine pages swapped out after a load, back on the request path)
+# under memory pressure this service is the one to go (its cgroup holds about 28.5 GiB, its engine 35 GiB resident:
+# results/oom-incident-20261021.txt, section 3), not another user's job; and none of it goes to swap (up to
+# 1.39 GiB of swap was in use during the tuning runs before: results/SUMMARY.md)
 OOMScoreAdjust=500
 MemorySwapMax=0
 NoNewPrivileges=yes
 ProtectSystem=full
 PrivateTmp=yes
-# SIGTERM goes to server.py only (it sends QUIT to the engine, up to ~60 s); what is left when server.py exits is killed
-# at once, and everything after TimeoutStopSec.  During the ~9 min load server.py has no SIGTERM handler yet, so a stop
+# SIGTERM goes to server.py only (it sends QUIT to the engine, then waits 20 s each for QUIT, terminate and kill: serve/server.py); what is left when server.py exits is killed
+# at once, and everything after TimeoutStopSec.  During the ~9 min load (538-548 s with IQ3_S:
+# results/ab3-iq3s-*-switch.txt, results/ab2-iq3s-*-switch.txt) server.py has no SIGTERM handler yet, so a stop
 # then ends it at once and the engine is killed (not graceful, but harmless)
 KillMode=mixed
 TimeoutStopSec=120

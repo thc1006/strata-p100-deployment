@@ -2,9 +2,9 @@
 # ExecStartPre of strata-q3.service.  It waits where waiting helps and refuses only what a start cannot fix:
 #   - no other Strata engine or :8080 listener (a manual start would load a second copy)
 #   - the four P100s are there (the unit can be dispatched before the driver has bound them at boot): up to 120 s
-#   - enough RAM for the locked PLE table (26.8 GiB) + resident experts + the engine: waits up to 25 min (another user's
-#     job may be finishing), counting what the ZFS ARC can give back above its minimum.  Failing fast here would use up
-#     the unit's start limit in minutes and leave the service down.
+#   - enough RAM for the locked PLE table (26.8 GiB, results/iq3s-memory-budget-20261019.txt) + resident experts + the
+#     engine: waits up to 25 min (another user's job may be finishing), counting what the ZFS ARC can give back above
+#     its minimum.  Failing fast here would use up the unit's start limit in minutes and leave the service down.
 #   - the engine binary is the deployed one, the model loads at start (no lazy_load), and the config has no CRITICAL
 #     difference from config/profile.conf (setup.sh's start and update.sh rewrite it): every difference is critical
 #     except the tuning steps and the web Settings fields listed in configure_strata_q3.py NOTE_ONLY_KEYS, which warn
@@ -12,7 +12,11 @@ set -u
 D=$(cd "$(dirname "$0")/.." && pwd)
 STRATA=${STRATA_DIR:-/home/thc1006/dev/strata}
 CFG=$STRATA/strata-iq3_xxs.json
-MIN_AVAIL_GIB=${STRATA_MIN_AVAIL_GIB:-36}
+# what a start needs usable: what IQ3_S's starts took of the 58 GiB they saw (35.6 GiB at most: 22.4-23.1 GiB
+# were available after them, results/ab2-iq3s-*-switch.txt and results/ab3-iq3s-*-switch.txt), plus the 6 GiB
+# floor of decision 0004.  36 GiB, the gate before 2026-10-22, was set for IQ3_XXS, which takes about 31 GiB
+# (results/deploy-0.1.45-20261019.txt).
+MIN_AVAIL_GIB=${STRATA_MIN_AVAIL_GIB:-42}
 MEM_WAIT_S=${STRATA_MEM_WAIT_S:-1500}
 say() { echo "strata-preflight: $*"; }
 [[ "$MIN_AVAIL_GIB" =~ ^[0-9]+$ && "$MEM_WAIT_S" =~ ^[0-9]+$ ]] ||
@@ -49,7 +53,8 @@ while [ "$(usable_gib)" -lt "$MIN_AVAIL_GIB" ]; do
 done
 
 # the ARC cap only warns: without zfs-arc-max.service the figure above counts an ARC that can grow back
-arc_want=$(grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' /etc/systemd/system/zfs-arc-max.service 2>/dev/null | cut -d' ' -f2)
+arc_want=$(grep -E '^[[:blank:]]*ExecStart[[:blank:]]*=' /etc/systemd/system/zfs-arc-max.service 2>/dev/null |
+           grep -o 'echo [0-9]* > /sys/module/zfs/parameters/zfs_arc_max' | cut -d' ' -f2)
 arc_have=$(cat /sys/module/zfs/parameters/zfs_arc_max 2>/dev/null)
 if [ -z "$arc_want" ] || [ "$arc_have" != "$arc_want" ]; then
   say "note: zfs_arc_max is ${arc_have:-unreadable}, zfs-arc-max.service writes ${arc_want:-?} (did it run?)"
@@ -59,11 +64,13 @@ fi
 PROFILE_ARGS=$(sed -e 's/#.*//' "$D/config/profile.conf" | tr -d '\r' | xargs)
 [ -n "$PROFILE_ARGS" ] || { say "config/profile.conf has no arguments"; exit 1; }
 err=$(mktemp); trap 'rm -f "$err"' EXIT
+# python3 -I: no user site-packages (a .pth there would run here) and no PYTHON* variables; the tool imports only
+# the standard library
 # shellcheck disable=SC2086  # PROFILE_ARGS holds the tool's arguments, one word each
-out=$(python3 "$D/tools/configure_strata_q3.py" "$CFG" $PROFILE_ARGS --dry-run 2>"$err") || {
+out=$(python3 -I "$D/tools/configure_strata_q3.py" "$CFG" $PROFILE_ARGS --dry-run 2>"$err") || {
   say "config check failed: $(cat "$err")"; exit 1; }
 # fail closed: no verdict (a JSON or Python error) is a refusal, not a pass
-verdict=$(printf '%s' "$out" | python3 -c '
+verdict=$(printf '%s' "$out" | python3 -I -c '
 import json, sys
 d = json.load(sys.stdin)
 cfg = json.load(open(sys.argv[1], encoding="utf-8-sig"))     # server.py reads it the same way

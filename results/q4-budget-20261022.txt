@@ -1,0 +1,386 @@
+# Where each candidate GGUF of Qwen3.8-Flash-Next would live on this machine, and the RAM left above the floor: the
+# computation of 2026-10-18 21:46-21:53, run again on 2026-10-22 on the same inputs.  Decision 0004's Pros and Cons take
+# their RAM figures and routing shares from it.  results/iq3s-memory-budget-20261019.txt is another computation, by
+# bench/model_memory_budget.py on 2026-10-19: each card's share of the routing at three reserves, and no RAM figures.
+#
+# How it was made (the scripts are at the end of this file):
+# - gguf_head.py read the tensor headers of each shard into one JSON-lines file per shard on 2026-10-18 21:41-21:42:
+#   by HTTP range requests at the pinned revisions listed at the end, and IQ3_XXS from its local shards
+#   (~/dev/Strata-data/models/IQ3_XXS).  The routed experts' and PLE tables' sizes below equal those of
+#   results/iq3s-memory-budget-20261019.txt.
+# - budget.py gives, for each file, the experts that do not fit in VRAM at its best layer split, and the RAM left above
+#   an 8 GiB floor.  It takes as constants what was read by hand on the running service (IQ3_XXS, engine 0.1.43.1) at
+#   21:4x on 2026-10-18: MemAvailable 18.6 GiB; the ARC at 7.47 GiB of its 8 GiB cap; the experts each card held (the
+#   engine log of the 02:26 start); each card's VRAM free above the 1536 MiB reserve (/metrics).  No raw output of
+#   these readings was kept.
+# - coverage_fast.py gives the share of the expert profile's routing that the cards would hold
+#   (~/dev/strata/data/expert-profile.bin, sha256 8f59b4aa8873209d..., as config/deployed-artifacts.sha256 lists it).
+# - derive.py gives decision 0004's figures, unrounded, from budget.py's output.
+# - On 2026-10-22, `python3 -I budget.py`, `python3 -I coverage_fast.py` and `python3 -I derive.py` ran in the
+#   directory that holds the header files of 2026-10-18.  budget.py's output is, byte for byte, the one saved on
+#   2026-10-18, and coverage_fast.py printed the same lines as on 2026-10-18.
+#
+# Decision 0004 uses the rows "+kv-resident 20480, reserve 1024" (kv-resident 20480 and a 1024 MiB reserve), at 32K
+# of context, with the ARC at 2 GiB (the second number of each pair) and a 6 GiB floor instead of 8 GiB (2.0 GiB more
+# RAM above it).  derive.py's lines below give them: bartowski Q4_0 -1.50 GiB, Unsloth UD-Q4_K_XL -11.20 GiB,
+# bartowski IQ4_XS +1.20 GiB, Unsloth UD-IQ4_XS +5.24 GiB.  The routing shares are coverage_fast.py's rows
+# "kv-resident 20480 + reserve 1024".
+
+== budget.py, 2026-10-22 (the same as 2026-10-18)
+VRAM for experts now: 42.47 GiB; RAM headroom above the 8 GiB floor: 10.6 GiB (+5.5 if ARC 8->2 GiB)
+KV streaming pinned RAM, 4 slots: 32K (now) 0.0 GiB, 128K x4 int8 6.7 GiB, 128K x4 k8v4 5.3 GiB, 256K x4 k8v4 10.5 GiB
+
+IQ3_XXS (now): experts 39.97 GiB, dense+head vs now +0.00 GiB, PLE 26.82 GiB
+  as deployed                        best split (12, 26, 38): spill  0.00 GiB to RAM (100.0% of expert bytes in VRAM) | RAM left above floor: 32K (now) +10.6/+16.1, 128K x4 int8 +3.9/+9.4, 128K x4 k8v4 +5.3/+10.8, 256K x4 k8v4 +0.1/+5.5
+  +kv-resident 20480, reserve 1024   best split (11, 25, 38): spill  0.00 GiB to RAM (100.0% of expert bytes in VRAM) | RAM left above floor: 32K (now) +8.9/+14.4, 128K x4 int8 +3.9/+9.4, 128K x4 k8v4 +5.3/+10.8, 256K x4 k8v4 +0.1/+5.5
+  + also prefill 1024 (est.)         best split (7, 23, 37): spill  0.00 GiB to RAM (100.0% of expert bytes in VRAM) | RAM left above floor: 32K (now) +8.9/+14.4, 128K x4 int8 +3.9/+9.4, 128K x4 k8v4 +5.3/+10.8, 256K x4 k8v4 +0.1/+5.5
+
+GSQ-RCO IQ3_S: experts 46.84 GiB, dense+head vs now +0.31 GiB, PLE 26.82 GiB
+  as deployed                        best split (12, 24, 36): spill  4.68 GiB to RAM ( 90.0% of expert bytes in VRAM) | RAM left above floor: 32K (now) +5.9/+11.4, 128K x4 int8 -0.8/+4.7, 128K x4 k8v4 +0.6/+6.1, 256K x4 k8v4 -4.6/+0.8
+  +kv-resident 20480, reserve 1024   best split (13, 25, 38): spill  2.10 GiB to RAM ( 95.5% of expert bytes in VRAM) | RAM left above floor: 32K (now) +6.8/+12.3, 128K x4 int8 +1.8/+7.3, 128K x4 k8v4 +3.2/+8.7, 256K x4 k8v4 -2.1/+3.4
+  + also prefill 1024 (est.)         best split (13, 25, 38): spill  0.30 GiB to RAM ( 99.4% of expert bytes in VRAM) | RAM left above floor: 32K (now) +8.6/+14.1, 128K x4 int8 +3.6/+9.1, 128K x4 k8v4 +5.0/+10.5, 256K x4 k8v4 -0.2/+5.2
+
+Unsloth UD-IQ4_XS: experts 55.43 GiB, dense+head vs now +0.78 GiB, PLE 26.82 GiB
+  as deployed                        best split (9, 19, 30): spill 13.74 GiB to RAM ( 75.2% of expert bytes in VRAM) | RAM left above floor: 32K (now) -3.1/+2.3, 128K x4 int8 -9.8/-4.4, 128K x4 k8v4 -8.4/-2.9, 256K x4 k8v4 -13.7/-8.2
+  +kv-resident 20480, reserve 1024   best split (10, 21, 32): spill 11.16 GiB to RAM ( 79.9% of expert bytes in VRAM) | RAM left above floor: 32K (now) -2.2/+3.2, 128K x4 int8 -7.3/-1.8, 128K x4 k8v4 -5.8/-0.4, 256K x4 k8v4 -11.1/-5.6
+  + also prefill 1024 (est.)         best split (10, 21, 33): spill  8.96 GiB to RAM ( 83.8% of expert bytes in VRAM) | RAM left above floor: 32K (now) -0.0/+5.4, 128K x4 int8 -5.1/+0.4, 128K x4 k8v4 -3.6/+1.8, 256K x4 k8v4 -8.9/-3.4
+
+bartowski IQ4_XS: experts 60.94 GiB, dense+head vs now -0.69 GiB, PLE 26.82 GiB
+  as deployed                        best split (9, 30, 40): spill 17.78 GiB to RAM ( 70.8% of expert bytes in VRAM) | RAM left above floor: 32K (now) -7.2/-1.7, 128K x4 int8 -13.9/-8.4, 128K x4 k8v4 -12.5/-7.0, 256K x4 k8v4 -17.7/-12.3
+  +kv-resident 20480, reserve 1024   best split (10, 20, 31): spill 15.20 GiB to RAM ( 75.1% of expert bytes in VRAM) | RAM left above floor: 32K (now) -6.3/-0.8, 128K x4 int8 -11.3/-5.8, 128K x4 k8v4 -9.9/-4.4, 256K x4 k8v4 -15.2/-9.7
+  + also prefill 1024 (est.)         best split (10, 20, 31): spill 13.00 GiB to RAM ( 78.7% of expert bytes in VRAM) | RAM left above floor: 32K (now) -4.1/+1.4, 128K x4 int8 -9.1/-3.6, 128K x4 k8v4 -7.7/-2.2, 256K x4 k8v4 -13.0/-7.5
+
+bartowski Q4_0: experts 63.57 GiB, dense+head vs now -0.63 GiB, PLE 26.82 GiB
+  as deployed                        best split (9, 30, 40): spill 20.48 GiB to RAM ( 67.8% of expert bytes in VRAM) | RAM left above floor: 32K (now) -9.9/-4.4, 128K x4 int8 -16.6/-11.1, 128K x4 k8v4 -15.2/-9.7, 256K x4 k8v4 -20.4/-15.0
+  +kv-resident 20480, reserve 1024   best split (9, 18, 39): spill 17.90 GiB to RAM ( 71.8% of expert bytes in VRAM) | RAM left above floor: 32K (now) -9.0/-3.5, 128K x4 int8 -14.0/-8.5, 128K x4 k8v4 -12.6/-7.1, 256K x4 k8v4 -17.8/-12.4
+  + also prefill 1024 (est.)         best split (9, 19, 30): spill 15.70 GiB to RAM ( 75.3% of expert bytes in VRAM) | RAM left above floor: 32K (now) -6.8/-1.3, 128K x4 int8 -11.8/-6.3, 128K x4 k8v4 -10.4/-4.9, 256K x4 k8v4 -15.6/-10.2
+
+Unsloth UD-Q4_K_XL: experts 71.73 GiB, dense+head vs now +0.92 GiB, PLE 26.82 GiB
+  as deployed                        best split (7, 25, 34): spill 30.18 GiB to RAM ( 57.9% of expert bytes in VRAM) | RAM left above floor: 32K (now) -19.6/-14.1, 128K x4 int8 -26.3/-20.8, 128K x4 k8v4 -24.9/-19.4, 256K x4 k8v4 -30.1/-24.7
+  +kv-resident 20480, reserve 1024   best split (8, 16, 34): spill 27.60 GiB to RAM ( 61.5% of expert bytes in VRAM) | RAM left above floor: 32K (now) -18.7/-13.2, 128K x4 int8 -23.7/-18.2, 128K x4 k8v4 -22.3/-16.8, 256K x4 k8v4 -27.6/-22.1
+  + also prefill 1024 (est.)         best split (8, 27, 36): spill 25.40 GiB to RAM ( 64.6% of expert bytes in VRAM) | RAM left above floor: 32K (now) -16.5/-11.0, 128K x4 int8 -21.5/-16.0, 128K x4 k8v4 -20.1/-14.6, 256K x4 k8v4 -25.4/-19.9
+
+bartowski Q4_K_M: experts 75.00 GiB, dense+head vs now -0.32 GiB, PLE 32.78 GiB
+  as deployed                        best split (7, 15, 24): spill 32.21 GiB to RAM ( 57.0% of expert bytes in VRAM) | RAM left above floor: 32K (now) -27.6/-22.1, 128K x4 int8 -34.3/-28.8, 128K x4 k8v4 -32.9/-27.4, 256K x4 k8v4 -38.1/-32.7
+  +kv-resident 20480, reserve 1024   best split (7, 15, 34): spill 29.63 GiB to RAM ( 60.5% of expert bytes in VRAM) | RAM left above floor: 32K (now) -26.7/-21.2, 128K x4 int8 -31.7/-26.2, 128K x4 k8v4 -30.3/-24.8, 256K x4 k8v4 -35.5/-30.1
+  + also prefill 1024 (est.)         best split (8, 27, 36): spill 27.43 GiB to RAM ( 63.4% of expert bytes in VRAM) | RAM left above floor: 32K (now) -24.5/-19.0, 128K x4 int8 -29.5/-24.0, 128K x4 k8v4 -28.1/-22.6, 256K x4 k8v4 -33.3/-27.9
+
+== coverage_fast.py, 2026-10-22 (the same lines as 2026-10-18)
+profile: 48x512, 301,977,600 routing events; per-layer sums equal: False
+  top 50% of each layer's experts: 74.53% of routing
+  top 60% of each layer's experts: 83.61% of routing
+  top 70% of each layer's experts: 90.75% of routing
+  top 75% of each layer's experts: 93.64% of routing
+  top 80% of each layer's experts: 95.91% of routing
+  top 85% of each layer's experts: 97.71% of routing
+  top 90% of each layer's experts: 98.92% of routing
+  top 95% of each layer's experts: 99.69% of routing
+GSQ-RCO IQ3_S        as deployed                        split (12, 24, 36): GPUs hold 98.24% of routing -> 8.5 of 480 expert calls per token from RAM
+GSQ-RCO IQ3_S        kv-resident 20480 + reserve 1024   split (13, 25, 38): GPUs hold 99.76% of routing -> 1.2 of 480 expert calls per token from RAM
+GSQ-RCO IQ3_S        + prefill 1024 (est.)              split (13, 25, 38): GPUs hold 99.99% of routing -> 0.0 of 480 expert calls per token from RAM
+Unsloth UD-IQ4_XS    as deployed                        split (9, 19, 30): GPUs hold 86.03% of routing -> 67.0 of 480 expert calls per token from RAM
+Unsloth UD-IQ4_XS    kv-resident 20480 + reserve 1024   split (10, 21, 32): GPUs hold 91.22% of routing -> 42.2 of 480 expert calls per token from RAM
+Unsloth UD-IQ4_XS    + prefill 1024 (est.)              split (10, 21, 33): GPUs hold 94.05% of routing -> 28.5 of 480 expert calls per token from RAM
+bartowski IQ4_XS     as deployed                        split (9, 30, 40): GPUs hold 84.01% of routing -> 76.8 of 480 expert calls per token from RAM
+bartowski IQ4_XS     kv-resident 20480 + reserve 1024   split (10, 20, 31): GPUs hold 88.34% of routing -> 55.9 of 480 expert calls per token from RAM
+bartowski IQ4_XS     + prefill 1024 (est.)              split (10, 20, 31): GPUs hold 89.78% of routing -> 49.1 of 480 expert calls per token from RAM
+bartowski Q4_0       as deployed                        split (9, 30, 40): GPUs hold 82.80% of routing -> 82.6 of 480 expert calls per token from RAM
+bartowski Q4_0       kv-resident 20480 + reserve 1024   split (9, 18, 39): GPUs hold 86.35% of routing -> 65.5 of 480 expert calls per token from RAM
+bartowski Q4_0       + prefill 1024 (est.)              split (9, 19, 30): GPUs hold 87.13% of routing -> 61.8 of 480 expert calls per token from RAM
+Unsloth UD-Q4_K_XL   as deployed                        split (7, 25, 34): GPUs hold 75.21% of routing -> 119.0 of 480 expert calls per token from RAM
+Unsloth UD-Q4_K_XL   kv-resident 20480 + reserve 1024   split (8, 16, 34): GPUs hold 79.04% of routing -> 100.6 of 480 expert calls per token from RAM
+Unsloth UD-Q4_K_XL   + prefill 1024 (est.)              split (8, 27, 36): GPUs hold 80.82% of routing -> 92.1 of 480 expert calls per token from RAM
+
+== derive.py, 2026-10-22
+IQ3_XXS (now)        spill  0.00 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB +10.93, ARC 2 GiB +16.40 GiB
+GSQ-RCO IQ3_S        spill  2.10 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB +8.83, ARC 2 GiB +14.30 GiB
+Unsloth UD-IQ4_XS    spill 11.16 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB -0.23, ARC 2 GiB +5.24 GiB
+bartowski IQ4_XS     spill 15.20 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB -4.27, ARC 2 GiB +1.20 GiB
+bartowski Q4_0       spill 17.90 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB -6.97, ARC 2 GiB -1.50 GiB
+Unsloth UD-Q4_K_XL   spill 27.60 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB -16.67, ARC 2 GiB -11.20 GiB
+bartowski Q4_K_M     spill 29.63 GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB -24.66, ARC 2 GiB -19.19 GiB
+
+== the files read (jobs.txt: name, URL at its pinned revision)
+IQ3_S https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+IQ3_S https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+UD-IQ4_XS https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00001-of-00003.gguf
+UD-IQ4_XS https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00002-of-00003.gguf
+UD-IQ4_XS https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-IQ4_XS/Qwen3.8-Flash-Next-UD-IQ4_XS-00003-of-00003.gguf
+UD-Q4_K_XL https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00001-of-00004.gguf
+UD-Q4_K_XL https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00002-of-00004.gguf
+UD-Q4_K_XL https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00003-of-00004.gguf
+UD-Q4_K_XL https://huggingface.co/unsloth/Qwen3.8-Flash-Next-GGUF/resolve/38bb39ee97821de2c9009abb7e93950eec396e66/UD-Q4_K_XL/Qwen3.8-Flash-Next-UD-Q4_K_XL-00004-of-00004.gguf
+bartowski-IQ4_XS https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-IQ4_XS/Qwen3.8-Flash-Next-IQ4_XS-00001-of-00003.gguf
+bartowski-IQ4_XS https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-IQ4_XS/Qwen3.8-Flash-Next-IQ4_XS-00002-of-00003.gguf
+bartowski-IQ4_XS https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-IQ4_XS/Qwen3.8-Flash-Next-IQ4_XS-00003-of-00003.gguf
+bartowski-Q4_0 https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_0/Qwen3.8-Flash-Next-Q4_0-00001-of-00003.gguf
+bartowski-Q4_0 https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_0/Qwen3.8-Flash-Next-Q4_0-00002-of-00003.gguf
+bartowski-Q4_0 https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_0/Qwen3.8-Flash-Next-Q4_0-00003-of-00003.gguf
+bartowski-Q4_K_M https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_K_M/Qwen3.8-Flash-Next-Q4_K_M-00001-of-00004.gguf
+bartowski-Q4_K_M https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_K_M/Qwen3.8-Flash-Next-Q4_K_M-00002-of-00004.gguf
+bartowski-Q4_K_M https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_K_M/Qwen3.8-Flash-Next-Q4_K_M-00003-of-00004.gguf
+bartowski-Q4_K_M https://huggingface.co/bartowski/Qwen3.8-Flash-Next-GGUF/resolve/928589fdb66c6ff07f22ac561e3fbce76553548f/Qwen3.8-Flash-Next-Q4_K_M/Qwen3.8-Flash-Next-Q4_K_M-00004-of-00004.gguf
+
+== gguf_head.py
+#!/usr/bin/env python3
+"""Read a GGUF file's header (local path or https URL, by HTTP range requests) and print its tensors as JSON lines:
+name, type, dims, offset, bytes (from the offsets; the last tensor's from the file size).  Standard library only."""
+import json, re, struct, sys, urllib.request
+
+TYPES = {0: "F32", 1: "F16", 2: "Q4_0", 3: "Q4_1", 6: "Q5_0", 7: "Q5_1", 8: "Q8_0", 9: "Q8_1", 10: "Q2_K", 11: "Q3_K",
+         12: "Q4_K", 13: "Q5_K", 14: "Q6_K", 15: "Q8_K", 16: "IQ2_XXS", 17: "IQ2_XS", 18: "IQ3_XXS", 19: "IQ1_S",
+         20: "IQ4_NL", 21: "IQ3_S", 22: "IQ2_S", 23: "IQ4_XS", 24: "I8", 25: "I16", 26: "I32", 27: "I64", 28: "F64",
+         29: "IQ1_M", 30: "BF16", 34: "TQ1_0", 35: "TQ2_0", 39: "MXFP4"}
+
+
+class Src:
+    def __init__(self, where):
+        self.where, self.buf, self.pos, self.size = where, b"", 0, None
+        if not where.startswith("http"):
+            self.f = open(where, "rb")
+            self.f.seek(0, 2); self.size = self.f.tell()
+
+    def need(self, n):
+        while self.pos + n > len(self.buf):
+            want = max(len(self.buf) * 2, 1 << 22, self.pos + n)
+            if self.where.startswith("http"):
+                req = urllib.request.Request(self.where, headers={"Range": f"bytes={len(self.buf)}-{want - 1}",
+                                                                  "User-Agent": "gguf-head/1"})
+                with urllib.request.urlopen(req, timeout=120) as r:
+                    cr = r.headers.get("Content-Range") or ""
+                    m = re.search(r"/(\d+)$", cr)
+                    if m:
+                        self.size = int(m.group(1))
+                    chunk = r.read()
+                    if r.status == 200:            # no range support: the whole body came back
+                        self.buf = chunk; self.size = len(chunk); continue
+            else:
+                self.f.seek(len(self.buf)); chunk = self.f.read(want - len(self.buf))
+            if not chunk:
+                raise EOFError(self.where)
+            self.buf += chunk
+
+    def read(self, n):
+        self.need(n); b = self.buf[self.pos:self.pos + n]; self.pos += n; return b
+
+    def u32(self): return struct.unpack("<I", self.read(4))[0]
+    def u64(self): return struct.unpack("<Q", self.read(8))[0]
+    def s(self): return self.read(self.u64()).decode("utf-8", "replace")
+
+
+SCALAR = {0: "<B", 1: "<b", 2: "<H", 3: "<h", 4: "<I", 5: "<i", 6: "<f", 7: "<?", 10: "<Q", 11: "<q", 12: "<d"}
+
+
+def value(src, t):
+    if t in SCALAR:
+        fmt = SCALAR[t]; return struct.unpack(fmt, src.read(struct.calcsize(fmt)))[0]
+    if t == 8:
+        return src.s()
+    if t == 9:
+        et, n = src.u32(), src.u64()
+        if et in SCALAR:                                   # skip numeric arrays quickly
+            src.read(struct.calcsize(SCALAR[et]) * n); return f"<array {n}>"
+        return [value(src, et) for _ in range(n)] if n < 64 else ([value(src, et) for _ in range(n)] and f"<array {n}>")
+    raise ValueError(f"kv type {t}")
+
+
+def main(where):
+    src = Src(where)
+    assert src.read(4) == b"GGUF", "not GGUF"
+    ver, nt, nkv = src.u32(), src.u64(), src.u64()
+    kv = {}
+    for _ in range(nkv):
+        k = src.s(); t = src.u32(); kv[k] = value(src, t)
+    align = int(kv.get("general.alignment", 32))
+    tensors = []
+    for _ in range(nt):
+        name = src.s(); nd = src.u32(); dims = [src.u64() for _ in range(nd)]; t = src.u32(); off = src.u64()
+        tensors.append({"name": name, "type": TYPES.get(t, f"type{t}"), "dims": dims, "offset": off})
+    data_start = (src.pos + align - 1) // align * align
+    if src.size is None and where.startswith("http"):
+        src.need(1)
+    order = sorted(range(len(tensors)), key=lambda i: tensors[i]["offset"])
+    for a, b in zip(order, order[1:] + [None]):
+        end = tensors[b]["offset"] if b is not None else src.size - data_start
+        tensors[a]["bytes"] = end - tensors[a]["offset"]
+    meta = {k: v for k, v in kv.items() if not isinstance(v, str) or len(v) < 200}
+    meta = {k: v for k, v in meta.items() if not k.startswith("tokenizer.ggml.")}
+    print(json.dumps({"file": where.rsplit("/", 1)[-1], "version": ver, "tensors": nt, "size": src.size,
+                      "data_start": data_start, "meta": meta}, default=str))
+    for t in tensors:
+        print(json.dumps(t))
+
+
+if __name__ == "__main__":
+    main(sys.argv[1])
+
+== budget.py
+#!/usr/bin/env python3
+"""Where each candidate model would live on this machine: VRAM per GPU (best contiguous layer split), the experts that
+spill to pinned RAM, and the RAM left above the 8 GiB floor with and without longer context (KV streaming).
+Capacities are measured on the running engine (log of the 2026-10-18 02:26 start, /metrics at 21:4x)."""
+import itertools, json, re, sys
+
+GI = 2 ** 30
+L = 48
+# experts each GPU holds now (exact, from the GGUF headers = the engine log) + its VRAM free beyond the 1536 MiB
+# reserve (/metrics mem_used against the engine's 15.89 GiB per card)
+NOW_EXPERTS = [9.41, 9.88, 11.43, 9.25]
+SPARE = [1111 / 1024, 797 / 1024, 420 / 1024, 228 / 1024]
+TWEAKS = {"as deployed": [0, 0, 0, 0],
+          "+kv-resident 20480, reserve 1024": [0.145 + 0.5] * 4,
+          "+ also prefill 1024 (est.)": [0.145 + 0.5 + 0.55] * 4}
+HEADROOM = 18.6 - 8.0          # MemAvailable now minus the 8 GiB floor
+ARC_CUT = 7.47 - 2.0           # if the ARC limit went from 8 to 2 GiB
+KV = {"32K (now)": 0.0, "128K x4 int8": 4 * 131072 * 13.7e3 / GI, "128K x4 k8v4": 4 * 131072 * 10.8e3 / GI,
+      "256K x4 k8v4": 4 * 262144 * 10.8e3 / GI}
+
+
+def load(prefix, files):
+    exp, dense, ple = [0] * L, [0] * L, 0
+    head = 0
+    for fn in files:
+        for i, line in enumerate(open(fn)):
+            if i == 0:
+                continue
+            t = json.loads(line)
+            m = re.match(r"blk\.(\d+)\.", t["name"])
+            if "_exps" in t["name"]:
+                exp[int(m.group(1))] += t["bytes"]
+            elif t["name"].startswith("per_layer_token_embd"):
+                ple += t["bytes"]
+            elif m:
+                dense[int(m.group(1))] += t["bytes"]
+            elif t["name"].startswith("output"):
+                head += t["bytes"]
+    return [e / GI for e in exp], [d / GI for d in dense], head / GI, ple / GI
+
+
+def best_split(exp, dense, head, cap):
+    best = None
+    for a, b, c in itertools.combinations(range(1, L), 3):
+        spans = [(0, a), (a, b), (b, c), (c, L)]
+        spill = 0
+        for g, (x, y) in enumerate(spans):
+            need = sum(exp[x:y]) + sum(dense[x:y]) - BASE_DENSE[g] + (head - BASE_HEAD if g == 3 else 0)
+            spill += max(0.0, need - cap[g])
+        if best is None or spill < best[0]:
+            best = (spill, (a, b, c))
+    return best
+
+
+base = load("iq3_xxs", ["iq3_xxs-1.jsonl", "iq3_xxs-2.jsonl"])
+SPL = [(0, 13), (13, 26), (26, 38), (38, 48)]
+BASE_DENSE = [sum(base[1][x:y]) for x, y in SPL]
+BASE_HEAD = base[2]
+MODELS = {"IQ3_XXS (now)": "iq3_xxs", "GSQ-RCO IQ3_S": "IQ3_S", "Unsloth UD-IQ4_XS": "UD-IQ4_XS",
+          "bartowski IQ4_XS": "bartowski-IQ4_XS", "bartowski Q4_0": "bartowski-Q4_0",
+          "Unsloth UD-Q4_K_XL": "UD-Q4_K_XL", "bartowski Q4_K_M": "bartowski-Q4_K_M"}
+import glob
+rows = []
+for name, pre in MODELS.items():
+    files = sorted(glob.glob(f"{pre}-*.jsonl"))
+    exp, dense, head, ple = load(pre, files)
+    out = {"model": name, "experts": sum(exp), "dense_delta": sum(dense) + head - sum(BASE_DENSE) - BASE_HEAD,
+           "ple": ple}
+    for tname, tw in TWEAKS.items():
+        cap = [NOW_EXPERTS[g] + SPARE[g] + tw[g] for g in range(4)]
+        spill, split = best_split(exp, dense, head, cap)
+        out[tname] = (spill, split)
+    rows.append(out)
+print(f"VRAM for experts now: {sum(NOW_EXPERTS) + sum(SPARE):.2f} GiB; RAM headroom above the 8 GiB floor: "
+      f"{HEADROOM:.1f} GiB (+{ARC_CUT:.1f} if ARC 8->2 GiB)")
+print("KV streaming pinned RAM, 4 slots: " + ", ".join(f"{k} {v:.1f} GiB" for k, v in KV.items()))
+for r in rows:
+    print(f"\n{r['model']}: experts {r['experts']:.2f} GiB, dense+head vs now {r['dense_delta']:+.2f} GiB, PLE {r['ple']:.2f} GiB")
+    for tname in TWEAKS:
+        spill, split = r[tname]
+        res = 100 * (1 - spill / r["experts"])
+        stream32 = 4 * 32768 * 13.7e3 / GI if "kv-resident" in tname or "prefill" in tname else 0.0
+        extra_ple = r["ple"] - 26.82
+        left = {k: HEADROOM - spill - (v if v else stream32) - extra_ple for k, v in KV.items()}
+        print(f"  {tname:34} best split {split}: spill {spill:5.2f} GiB to RAM ({res:5.1f}% of expert bytes in VRAM) | "
+              "RAM left above floor: " + ", ".join(f"{k} {v:+.1f}/{v + ARC_CUT:+.1f}" for k, v in left.items()))
+
+== coverage_fast.py
+#!/usr/bin/env python3
+"""Routing mass the GPUs would hold for each candidate: Strata's profile (data/expert-profile.bin: the ranked pairs
+and a 48x512 table of routing counts) fills each GPU's expert cache with its layers' most-used experts until the
+capacity; the rest are computed from RAM.  Misses per token = 480 routed experts x the share of routing outside VRAM."""
+import glob, itertools, json, re, struct
+
+GI = 2 ** 30
+b = open("/home/thc1006/dev/strata/data/expert-profile.bin", "rb").read()
+_, nl, ne, _, n = struct.unpack("<5I", b[4:24])
+counts = [list(struct.unpack(f"<{ne}i", b[24 + n * 4 + l * ne * 4: 24 + n * 4 + (l + 1) * ne * 4])) for l in range(nl)]
+tot = sum(map(sum, counts))
+print(f"profile: {nl}x{ne}, {tot:,} routing events; per-layer sums equal: {len({sum(c) for c in counts}) == 1}")
+# how skewed: share of routing held by the top x% of each layer's experts
+for frac in (0.5, 0.6, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95):
+    k = int(ne * frac)
+    print(f"  top {frac:.0%} of each layer's experts: {sum(sum(sorted(c, reverse=True)[:k]) for c in counts) / tot:.2%} of routing")
+
+NOW = [9.41, 9.88, 11.43, 9.25]; SPARE = [1111 / 1024, 797 / 1024, 420 / 1024, 228 / 1024]
+TW = {"as deployed": 0.0, "kv-resident 20480 + reserve 1024": 0.645, "+ prefill 1024 (est.)": 1.195}
+
+
+def per_layer(pre):
+    exp, dense, head = [0.0] * nl, [0.0] * nl, 0.0
+    for fn in sorted(glob.glob(f"{pre}-*.jsonl")):
+        for i, line in enumerate(open(fn)):
+            if i:
+                t = json.loads(line); m = re.match(r"blk\.(\d+)\.", t["name"])
+                if "_exps" in t["name"]: exp[int(m.group(1))] += t["bytes"] / GI
+                elif m and not t["name"].startswith("per_layer"): dense[int(m.group(1))] += t["bytes"] / GI
+                elif t["name"].startswith("output"): head += t["bytes"] / GI
+    return exp, dense, head
+
+
+bexp, bden, bhead = per_layer("iq3_xxs")
+SPL = [(0, 13), (13, 26), (26, 38), (38, 48)]
+BD = [sum(bden[x:y]) for x, y in SPL]
+
+
+def held(exp, dense, head, spans, cap):
+    hit = 0
+    for g, (x, y) in enumerate(spans):
+        room = cap[g] - (sum(dense[x:y]) - BD[g]) - ((head - bhead) if g == 3 else 0)
+        pairs = sorted(((counts[l][e], l) for l in range(x, y) for e in range(ne)), reverse=True)
+        for c, l in pairs:
+            sz = exp[l] / ne
+            if room < sz:
+                continue
+            room -= sz; hit += c
+    return hit / tot
+
+
+SPLITS = {"IQ3_S": [(12, 24, 36), (13, 25, 38), (13, 25, 38)], "UD-IQ4_XS": [(9, 19, 30), (10, 21, 32), (10, 21, 33)],
+          "bartowski-IQ4_XS": [(9, 30, 40), (10, 20, 31), (10, 20, 31)], "bartowski-Q4_0": [(9, 30, 40), (9, 18, 39), (9, 19, 30)],
+          "UD-Q4_K_XL": [(7, 25, 34), (8, 16, 34), (8, 27, 36)]}
+for name, pre in (("GSQ-RCO IQ3_S", "IQ3_S"), ("Unsloth UD-IQ4_XS", "UD-IQ4_XS"), ("bartowski IQ4_XS", "bartowski-IQ4_XS"),
+                  ("bartowski Q4_0", "bartowski-Q4_0"), ("Unsloth UD-Q4_K_XL", "UD-Q4_K_XL")):
+    exp, dense, head = per_layer(pre)
+    for (tname, extra), (a, b2, c) in zip(TW.items(), SPLITS[pre]):
+        cap = [NOW[g] + SPARE[g] + extra for g in range(4)]
+        cov = held(exp, dense, head, [(0, a), (a, b2), (b2, c), (c, nl)], cap)
+        print(f"{name:20} {tname:34} split {(a, b2, c)}: GPUs hold {cov:.2%} of routing -> "
+              f"{480 * (1 - cov):.1f} of 480 expert calls per token from RAM")
+
+== derive.py
+"""Decision 0004's RAM figures from budget.py's rows "+kv-resident 20480, reserve 1024", unrounded: the RAM left above
+a 6 GiB floor (budget.py's 8 GiB floor plus 2.0 GiB) at 32K, with the ARC at its 8 GiB cap and at 2 GiB."""
+import re
+GI = 2 ** 30
+HEADROOM, ARC_CUT = 18.6 - 8.0, 7.47 - 2.0          # budget.py's constants
+STREAM32 = 4 * 32768 * 13.7e3 / GI                   # budget.py: the 32K KV that kv-resident streams from RAM
+model = None
+for line in open("budget.txt"):
+    m = re.match(r"(\S.*?): experts .* PLE ([\d.]+) GiB", line)
+    if m:
+        model, ple = m.group(1), float(m.group(2))
+    m = re.match(r"\s+\+kv-resident 20480, reserve 1024\s+best split \S+ \S+ \S+: spill\s+([\d.]+) GiB", line)
+    if m and model:
+        spill = float(m.group(1))
+        left8 = HEADROOM - spill - STREAM32 - (ple - 26.82)
+        print(f"{model:20} spill {spill:5.2f} GiB; RAM left above a 6 GiB floor at 32K: ARC 8 GiB {left8 + 2.0:+.2f}, "
+              f"ARC 2 GiB {left8 + ARC_CUT + 2.0:+.2f} GiB")

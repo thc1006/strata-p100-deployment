@@ -1,0 +1,8 @@
+# The GPUs' power limits and top SM clock, read on 2026-10-22 22:07 (UTC+8) while strata-q3 served, for
+# docs/deployment-record.md.  The command and its output, unchanged:
+$ nvidia-smi --query-gpu=index,name,pci.bus_id,power.limit,power.default_limit,power.min_limit,power.max_limit,clocks.max.sm --format=csv
+index, name, pci.bus_id, power.limit [W], power.default_limit [W], power.min_limit [W], power.max_limit [W], clocks.max.sm [MHz]
+0, Tesla P100-PCIE-16GB, 00000000:04:00.0, 250.00 W, 250.00 W, 125.00 W, 250.00 W, 1328 MHz
+1, Tesla P100-PCIE-16GB, 00000000:0B:00.0, 250.00 W, 250.00 W, 125.00 W, 250.00 W, 1328 MHz
+2, Tesla P100-PCIE-16GB, 00000000:13:00.0, 250.00 W, 250.00 W, 125.00 W, 250.00 W, 1328 MHz
+3, Tesla P100-PCIE-16GB, 00000000:1B:00.0, 250.00 W, 250.00 W, 125.00 W, 250.00 W, 1328 MHz

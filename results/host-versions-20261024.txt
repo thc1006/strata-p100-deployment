@@ -1,0 +1,16 @@
+# The kernel, ZFS module, NVIDIA driver, CPU and memory of this machine, read on 2026-10-24 14:55 (UTC+8).
+# It has run since the boot below, before the first measurement in results/ (2026-10-16), so every run since then
+# had these versions.  The commands and their output, unchanged:
+$ uptime -s
+2026-10-13 02:25:58
+$ uname -r
+6.8.0-138-generic
+$ cat /sys/module/zfs/version
+2.2.2-0ubuntu9.4
+$ head -1 /proc/driver/nvidia/version
+NVRM version: NVIDIA UNIX x86_64 Kernel Module  535.230.02  Fri Dec 20 21:42:05 UTC 2024
+$ lscpu | grep -E '^(Model name|CPU\(s\)):'
+CPU(s):                                  8
+Model name:                              Intel(R) Xeon(R) CPU E5-2696 v4 @ 2.20GHz
+$ grep MemTotal /proc/meminfo
+MemTotal:       65846904 kB

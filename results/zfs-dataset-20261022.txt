@@ -1,0 +1,8 @@
+# The ZFS dataset that holds ~/dev/Strata-data, and its record size, read on 2026-10-22 22:07 (UTC+8), for
+# README.md (the record that a PLE row's prefetch hint reads).  The commands and their output, unchanged:
+$ df --output=source,target ~/dev/Strata-data
+Filesystem               Mounted on
+rpool/ROOT/ubuntu_b3m9mu /
+$ zfs get -H -o name,property,value,source recordsize,compression rpool/ROOT/ubuntu_b3m9mu
+rpool/ROOT/ubuntu_b3m9mu	recordsize	128K	default
+rpool/ROOT/ubuntu_b3m9mu	compression	lz4	inherited from rpool

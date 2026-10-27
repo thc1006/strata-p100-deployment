@@ -1,0 +1,16 @@
+# The ZFS ARC's limits on this machine and its RAM, read on 2026-10-25 without sudo: the module's version and
+# parameters, the ARC's target (c), minimum (c_min), maximum (c_max) and size from arcstats, and MemTotal.
+# zfs_arc_min 0 means OpenZFS's default minimum.
+$ cat /sys/module/zfs/version
+2.2.2-0ubuntu9.4
+$ grep . /sys/module/zfs/parameters/zfs_arc_min /sys/module/zfs/parameters/zfs_arc_max /sys/module/zfs/parameters/zfs_arc_shrinker_limit
+/sys/module/zfs/parameters/zfs_arc_min:0
+/sys/module/zfs/parameters/zfs_arc_max:2147483648
+/sys/module/zfs/parameters/zfs_arc_shrinker_limit:0
+$ grep -E '^(c|c_min|c_max|size) ' /proc/spl/kstat/zfs/arcstats
+c                               4    2147483648
+c_min                           4    2107100928
+c_max                           4    2147483648
+size                            4    2107535264
+$ grep MemTotal /proc/meminfo
+MemTotal:       65846904 kB

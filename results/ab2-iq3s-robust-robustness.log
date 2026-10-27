@@ -1,0 +1,37 @@
+[08:45:28] boundary (ab2-iq3s-robust)
+   {'prompt_tokens': 27942, 'room': 4818, 'over_by_one_status': 400, 'exact_fit_status': 200, 'exact_fit_first_token_s': 36.54, 'pass': True}
+[08:46:05] disconnect (ab2-iq3s-robust)
+  others finished: [761, 725, 762] fifth TTFT: 0.85 pass: True
+[08:46:36] multiturn (ab2-iq3s-robust)
+  20 turns + 25 extra requests, 0 failures; cached by turn: [[0, 2356, 5269, 7661, 10988], [0, 2846, 5499, 8714, 11915], [0, 3433, 6360, 9269, 11940], [0, 2950, 6424, 9827, 13460]]
+[08:51:38] budget (ab2-iq3s-robust)
+  budget 128: reasoning chunks 144, answer 34 (want 34), finish stop, TTFT content 6.46 s
+  budget 512: reasoning chunks 528, answer 34 (want 34), finish stop, TTFT content 16.7 s
+[08:52:31] qa (ab2-iq3s-robust)
+  solo 16/16, four at a time 16/16
+[08:54:22] overload: 8 and 12 clients on 4 slots
+
+clients  total tok/s  per-req tok/s  first p50/p95 (s)  latency p50/p95 (s)  errors
+      8         77.8           24.5     9.44/17.20       19.82/26.33     0
+     12         77.4           23.0    15.96/30.22       27.45/39.66     0
+[08:55:28] needle 30k at depths 10/50/90
+  30k depth  10%: FOUND  (30,349 prompt tokens, 39 s)
+  30k depth  50%: FOUND  (30,349 prompt tokens, 39 s)
+  30k depth  90%: FOUND  (30,350 prompt tokens, 40 s)
+3 of 3 found
+[08:57:26] early close
+solo: OK -> 'Blue '
+batch: OK -> 'Blue '
+[08:57:30] poisson (ab2-iq3s-robust)
+  rate 0.05/s: goodput 87%, errors 0, TTFT p50/p95 8.2/29.36 s, longest pause p95/max 1.48/1.49 s
+[09:08:29] poisson (ab2-iq3s-robust)
+  rate 0.2/s: goodput 20%, errors 0, TTFT p50/p95 95.18/260.15 s, longest pause p95/max 1.78/1.8 s
+[09:14:57] soak (ab2-iq3s-robust)
+  207 requests, 0 errors, 117264 tokens
+[09:45:41] engine log since this run: errors, refusals, watchdog, warnings
+engine prompt lines (batched requests log more than one): 435
+     24 strata verify: captured the N-token window (upload no error, sync no error)
+[09:45:41] server journal since this run: HTTP errors, refusals, restarts
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (32768) exceeds the context (32768); requests are never truncated. Send a smaller max_tokens (at most 4818 here), or add "fit_max_tokens": true to the model's strata-<model>.json to shorten it to the room left (#545)
+ 十  20 08:45:29 <host> python[532713]: [strata] 400 invalid request: request exceeds the context window: prompt (27942 tokens) + max tokens (4819) exceeds the context (32768); requests are never truncated. Send a smaller max_tokens (at most 4818 here), or add "fit_max_tokens": true to the model's strata-<model>.json to shorten it to the room left (#545)
+[09:45:41] done

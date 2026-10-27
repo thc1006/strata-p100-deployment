@@ -1,0 +1,16 @@
+# du of ~/dev/Strata-data on <host> (ZFS), 2026-10-21 02:32 (UTC+8), for docs/reference/system-changes.md.
+# For each directory, from ~/dev: du -s -B1 <dir> (disk use, bytes), then du -s -B1 --apparent-size <dir>.
+# Its output, unchanged:
+234018640896	Strata-data
+233886438600	Strata-data
+130731206656	Strata-data/models
+130657523044	Strata-data/models
+96354913280	Strata-data/packs
+96301256488	Strata-data/packs
+6932519936	Strata-data/mtp
+6927659063	Strata-data/mtp
+# The same in GiB (bytes / 2^30, one decimal):
+Strata-data          disk   217.9 GiB   apparent   217.8 GiB
+Strata-data/models   disk   121.8 GiB   apparent   121.7 GiB
+Strata-data/packs    disk    89.7 GiB   apparent    89.7 GiB
+Strata-data/mtp      disk     6.5 GiB   apparent     6.5 GiB

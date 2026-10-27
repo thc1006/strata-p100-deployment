@@ -1,0 +1,41 @@
+# The first metadata keys of IQ3_S's shard 1, up to its context length, read on 2026-10-22 22:27 (UTC+8) with
+# the script at the end of this file, for tools/configure_strata_q3.py:
+#   python3 -I gguf_keys.py ~/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+GGUF version 3, 1223 tensors, 67 metadata keys
+general.architecture = qwen4exp
+general.type = model
+general.sampling.top_k = 20
+general.sampling.top_p = 0.949999988079071
+general.sampling.temp = 1.0
+general.name = Qwen3.8-Flash-Next GSQ-RCO
+general.description = A Preview of the Qwen4 Architecture
+general.size_label = 512x56B
+qwen4exp.block_count = 48
+qwen4exp.context_length = 262144
+
+== gguf_keys.py
+"""The first metadata keys of a GGUF file, up to and including the architecture's context_length (standard library)."""
+import struct, sys
+f = open(sys.argv[1], "rb")
+def rd(fmt):
+    return struct.unpack("<" + fmt, f.read(struct.calcsize(fmt)))
+assert f.read(4) == b"GGUF"
+ver, = rd("I")
+nt, nkv = rd("QQ")
+SZ = {0: "B", 1: "b", 2: "H", 3: "h", 4: "I", 5: "i", 6: "f", 7: "?", 10: "Q", 11: "q", 12: "d"}
+print(f"GGUF version {ver}, {nt} tensors, {nkv} metadata keys")
+for _ in range(nkv):
+    n, = rd("Q")
+    key = f.read(n).decode()
+    t, = rd("I")
+    if t in SZ:
+        v = rd(SZ[t])[0]
+    elif t == 8:
+        n, = rd("Q")
+        v = f.read(n).decode("utf-8", "replace")
+    else:
+        print(f"{key}: type {t}, not read; stopping")
+        break
+    print(f"{key} = {v}")
+    if key.endswith(".context_length"):
+        break

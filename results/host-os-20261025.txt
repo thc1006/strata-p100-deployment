@@ -1,0 +1,7 @@
+# The operating system and the virtual machine this machine runs, read on 2026-10-25 02:46 (UTC+8), for the
+# upstream posts' environment lines (docs/upstream/).  The commands and their output, unchanged:
+$ grep -E "^(PRETTY_NAME|VERSION_ID)=" /etc/os-release
+PRETTY_NAME="Ubuntu 22.04.5 LTS"
+VERSION_ID="22.04"
+$ systemd-detect-virt
+vmware

@@ -1,0 +1,14 @@
+# /var/log/apt/history.log, the two entries of 2026-10-16 that docs/reference/system-changes.md describes (gh, then
+# setup.sh's python3 packages), copied on 2026-10-22, unchanged.  The second installs 18 packages, 16 of them
+# marked automatic (dependencies).
+Start-Date: 2026-10-16  05:17:16
+Commandline: apt install gh
+Requested-By: thc1006 (1003)
+Install: gh:amd64 (2.4.0+dfsg1-2)
+End-Date: 2026-10-16  05:17:17
+
+Start-Date: 2026-10-16  05:32:48
+Commandline: apt-get install -y python3 python3-venv python3-pip
+Requested-By: thc1006 (1003)
+Install: python3-setuptools-whl:amd64 (59.6.0-1.2ubuntu0.22.04.3, automatic), libpython3-dev:amd64 (3.10.6-1~22.04.1, automatic), python3-venv:amd64 (3.10.6-1~22.04.1), python3-pip-whl:amd64 (22.0.2+dfsg-1ubuntu0.7, automatic), python3.10-venv:amd64 (3.10.12-1~22.04.18, automatic), zlib1g-dev:amd64 (1:1.2.11.dfsg-2ubuntu9.2, automatic), python3-wheel:amd64 (0.37.1-2ubuntu0.22.04.1, automatic), python3-dev:amd64 (3.10.6-1~22.04.1, automatic), libpython3.10-dev:amd64 (3.10.12-1~22.04.18, automatic), python3-pip:amd64 (22.0.2+dfsg-1ubuntu0.7), python3.10-dev:amd64 (3.10.12-1~22.04.18, automatic), python3-distutils:amd64 (3.10.8-1~22.04, automatic), libjs-jquery:amd64 (3.6.0+dfsg+~3.5.13-1, automatic), libexpat1-dev:amd64 (2.4.7-1ubuntu0.9, automatic), python3-setuptools:amd64 (59.6.0-1.2ubuntu0.22.04.3, automatic), libjs-sphinxdoc:amd64 (4.3.2-1, automatic), javascript-common:amd64 (11+nmu1, automatic), libjs-underscore:amd64 (1.13.2~dfsg-2, automatic)
+End-Date: 2026-10-16  05:32:56

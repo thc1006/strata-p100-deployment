@@ -1,0 +1,59 @@
+# scripts/test.sh on <host> (Ubuntu 22.04.5 LTS, Python 3.10.12, bash 5.1.16), 2026-10-20.
+# Part 1: commit e5d7908, before the fixes of the review of scripts/test.sh and scripts/check-drift.sh, run in a worktree
+# at that commit; the run ended at 16:24. It ran without a timer: the unit tests' own "Ran ... in" line gives their
+# time. The JSON lines on the way are the stub harnesses' fake screens. Its output, as it was captured: each line cut at
+# 300 characters (that cut only the JSON lines; the test counts and times are whole).
+# The tree with the fixes, timed: results/test-sh-20261027.txt.
+
+== part 1: e5d7908
+
+== unit tests (tests/)
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-20 16:21:47", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0, "
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-20 16:21:47", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "error": "stream ended without finish_reason/usage (cut off)", "ttft_s": 0.0, "ttft_content_s"
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-20 16:21:47", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0,
+engine_screen: requests sent: 3
+engine_screen: 1 failed records (prefill)
+{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-20 16:21:49", "phase": "admit", "round": 0, "joiner_ttft_s": 0.0, "longest_gap_s": 0.6, "decoder_chunks_during": 84, "makespan_s": 1.62, "decoders_first_token_vs_join_
+{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-20 16:21:51", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.6, "decoder_chunks_during": 84, "makespan_s": 1.62, "decoders_first_token_vs_join_
+engine_screen: requests sent: 8
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:51", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_toke
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:51", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 4003, "cached": 0, "completion_toke
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:51", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_to
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:51", "phase": "decode", "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1502, "cached": 0, "completion_tokens": 9, "ttft_s
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:52", "phase": "four", "round": 0, "wall_s": 0.95, "total_tok_s": 33.78, "error": null}
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:53", "phase": "four", "round": 1, "wall_s": 0.95, "total_tok_s": 33.77, "error": null}
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:55", "phase": "admit", "round": 0, "joiner_ttft_s": 0.01, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "d
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "turns", "i": 0, "first_sha": "bc8345ee899cc13d", "second_sha": "8fb3fe4542bc0653", "second_cached": 0, "second_prompt
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "turns", "i": 1, "first_sha": "0b2c4ae7a7be2b60", "second_sha": "d52cafab8e5ff60a", "second_cached": 0, "second_prompt
+engine_screen: requests sent: 24
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_toke
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 4003, "cached": 0, "completion_toke
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_to
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:57", "phase": "decode", "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1502, "cached": 0, "completion_tokens": 9, "ttft_s
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:58", "phase": "four", "round": 0, "wall_s": 0.95, "total_tok_s": 33.77, "error": null}
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:21:59", "phase": "four", "round": 1, "wall_s": 0.95, "total_tok_s": 33.77, "error": null}
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:22:01", "phase": "admit", "round": 0, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:22:02", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:22:03", "phase": "turns", "i": 0, "first_sha": "bc8345ee899cc13d", "second_sha": "8fb3fe4542bc0653", "second_cached": 0, "second_prompt
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-20 16:22:03", "phase": "turns", "i": 1, "first_sha": "0b2c4ae7a7be2b60", "second_sha": "d52cafab8e5ff60a", "second_cached": 0, "second_prompt
+engine_screen: requests sent: 24
+----------------------------------------------------------------------
+Ran 130 tests in 585.909s
+
+OK
+{"corpus_sha": "4bfdf4eb453093ff", "status": 200, "finish": "stop", "prompt_tokens": 1997, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0, "ttft_content_s": 0.0, "client_decode_tok_s": 189.13, "total_s": 0.04, "engine_prompt_tok_s": 419.97, "engine_decode_tok_s": 30.0}
+
+== shell syntax
+checked 25 files
+
+== python syntax
+checked 32 files
+
+== systemd units (systemd-analyze verify; lines about other units on this machine are ignored)
+no findings for systemd/*
+
+== programs the units run (verify checks only the first command of each Exec type and skips '-' ones)
+checked 5 Exec lines
+
+all checks passed

@@ -1,0 +1,78 @@
+# PR #2918 on Strata main 9ae93f7 (v0.2.1 with the 0.1.46.1 hotfix), 2026-10-20 21:20-21:30 (UTC+8), after an independent
+# reproduction of the bug on 0.2.1 in the PR (comment 6291825797): ple_reader_test --selftest with the PR applied, and
+# with its one changed line in ngram.cpp removed again (the test kept).
+# The PR's commit (head 25f40ed, git format-patch) applied to main's include/ and src/ (git archive 9ae93f7); git apply
+# --check passed. The rebased commit pushed to the PR, 7114105, is that patch on 9ae93f7 (the same patch-id). Built for
+# the CPU only, with g++ 11.4:
+#   g++ -std=c++20 -O2 -pthread -Iinclude -Isrc src/kernels/ngram.cpp src/ngram/ple_reader.cpp \
+#       src/platform/direct_file.cpp src/ngram/ple_reader_test.cpp -o test-<variant>
+# 'tree' is the PR applied; 'nofix' is the same with the line `if (impl_->locked) return;` removed from ngram.cpp.
+# sha256 (first 16) of the PR-applied files: src/kernels/ngram.cpp 93dd33c89e17552d, src/ngram/ple_reader_test.cpp
+# 2b496a42d003378a (the same as on 0.2.0-beta: results/pr2918-selftest-020-20261020.txt).
+# Run as a user without CAP_IPC_LOCK on Linux with glibc (Ubuntu 22.04.5, kernel 6.8), each run with a TMPDIR of its
+# own on ZFS; RLIMIT_MEMLOCK at its default here (8037 MiB) or lowered with ulimit -l in a subshell. Only the last 12
+# lines of each run are shown, empty lines left out.
+
+### tree, RLIMIT_MEMLOCK 8037 MiB (default)
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16 NVFP4: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+exit status 0
+### tree, RLIMIT_MEMLOCK 64 KiB
+note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: BF16: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Cannot allocate memory; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: NVFP4: mlock refused, the "ram" leg reads the table unlocked
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple row hints (Linux): kept on a refused lock, none on a locked table, back after reopening it without the lock: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16 NVFP4: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+exit status 0
+### tree, RLIMIT_MEMLOCK 0 KiB
+note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: BF16: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: NVFP4: mlock refused, the "ram" leg reads the table unlocked
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple row hints (Linux): kept on a refused lock: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16 NVFP4: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+exit status 0
+### nofix, RLIMIT_MEMLOCK 8037 MiB (default)
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+FAIL src/ngram/ple_reader_test.cpp:449: a locked table: gather_batch made 256 row hints, not 0
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+exit status 1
+### nofix, RLIMIT_MEMLOCK 64 KiB
+note: opening a table with RLIMIT_MEMLOCK at 0, an mlock failure here is expected
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+FAIL src/ngram/ple_reader_test.cpp:449: a locked table: gather_batch made 256 row hints, not 0
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+exit status 1
+### nofix, RLIMIT_MEMLOCK 0 KiB
+note: Q8_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: Q4_0: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: BF16: mlock refused, the "ram" leg reads the table unlocked
+strata: PLE table mlock failed (Operation not permitted; raise `ulimit -l`): its pages stay faulted in but may be reclaimed
+note: NVFP4: mlock refused, the "ram" leg reads the table unlocked
+ple prefetched-key reuse (reordered, duplicated, subset), Direct vs Mmap bytes: OK
+ple row hints (Linux): kept on a refused lock: OK
+ple formats, both readers vs their dequantizers: IQ4_NL Q5_0 F8_E4M3 Q5_1 Q8_0 Q4_0 BF16 NVFP4: OK
+ple_reader selftest (row_bytes=90): OK
+ple_reader selftest (row_bytes=110): OK
+exit status 0

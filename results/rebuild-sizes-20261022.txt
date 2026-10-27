@@ -1,0 +1,17 @@
+# du of the directories a rebuild makes besides ~/dev/Strata-data (that one is in results/strata-data-du-20261021.txt),
+# on <host> (ZFS), 2026-10-22 21:38 (UTC+8), for docs/runbooks/rebuild.md.
+# For each path, from ~: du -s -B1 <path> (disk use, bytes), then du -s -B1 --apparent-size <path>, each under
+# nice -n 19 ionice -c3.
+# Its output, unchanged:
+7104715776	cuda-12.9
+10043220389	cuda-12.9
+293460992	dev/strata
+489314798	dev/strata
+5862937600	downloads/cuda/cuda_12.9.1_575.57.08_linux.run
+5860276058	downloads/cuda/cuda_12.9.1_575.57.08_linux.run
+# The same in GiB (bytes / 2^30, two decimals):
+cuda-12.9                                       disk   6.62 GiB   apparent   9.35 GiB
+dev/strata                                      disk   0.27 GiB   apparent   0.46 GiB
+downloads/cuda/cuda_12.9.1_575.57.08_linux.run  disk   5.46 GiB   apparent   5.46 GiB
+# With Strata-data's apparent size of 2026-10-21 (233886438600 bytes), the apparent sizes add up to 250279249845 bytes,
+# 233.09 GiB (250.3 GB).

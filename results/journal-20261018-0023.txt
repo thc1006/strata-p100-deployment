@@ -1,0 +1,8 @@
+# The journal of strata-q3.service, 2026-10-18 00:15 to 00:35 (UTC+8): the restart after the directory reorganization
+# of decision 0002, the preflight's line and wait-ready's line.  Read on 2026-10-27, without sudo, with:
+#   journalctl -q -u strata-q3.service --since "2026-10-18 00:15" --until "2026-10-18 00:35" --no-pager -o short-iso \
+#     | grep -E 'preflight|wait-ready'
+# Without sudo it shows only the lines of the service's own processes; the grep keeps the preflight's and wait-ready's.
+# The host name is written <host>; everything else is the output, unchanged.
+2026-10-18T00:23:27+0800 <host> strata-preflight.sh[502395]: strata-preflight: ok: 4 GPUs, 57 GiB usable, config matches (--profile deployed) in everything that decides memory and placement
+2026-10-18T00:30:47+0800 <host> strata-wait-ready.sh[502444]: strata-wait-ready: loaded after 438 s

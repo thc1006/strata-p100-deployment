@@ -1,0 +1,104 @@
+# scripts/check-drift.sh --full --candidate of commit cc4f7bf, in a checkout with no local change, on <host>, 2026-10-27, under nice -n 19 ionice -c3, timed by bash's time.
+# The host name is written <host>; everything else is the output, unchanged.
+# 2026-10-27 18:41:25: load average 1.05 1.09 1.18; strata-q3 active
+== installed files, and what systemd loaded of each unit
+DRIFT  /etc/systemd/system/strata-q3.service differs from the repo copy (diff it)
+ok     strata-q3.service (loaded: as the repo's file, 26 settings; its cgroup holds its MemorySwapMax)
+ok     /etc/systemd/system/strata-q3-health.service
+ok     strata-q3-health.service (loaded: as the repo's file, 12 settings)
+ok     /etc/systemd/system/strata-q3-health.timer
+ok     strata-q3-health.timer (loaded: as the repo's file, 5 settings)
+DRIFT  /etc/systemd/system/zfs-arc-max.service differs from the repo copy (diff it)
+ok     zfs-arc-max.service (loaded: as the repo's file, 8 settings)
+DRIFT  /etc/systemd/system/user-1003.slice.d/50-memory.conf is missing
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemoryMax.conf (systemctl set-property --runtime) holds the repo's values
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemorySwapMax.conf (systemctl set-property --runtime) holds the repo's values
+ok     user-1003.slice (loaded: as the repo's drop-ins, 2 settings; its cgroup holds its MemoryMax, MemorySwapMax)
+DRIFT  /etc/logrotate.d/strata-q3 differs from the repo copy (diff it)
+DRIFT  /usr/local/sbin/strata-q3-health differs from the repo copy (diff it)
+ok     zfs_arc_max = 2147483648
+ok     zfs_arc_shrinker_limit = 0
+== host units (config/host-units.conf)
+ok     default target multi-user.target
+ok     system cups.service disabled, inactive
+ok     system cups.socket disabled, inactive
+ok     system cups.path disabled, inactive
+ok     system cups-browsed.service disabled, inactive
+ok     system avahi-daemon.socket disabled, inactive
+ok     system avahi-daemon.service masked, inactive
+ok     system ModemManager.service masked, inactive
+ok     system fwupd.service masked, inactive
+ok     system fwupd-refresh.timer disabled, inactive
+ok     system packagekit.service masked, inactive
+ok     system colord.service masked, inactive
+ok     system switcheroo-control.service masked, inactive
+ok     system power-profiles-daemon.service masked, inactive
+ok     system kerneloops.service disabled, inactive
+ok     system upower.service masked, inactive
+ok     system udisks2.service masked, inactive
+ok     system accounts-daemon.service masked, inactive
+ok     system rtkit-daemon.service masked, inactive
+ok     system docker.service disabled, inactive
+ok     system docker.socket disabled, inactive
+ok     system containerd.service disabled, inactive
+ok     system snapd.service disabled, inactive
+ok     system snapd.socket disabled, inactive
+ok     system snapd.seeded.service disabled, inactive
+ok     system motd-news.timer disabled, inactive
+ok     system update-notifier-download.timer disabled, inactive
+ok     system update-notifier-motd.timer disabled, inactive
+ok     system man-db.timer disabled, inactive
+ok     system e2scrub_all.timer disabled, inactive
+ok     user pipewire.socket masked, inactive
+ok     user pipewire.service masked, inactive
+ok     user pipewire-media-session.service masked, inactive
+ok     user snap.snapd-desktop-integration.snapd-desktop-integration.service masked, inactive
+== Strata config
+ok     /home/thc1006/dev/strata/strata-iq3_xxs.json
+ok     setup's config + configure_strata_q3.py --profile deployed --model iq3_s = the deployed snapshot
+== deployed files (sha256, config/deployed-artifacts.sha256)
+ok     strata/engine-cuda12/strata
+ok     strata/engine-cuda12/libstrata_kq.so
+ok     strata/engine-cuda12/BUILD.json
+ok     strata/strata-iq3_xxs.json
+ok     strata/data/expert-profile.bin
+ok     strata/.venv/pyvenv.cfg
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcudart.so.12.9.79
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublas.so.12.9.1.4
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublasLt.so.12.9.1.4
+ok     Strata-data/mtp/rt/dense.bin
+ok     Strata-data/mtp/rt/dense.txt
+ok     Strata-data/mtp/rt/draft_vocab.bin
+ok     Strata-data/mtp/rt/experts.bin
+ok     Strata-data/packs/iq3_s/index.txt
+ok     Strata-data/packs/iq3_s/native_experts.txt
+ok     Strata-data/packs/iq3_s/dense.bin
+ok     Strata-data/packs/iq3_s/experts.bin
+ok     Strata-data/packs/iq3_s/tokenizer/chat_template.jinja
+ok     Strata-data/packs/iq3_s/tokenizer/merges.txt
+ok     Strata-data/packs/iq3_s/tokenizer/token_type.json
+ok     Strata-data/packs/iq3_s/tokenizer/vocab.json
+ok     strata/.venv/.strata-pip.json
+ok     Strata-data/packs/iq3_s/conversions.json
+ok     Strata-data/packs/iq3_s/experts.bin.src.json
+ok     Strata-data/packs/iq3_s/tokenizer/tokenizer.json
+ok     Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+ok     Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+== the Strata tree, its venv and its shared settings; the service's checkout (/home/thc1006/dev/p100-q3-deployment)
+ok     /home/thc1006/dev/strata is at 477ac13cbe8e582c20484871ce459d20d82df09d
+ok     /home/thc1006/dev/strata: its 3286 files are the pinned commit's
+ok     /home/thc1006/dev/strata: where server.py imports from, the commit's modules and the list's only, and their cached bytecode is what they compile to
+ok     /home/thc1006/dev/strata/.venv: the packages config/strata-venv.txt lists, with the RECORDs it pins, file by file as their RECORDs give them, no other file, and their cached bytecode what their sources compile to
+ok     no .pth, usercustomize or sitecustomize in the service user's site-packages (/home/thc1006/.local/lib/python*)
+ok     no shared settings file (/home/thc1006/dev/strata/strata-iq3_xxs.shared-settings.json)
+ok     /home/thc1006/dev/p100-q3-deployment: its commit 15ab1da, file by file, and no other file where the service runs code from
+note   this check runs from /tmp/claude-1003/-home-thc1006-dev-p100-q3-deployment/1adb7471-0f57-4b0c-a4da-e2069829bd67/scratchpad/measure-cc4f7bf, which the service does not run: --candidate, a commit to be deployed
+== the running service
+ok     strata-q3.service runs what the files above say
+
+drift found: see DRIFT lines above
+
+real	11m24.306s
+user	6m21.373s
+sys	4m6.512s
+# 2026-10-27 18:52:49: load average 1.74 1.50 1.34; strata-q3 active

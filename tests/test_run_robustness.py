@@ -33,6 +33,7 @@ EXPECTED = [
 class Robustness(unittest.TestCase):
     @unittest.skipUnless(shutil.which("setsid"), "needs setsid")
     def test_against_stubs(self):
+        # its stubs start no fake engine: it runs in every scripts/test.sh
         result = harness_run.run(ROOT / "tests" / "run_robustness_stubs.sh", ROOT, TIMEOUT)
         harness_run.check(self, result, EXPECTED, TIMEOUT)
 

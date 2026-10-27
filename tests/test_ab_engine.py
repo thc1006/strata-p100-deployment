@@ -1,12 +1,12 @@
 """bench/ab_engine.sh against stubs of the service manager, the journal, sudo and the GPUs, with fake servers on a free
-port (tests/ab_engine_stubs.sh, run by tests/harness_run.py).  It changes no file outside its temporary directory, but
-while it runs its fake engines make strata-preflight.sh refuse to start strata-q3, so it does not run beside an
-experiment, a scheduled restore or a start of the service.  CI's container has no gcc, so CI skips it; on the machine,
-scripts/test.sh runs it, also when scripts/deploy.sh checks a commit."""
+port (tests/ab_engine_stubs.sh, run by tests/harness_run.py).  It changes no file outside its temporary directory,
+but while it runs its fake engines make strata-preflight.sh refuse to start strata-q3, so it does not run beside an
+experiment, a scheduled restore or the service.  CI runs it (scripts/test.sh --repo-only --harnesses); on this
+machine it runs only with scripts/test.sh --harnesses, and only while strata-q3 is stopped (tests/harness_run.py:
+gate, not_now)."""
 from __future__ import annotations
 
 from pathlib import Path
-import shutil
 import sys
 import unittest
 
@@ -89,11 +89,8 @@ EXPECTED = [
 
 
 class Driver(unittest.TestCase):
-    @unittest.skipUnless(all(shutil.which(p) for p in ("gcc", "setsid", "pgrep", "ss", "curl")), "needs gcc, setsid, pgrep, ss and curl")
     def test_against_stubs(self):
-        why = harness_run.not_now()
-        if why:
-            self.fail(f"not run now: {why}")
+        harness_run.gate(self, ("gcc", "setsid", "pgrep", "ss", "curl"))
         result = harness_run.run(ROOT / "tests" / "ab_engine_stubs.sh", ROOT, TIMEOUT)
         harness_run.check(self, result, EXPECTED, TIMEOUT)
 

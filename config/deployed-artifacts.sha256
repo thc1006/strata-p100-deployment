@@ -1,13 +1,38 @@
-# Deployed artifacts, 2026-10-20 - sha256
+# Deployed artifacts, 2026-10-20 - sha256 (scripts/check-drift.sh; a path is under ~/dev unless it starts with /;
+# files over 1 GiB, the model shards and the pack's dense and expert weights, are hashed only with --full)
 # strata source pin: 477ac13cbe8e582c20484871ce459d20d82df09d (v0.1.45), engine strata 0.1.45, BUILD.json src git-477ac13cb (the binary the engine experiments ran)
 00869ac7b733d8214216d25004dbb1dd2fa878a4848d8af555a42c84f679e304  strata/engine-cuda12/strata
 937244cf786147b6a6c3d107b0400e068a8b71fbae8138a356738cf268dfb13e  strata/engine-cuda12/libstrata_kq.so
+f58245bcb89c3d86a2e38b7eb407716da37948017392af3667001f11e2c532f9  strata/engine-cuda12/BUILD.json
 e3e5a7b4e22e72c19d52892d60d15b886f2d907f0f8363011a728627801418c5  strata/strata-iq3_xxs.json
 8f59b4aa8873209dff11c11e37bcda9529a1335b724a1afeea37bf6388975baf  strata/data/expert-profile.bin
+# the venv's settings: the system's python, without its site-packages
+db6c8a96f25493eda9f74f23f0b5f248a8b50a5b469b15c5ee7313875b416364  strata/.venv/pyvenv.cfg
+# the CUDA 12.9 libraries the engine loads (its RUNPATH: ~/cuda-12.9/lib64)
+256e6409e4f06f618e1fb53d4844a6b81cdded1013afa8ade40c22f99eb133b7  /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcudart.so.12.9.79
+d63456d94f1b8e2408a8a9538c8740eb474c9eba48a84f420b15e2e10fbcd048  /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublas.so.12.9.1.4
+96ddf4891ca4f4ed1475966783a9185df2abd64a81c3cc713b96d036696fc541  /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublasLt.so.12.9.1.4
+# the MTP draft head
 c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a  Strata-data/mtp/rt/dense.bin
+991456cf4eb266eb8a888c349e548d11bc640f5dbd9149439aa9786af0f732fd  Strata-data/mtp/rt/dense.txt
 b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91  Strata-data/mtp/rt/draft_vocab.bin
 09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f  Strata-data/mtp/rt/experts.bin
+# the IQ3_S pack: its index, its tokenizer and chat template (server.py loads the template from there), the experts
+# the engine reads in their own format, and its dense and expert weights (sizes as index.txt and experts.bin.src.json
+# give them)
 b2a014878c3b61d6a6f915e194055a5e68ede34f9465dd1cb13249d902f008ac  Strata-data/packs/iq3_s/index.txt
+d9ac2dfa3ee63c55c9c6a6db26f72da0cec0ee41733f007e5cbbbba71617aa5d  Strata-data/packs/iq3_s/native_experts.txt
+d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13  Strata-data/packs/iq3_s/dense.bin
+ed9d0a872b4d9fb992a05f3f5114107b0689767f0d95e2fb7e2ffe091000e67c  Strata-data/packs/iq3_s/experts.bin
+12827f24b742ea4e80cdc12dbcf9622227056b9f797252a3149263d4f9aaadce  Strata-data/packs/iq3_s/tokenizer/chat_template.jinja
+4ba698529766c7a2f5052083ea10cdf2485577f5237a332ee291054eb11e3332  Strata-data/packs/iq3_s/tokenizer/merges.txt
+5088c8c298fc06af8382ddb3b76c888703ac2634e82263b97eedcc2ad202738b  Strata-data/packs/iq3_s/tokenizer/token_type.json
+4ba64f0332abcfb0b600b7df1537d1e836e68009d5fb7cdb77339738dc6365c4  Strata-data/packs/iq3_s/tokenizer/vocab.json
+# how the pack and the venv were made: records that neither the engine nor server.py reads (not read at start)
+d78dc607b6a2c87d8f337efcbdda063865e0ff9f81d5584f713121b48ae4c223  strata/.venv/.strata-pip.json
+51df3cd6ffd0d38c2da8e2d3a95a604b4a96c20b06fc639a9bf477282a42b86a  Strata-data/packs/iq3_s/conversions.json
+5a18d0c1f89ac64c08998010c81536fcd6b67557778f8f2dfc36539ad0150cad  Strata-data/packs/iq3_s/experts.bin.src.json
+c0bd435efbc6c3b28964b47999afe16c4ad268c7c7c4e8cb3af410796a6f30bf  Strata-data/packs/iq3_s/tokenizer/tokenizer.json
 # model shards (verified against the Hugging Face LFS hashes at download; IQ3_S's shard 2 is a hard link of IQ3_XXS's, the same file):
 4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3  Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
 316b46f3a2dbd68c900f43136ab9449f9dcc3725dfd8c794847c204bc161e113  Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf

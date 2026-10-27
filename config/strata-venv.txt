@@ -1,0 +1,23 @@
+# The packages of ~/dev/strata/.venv, as scripts/check-drift.sh compares them: one line for each dist-info
+# directory, its name==version and the sha256 of its RECORD (which gives the hash of each of its files); 2026-10-21.
+# After an intended change of the venv, write the lines again from it:
+#   for d in ~/dev/strata/.venv/lib/python3*/site-packages/*.dist-info; do
+#     echo "$(sed -n 's/^Name: //p' "$d/METADATA" | head -1)==$(sed -n 's/^Version: //p' "$d/METADATA" | head -1)  $(sha256sum < "$d/RECORD" | cut -d' ' -f1)"
+#   done | LC_ALL=C sort
+Jinja2==3.1.6  ebc4b8e8e5dd080f0947ea69c6e6183727268101e36df935f38bf37626e17128
+MarkupSafe==3.0.3  4b73c2b62907834e396cb0cdbb5c49a0b4055870058912d901cab7942af42980
+PyYAML==6.0.3  f9f18009052f05eae33a77c4766fcace611680e986e38257178ec348ed7fab04
+certifi==2026.7.22  40b42df48046d777d779ab938c5ec5ef5a513147ad31cfb7388e5690a256f765
+charset-normalizer==3.5.1  51f397560fd8ec06a6c734bfdf560253a33840517217ff0e60381952f99f5c7b
+cmake==4.4.3  cb0c2674d9376f2f00aa0fc4085a596c1751b6d3818ffa1b15dadb50ebb1bfdd
+idna==3.20  bd96ae32d9584bfe0225e8f2b8d507930603c765852e965a0fb26e16940c45e0
+ninja==1.13.2  0bf63b4458ab9c3f9cb7ff84099593c62b441b404770b75839143240e8470f5f
+numpy==2.2.6  39957cf61fdf6606333fbc362ddae7a718de5119f6ff1a0bcbc0ec7345de5f3f
+pillow==12.3.0  d178cdf25e90513ac168a18762712b6737d467e49909b8145e9a7fa194fbbb72
+pip==22.0.2  dc44472e98d4a1968396f856749a4e5f45ad5cc51fe98a47a412001bfce4a2e4
+psutil==7.2.2  d67f605c727f4a4e46d7618a4bfc86cac945a5495e37c4c4a61ee86fed22df68
+regex==2026.9.10  3e80caf3265d31b43d6ce2414e766ac1802773de70e5aee2856b985ff1897756
+requests==2.34.2  a47be584947e4de680d12f7ffb7f18dbeaa11616c63df937130b2a854ff47e63
+setuptools==59.6.0  9c80d2842109da83a30a753d247e75731f2a1d79797c114dcc0bea4bf658c6e9
+tqdm==4.70.1  62f4f22c949f6744ddb08e305696518b4f7fef6b991928421bd30f65d34816b8
+urllib3==2.8.0  1a9b155193648b249c72959f9d8c64b11825181352b1f5603f9a93ec10fd5b90

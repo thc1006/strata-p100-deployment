@@ -130,7 +130,7 @@ LOG
 setsid bash -c 'exec 2>>"$STUB_LOG"; env -i STRATA_RESIDENT_HEADROOM_GIB="$1" CUDA_VISIBLE_DEVICES=0,1,2,3 OTHER=1 \
   "$SB/strata/engine-cuda12/strata" --serve --pack /d/packs/iq3_xxs \
   --native /d/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf --layer-split 13,26,38 \
-  --conversation-cache-min-free-mib "$2" & wait' _ "${1:-6}" "${2:-6144}" > /dev/null &
+  --conversation-cache-min-free-mib "$2" & wait' "$SB/fake-server" "${1:-6}" "${2:-6144}" > /dev/null &
 echo $! > "$SB/server.pid"
 sleep 0.5
 EOF

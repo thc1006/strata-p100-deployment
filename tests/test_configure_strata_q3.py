@@ -775,7 +775,7 @@ class FileTests(unittest.TestCase):
 
 
 @unittest.skipUnless(VENV_PY.exists() and (STRATA / "serve" / "server.py").exists(),
-                     "the pinned Strata checkout is not here")
+                     "machine: the pinned Strata checkout is not here")
 class ServerIntegrationTests(unittest.TestCase):
     """The tuned args through the real server.py, and every emitted flag against the engine's own parser."""
 

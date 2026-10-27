@@ -243,8 +243,8 @@ class Verdicts(unittest.TestCase):
         self.check(lambda r: four(r, x={"ttft": 20.0}, y={"ttft": 23.1}), 1, "Speed criterion: does NOT hold")
 
     def test_what_is_not_a_fault(self):
-        # a request that waited 90 s or more for a slot while the Poisson phase overloads the 4 slots: queueing
-        # (about one run in two had such a line); another process's OOM inside its own cgroup limit: a note
+        # a request that waited 90 s or more for a slot while the Poisson phase overloads the 4 slots: queueing;
+        # another process's OOM inside its own cgroup limit: a note
         cases = {"a slot wait": ({"journal_lines": [J_WAIT, J_WAIT]}, "Stability criterion (perf runs): holds"),
                  "a user scope's own OOM": ({"kernel_lines": K_USER_OOM}, "3 kernel lines of other processes"),
                  "a results commit between runs": ({"commit": "def456"}, "Stability criterion (perf runs): holds")}

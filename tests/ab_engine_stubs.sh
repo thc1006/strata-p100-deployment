@@ -94,7 +94,9 @@ done
 if [ -n "$active" ]; then        # a timer: the command runs after that many seconds (a span like 45min: an hour)
   [[ "$active" =~ ^[0-9]+$ ]] || active=3600
   echo "timer $unit ${active}s: $*" >> "$SB/actions"
-  setsid bash -c 'sleep "$1"; shift; echo "rescue fired" >> "$SB/actions"; "$@"' _ "$active" "$@" > /dev/null 2>&1 &
+  # its command line names the sandbox, so that harness_run.py's sweep finds it (it leaves the harness's session)
+  setsid bash -c 'sleep "$1"; shift; echo "rescue fired" >> "$SB/actions"; "$@"' "$SB/rescue-timer" "$active" "$@" \
+    > /dev/null 2>&1 &
   echo $! > "$SB/units/$unit.timer.pid"
   exit 0
 fi
@@ -458,7 +460,8 @@ drive nomustnot "$SB/arms-nomustnot.json" c1-26:C1; rc=$?
 up
 
 # 27. an interrupt while the test unit is still loading (not listening): it is stopped at once, with no error output,
-# and strata-q3 comes back (it once waited 60 s for a reply that could not exist, printing a traceback per poll)
+# and strata-q3 comes back (it once waited 60 s for a reply that could not exist, printing a traceback per poll:
+# results/ab_engine-combo-20261019.log)
 n0=$(grep -c '^systemd-run strata-ab-engine' "$SB/actions" 2>/dev/null)
 ( for _ in $(seq 300); do [ "$(grep -c '^systemd-run strata-ab-engine' "$SB/actions")" -gt "${n0:-0}" ] && break; sleep 0.1; done
   sleep 2; pkill -TERM -f "^bash $SB/repo/bench/ab_engine[.]sh" ) &      # the test unit started, still loading

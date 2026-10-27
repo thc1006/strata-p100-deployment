@@ -4,7 +4,8 @@
 Arguments: runs in order, each "tag=label=reference tag" (the reference is the run each per-prompt ratio is taken
 against; a run that is its own reference gets 1.000).  Reads results/ple_hint_probe.jsonl, <tag>-arm.txt,
 <tag>-t{p,d,p0}-trace.txt and <tag>-m-mem.txt.  Rules (from the review of the first draft):
-  - prompts are compared per slice offset (the three slices differ by ~3% among themselves; the arms by less);
+  - prompts are compared per slice offset (in results/AB-0.1.45-ple-hint.md the three slices differ by ~3% among
+    themselves; the arms by less);
   - a row with an error, a prompt row that did not stop at its 32-token limit or read < 15,000 tokens, is left out
     and counted;
   - a count that is missing from a trace prints MISSING, never 0;

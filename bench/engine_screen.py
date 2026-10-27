@@ -28,8 +28,9 @@ show apart:
   admit28  admit with a 28K-token joiner: a longer read beside the decoders
 Requests "sent at once" (four users, the admission's decoders, decode4, eval4) go out STAGGER seconds apart.  Sent
 in the same instant, the admission's decoders got their first tokens in an order that varied from run to run, and in
-the two runs of 2026-10-19 where the third was first (c1-3, c0-4), two of them answered otherwise; staggered, the
-order was the same in every round of m0-1 and m1-1.  --texts PATH also
+the two runs of 2026-10-19 where the third was first in the first round (c1-3, c0-4), two of them answered
+otherwise; staggered, the order was the same in every round of m0-1 and m1-1 (the admit records of
+results/engine-screen.jsonl).  --texts PATH also
 writes every answer's text there, to find where two arms' answers part.
 One JSON line per request (per admission, per conversation) to --json, each with the tag, the phase, the answer's
 sha256, the corpus's sha256 (the prompts are cut from it) and the phases of the screen.  The last line of the
@@ -67,7 +68,7 @@ SAMPLING = {"temperature": 1.0, "top_p": 0.95, "top_k": 20, "min_p": 0.0, "prese
             "frequency_penalty": 0.0, "repetition_penalty": 1.0}
 # four questions of the evaluation's kinds, written for this screen (not from a benchmark) and hard, so that the
 # thinking reaches the 1536-token cap and the four requests decode the same amount (screen 2026-10-19b's questions
-# ended after 98 to 874 tokens).  Answers: 2177; C (0.2934); B (2040); 884.
+# ended after 98 to 874 tokens, results/engine-screen.jsonl).  Answers: 2177; C (0.2934); B (2040); 884.
 EVAL_QUESTIONS = [
     "How many permutations (p1, p2, ..., p10) of the numbers 1 to 10 satisfy |p_i - i| <= 2 for every i? Think it "
     "through, then end with a line 'Answer: <number>'.",

@@ -16,7 +16,7 @@ dense weights that are larger than the base model's take their room from the car
 The fill approximates the engine's PROFILE policy: every card takes its own layers' experts in the order of their
 routing counts; an expert that does not fit in what is left is skipped and a smaller one may still fit.  The engine's
 own slot sizing differs in detail (slots per layer), so the shares are estimates; the engine log of a start is the
-measurement.
+measurement.  The example's --capacity is IQ3_XXS's at 1536 MiB, from results/iq3s-memory-budget-20261019.txt.
 """
 from __future__ import annotations
 

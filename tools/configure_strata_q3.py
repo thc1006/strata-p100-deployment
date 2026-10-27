@@ -16,8 +16,9 @@ Profiles:
               8192 MiB of host RAM for parked conversations
   baseline    the original setup guide's first step: PLE mmap, equal cuts 12,24,36, 1536 MiB reserve
   aggressive  the original setup guide's second step as written: PLE ram, the model's cuts, 1024 MiB reserve (not
-              adopted here: with IQ3_XXS it buys no experts - all 24,576 fit at 1536 - and with a full expert cache
-              (IQ3_S) the cards would run at ~0.3-0.5 GiB free, where issue #2065 hangs)
+              adopted here: with IQ3_XXS it buys no experts - all 24,576 fit at 1536 (results/c0-1-arm.txt) - and
+              with IQ3_S, whose cache fills CUDA2, that card could fall to about 240 MiB free, below where issue
+              #2065 hangs: docs/decisions/0004-iq3-s.md)
 """
 from __future__ import annotations
 
@@ -43,26 +44,32 @@ MODELS = ("iq3_xxs", "iq3_s")
 GSQ_SHARD = re.compile(r"Qwen3\.8-Flash-Next-GSQ-RCO-(IQ3_XXS|IQ3_S)-(0000[12])-of-00002\.gguf")
 # Conversation parking (docs/DETAILS.md "Multiple conversations"): up to PARK_SLOTS conversations of at least
 # PARK_MIN_TOKENS tokens kept in host RAM, so a conversation whose batch slot was taken by other requests comes back
-# without reading its history again (measured here, 6 clients on 4 slots: 0 -> all of the history reused per turn).
+# without reading its history again (measured here, 6 clients on 4 slots: 0 -> all of the history reused per turn,
+# results/SUMMARY.md).
 PARK_SLOTS, PARK_MIN_TOKENS = 8, 1024
 # the engine stops parking when MemAvailable would fall below this (default 2560 MiB).  6 GiB: the box runs only this
 # service (the maintainer's decision of 2026-10-18; it was 8 GiB, the original guide's headroom for other users)
 PARK_MIN_FREE_MIB = 6144
-PARK_MIB_MAX = 12288                 # RAM beside the locked PLE table (~20 GiB available after load)
+# RAM beside the locked PLE table: 22.4-23.1 GiB was available after IQ3_S's load (results/ab2-iq3s-*-switch.txt,
+# results/ab3-iq3s-*-switch.txt)
+PARK_MIB_MAX = 12288
 CUTS = {"equal": [12, 24, 36], "last-light": [13, 26, 38], "iq3_s-light": [13, 25, 38]}
-# IQ3_XXS: measured (4-user decode 85.9 -> 100.6 tok/s, results/R2-lastlight-*); every expert fits at either cut.
+# IQ3_XXS: measured (4-user decode 85.9 -> 100.6 tok/s, results/R1b-noplepf-perf.log -> results/R2-lastlight-perf.log);
+# every expert fits at either cut.
 # IQ3_S: its experts (46.8 GiB) do not all fit; 13,25,38 gives the four expert caches the most of the expert profile's
-# routing at a 1536 MiB reserve (98.97%, against 98.67% at 13,26,38: docs/decisions/0004-iq3-s.md)
+# routing at a 1536 MiB reserve (98.97%, against 98.67% at 13,26,38; all three: results/iq3s-memory-budget-20261019.txt)
 MODEL_CUTS = {"iq3_xxs": "last-light", "iq3_s": "iq3_s-light"}
 # Tuning-step overrides (the original guide's tuning order): one value changed at a time, kept by a later re-run only
 # when given again.
 PREFILL_CHOICES = ("1024", "2048", "4096", "auto")
 # auto (default): the engine pipelines one group per stage (4 slots on 4 stages = 4 groups of 1) and, unlike a fixed 4,
-# still divides the slots when VRAM holds fewer than 4.  1 = serial windows (measured here: -40% decode with 4 users).
+# still divides the slots when VRAM holds fewer than 4.  1 = serial windows (measured here: -40% decode with 4 users,
+# results/R3-groups1-perf.log against results/R1b-noplepf-perf.log).
 BATCH_GROUPS_CHOICES = ("auto", "1", "2", "4")
-POOL_WORKERS_RANGE = (1, 8)          # 8 vCPUs; the four stages share one expert pool
+POOL_WORKERS_RANGE = (1, 8)          # 8 vCPUs (results/AB-0.1.45-ple-hint.md); the stages share one expert pool
 # The floor strata-preflight.sh enforces (RESERVE_CRITICAL_BELOW_MIB): a lower reserve would be written and then refused
-# at the next start.  A P100 has 16384 MiB, so a reserve must be below that.
+# at the next start.  A P100 has 16384 MiB (vram_total_mib in results/ab3-iq3s-robust-robust-monitor.csv), so a
+# reserve must be below that.
 RESERVE_MIB_MIN, CARD_MIB = 1024, 16384
 
 # These values are rebuilt once; every unrelated option and model path stays.
@@ -73,7 +80,9 @@ CONTROLLED_VALUES = {
     "--pipeline-windows", "--vram-reserve-later-mib",
     "--conversation-cache-mib", "--conversation-cache-slots", "--conversation-cache-min-tokens",
     "--conversation-cache-min-free-mib",
-    "--rope-scaling", "--rope-scale",      # only for contexts past the trained 262144; this profile serves 32768
+    # only for contexts past the trained 262144 (qwen4exp.context_length in results/gguf-metadata-iq3s-20261022.txt);
+    # this profile serves 32768
+    "--rope-scaling", "--rope-scale",
     "--rope-freq-base", "--rope-freq-scale", "--yarn-orig-ctx", "--yarn-ext-factor", "--yarn-attn-factor",
     "--yarn-beta-fast", "--yarn-beta-slow",
 }
@@ -115,13 +124,15 @@ ENV_DEFAULTS = {
     "STRATA_PIPELINE_ADAPT_ASYNC": "0",
     "STRATA_KV_GROW": "0",
     # 0.1.45, confirmed here (docs/engine-experiments.md): the prompt MMQ takes each full 16-expert group's experts in
-    # row-count order, exact by design; 1.2K to 16K-token prompts read 9-18% faster with the same answers.  On only
+    # row-count order, exact by design; 1.2K to 16K-token prompts read 9-18% faster with the same answers
+    # (results/SCREEN-sched.md).  On only
     # for the value "1" (prefill/mmq_resident_sort.hpp)
     "STRATA_MMQ_GROUP_SORT": "1",
     # its inexact variant, which sorts the partial group too, would take precedence over it; off as in every run
     "STRATA_MMQ_RESIDENT_SORT_NE": "0",
     # a prompt is read on a thread of its own while the slot groups decode: three decoders' longest stall while a
-    # 16K prompt is read fell from 22.7 s to 0.5 s; the joining prompt's first token came 11% later, 1% with the sort
+    # 16K prompt is read fell from 22.7 s to 0.5 s; the joining prompt's first token came 11% later
+    # (results/SCREEN-sched.md), 1% with the sort (results/SCREEN-combo.md)
     "STRATA_PIPED_CONCURRENT": "1",
 }
 # The differences a start may have and only warns about (strata-preflight.sh): the tuning steps (--prefill,
@@ -426,7 +437,8 @@ def tune_config(cfg: dict[str, Any], profile: str = "deployed",
         kept.extend((flag, value))
     kept.extend(("--resident-experts", "--trim-stage-weights", "--no-kv-grow"))
     # A locked PLE table needs no read-ahead, and on ZFS the prompt path's per-row MADV_WILLNEED (ngram.cpp) becomes
-    # dmu_prefetch of whole 128K records: measured here, ~15.5 GB of disk reads for one 16K-token prompt.
+    # dmu_prefetch of whole 128K records: measured here, 15.5-17.8 GB of disk reads for one 16K-token prompt
+    # (results/ple_prefetch_console.txt).
     if ple_io == "ram":
         kept.append("--no-ple-prefetch")
     out = copy.deepcopy(cfg)

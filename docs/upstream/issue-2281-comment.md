@@ -109,3 +109,13 @@ strata serve: file tier I/O this request: the OS read 0.0 MB from storage (0 maj
 ```
 
 </details>
+
+---
+
+Not part of the comment as posted: the files in `results/` that hold its numbers.
+
+- The TL;DR, the first table, and the call counts and the 92 µs below "How the hint reaches the disk": `AB-0.1.44.1.md`, which summarizes `v441pf-probe.txt`, `v441-1-probe.txt` and `v441-2-probe.txt` (untraced) and `v441pf-traced-trace.txt` and `v441-2-traced-trace.txt` (traced).
+- Step 3: the 128 KiB record, `zfs-dataset-20261022.txt`; the ARC at its 8 GiB cap, `arc_max_gib` in `v441-1-monitor-all.json`; the 26.8 GiB table, `iq3s-memory-budget-20261019.txt`.
+- "Environment and method": the GPUs, the driver and the CPU, `setup-20261016.log`; Ubuntu 22.04.5 and the VMware VM, `host-os-20261025.txt`; the kernel and the OpenZFS module, `host-versions-20261024.txt`; the 90 B a row, shard 2's 28,800,138,432 bytes in `iq3s-model-files-20261019.txt` over its rows; the 8 vCPUs, `AB-0.1.45-ple-hint.md`; 62.8 GiB of RAM and the 320,001,536 rows, `v441pf-engine-lines.txt`; recordsize 128K and lz4, `zfs-dataset-20261022.txt`.
+- "All numbers": the untraced table and the misses × 128 KiB, the three `*-probe.txt` files above; the traced table and the paragraph after it, `AB-0.1.44.1.md` and the two `*-traced-trace.txt` files above; the engine's `the OS read` figures, `v441pf-engine-lines.txt`; 0.1.43.1 earlier the same day, `ple_prefetch_console.txt` and `engine-log-20261016-extract.txt`; the short prompts and the table of 0.1.44.1 against 0.1.43.1, `AB-0.1.44.1.md`.
+- "Server log lines": the start with the hint on, `v441pf-engine-lines.txt`; the second start with `--no-ple-prefetch`, `strata-0.1.44.1-log-extract-20261022.txt`.

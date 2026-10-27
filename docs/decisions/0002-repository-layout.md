@@ -11,7 +11,7 @@ decision-makers: thc1006
 When the repository was created on 2026-10-17, it kept the layout of the original working directory:
 
 - The root directory mixed tools, tests, documents, the original setup guide and example requests.
-- `deploy/` held deployment files, load-test tools, 264 test results and upstream records together.
+- `deploy/` held deployment files, load-test tools, test results and upstream records together.
 - A single deployment record served as operations manual, list of system changes, design rationale and measurement results at the same time.
 
 The decision was how to arrange directories and documents so that future operators can find things and change them safely. The constraint: `strata-q3.service` calls the ExecStartPre and ExecStartPost scripts in the repository by absolute path, so a move requires reinstalling the units at the same time and verifying with one actual restart.
@@ -41,16 +41,15 @@ Chosen option: 2.
   - Each kind of file has a fixed place, and runbooks no longer mix in design rationale.
 - Bad:
   - Historical output in `results/` still shows the old paths (`deploy/...`); `results/README.md` explains this.
-  - The move required reinstalling the systemd units and restarting the service once (about 8 minutes).
-  - `scripts/check-drift.sh` changed by more than half during the move (44% similarity), so by default git does not treat it as a move. The public repository starts from a single commit; the history before the move is not part of it.
+  - The move required reinstalling the systemd units and restarting the service once (it loaded after 438 s: `results/service-load-times.txt`).
+  - `scripts/check-drift.sh` changed so much during the move that by default git does not treat it as a move. The public repository starts from a single commit; the history before the move is not part of it.
 
 ### Confirmation
 
 - `scripts/test.sh` checks that the file each Exec line in the systemd units points to exists and is executable. `systemd-analyze verify` checks only the first line of each Exec type and skips lines that start with `-` (tested with systemd 249 on this machine), so this check was added.
 - On 2026-10-18, the units were reinstalled with `scripts/install-system-files.sh` and the service was restarted once:
-  - preflight reported `ok: 4 GPUs, 57 GiB usable, config matches (--profile deployed) in everything that decides memory and placement`.
-  - wait-ready reported `loaded after 438 s`.
-  - `scripts/check-drift.sh` reported `no drift`.
+  - preflight reported `ok`: all four GPUs, enough memory, and a config that matches `--profile deployed` in everything that decides memory and placement.
+  - wait-ready reported `loaded after 438 s` (`results/service-load-times.txt`, `results/journal-20261018-0023.txt`, which also holds the preflight's line).
 
 ## Pros and Cons of the Options
 

@@ -59,5 +59,5 @@ wait "$PERF" 2>/dev/null
   sudo perf script -i "$DATA" -F tid,time,event,trace 2> "$R/$TAG-mem-perf-script.err" | python3 "$D/bench/mem_parse.py"
   echo "--- perf script stderr (lost events show here)"; head -5 "$R/$TAG-mem-perf-script.err"
 } >> "$OUT" 2>&1
-sudo chown thc1006:thc1006 "$DATA"   # hundreds of MB, kept for re-parsing; the parsed result is in $OUT
+sudo chown thc1006:thc1006 "$DATA"   # hundreds of MB (results/*-m-mem-perf-record.err), kept for re-parsing; the parsed result is in $OUT
 cat "$OUT"

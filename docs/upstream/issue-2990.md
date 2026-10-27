@@ -67,3 +67,10 @@ Reproduced locally
 
 No Intel GPU (the script ran outside the strata-sycl-dev image) · 4× Tesla P100 16 GB · 62.8 GiB RAM · Ubuntu 22.04.5
 
+---
+
+Not part of the issue as posted: the files in `results/` that hold its numbers.
+
+- "What happened", the runs with 0.2.0-beta's script, and the output and the script's sha256 under "Smallest steps": `sycl-build-sh-exit-20261020.txt`.
+- The 0.1.45 runs, the SYCL build directory included: `sycl-build-sh-exit-20261018.txt`, which the issue links.
+- "Graphics card, memory and system": the GPUs, `setup-20261016.log`; 62.8 GiB RAM, the memory guard line of `v441pf-engine-lines.txt`; Ubuntu 22.04.5, `host-os-20261025.txt`; kernel 6.8, `host-versions-20261024.txt`.

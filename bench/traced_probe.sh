@@ -29,7 +29,8 @@ sleep 1
   python3 "$D/bench/ple_prefetch_probe.py" --tag "$TAG" --json "$R/ple_prefetch_probe.jsonl" "${OFFS[@]}"
 } > "$OUT" 2>&1
 # SIGINT to perf itself (the child of sudo): sudo does not always relay a signal from this script's process group,
-# and perf then counts on until killed (seen once: perf ran 27 min, 26 of them after the probe had ended)
+# and perf then counts on until killed (seen once, in v441-1: perf ran 27 min, 26 of them after the probe had ended;
+# results/v441-1-traced-trace.txt, ple_prefetch_probe.jsonl and ab-v441-driver.log)
 sudo pkill -INT -P "$PERF" 2>/dev/null
 for i in $(seq 1 30); do [ -d "/proc/$PERF" ] || break; sleep 1; done     # sudo runs as root: no kill -0 from here
 [ -d "/proc/$PERF" ] && { echo "perf did not stop on SIGINT; killed (no counts)" >> "$OUT"; sudo pkill -KILL -P "$PERF"; }

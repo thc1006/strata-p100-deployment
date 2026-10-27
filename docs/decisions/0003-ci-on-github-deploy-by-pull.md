@@ -12,9 +12,9 @@ Until 2026-10-18 the repository had no CI. `scripts/test.sh` ran only on this ma
 
 The maintainer asked for CI, and for deployment to be ready for automation: a commit that has passed the checks should be able to reach this machine without manual steps. The constraints:
 
-- The machine runs Ubuntu 22.04, with Python 3.10 and systemd 249. The checks should run with the same versions.
+- The machine runs Ubuntu 22.04, with Python 3.10 and systemd 249 (the release: `results/host-os-20261025.txt`). The checks should run with the same versions.
 - The units run programs that exist only on this machine (`~/dev/strata/.venv/bin/python`, `/usr/local/sbin/strata-q3-health`), so the last two checks of `scripts/test.sh` fail anywhere else.
-- A start of the service takes 7–9 minutes and other people use the service. The system files need root.
+- A start of the service takes 7–9 minutes (`results/service-load-times.txt`) and other people use the service. The system files need root.
 
 ## Considered Options
 
@@ -29,7 +29,7 @@ Chosen option: 1, because then code from GitHub runs on the production machine o
 - `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, as a user without privileges, with the repository mounted read-only. It uses no actions and no token.
 - The job runs in Canonical's Ubuntu Base 22.04.5, a root file system that the job fetches from cdimage.ubuntu.com, checks against the release's SHA256SUMS entry and imports into Docker.
   - It does not use the `ubuntu-22.04` runner label: GitHub began deprecating that image on 2026-09-17 and stops supporting it on 2027-04-17.
-  - It does not pull a container image: on 2026-10-18, Amazon ECR Public refused the anonymous pull of Canonical's `lts/ubuntu:22.04` from a GitHub runner with `toomanyrequests: Data limit exceeded` (run 39100153814), 55 minutes after the same pull had worked (run 39096952832).
+  - It does not pull a container image: on 2026-10-18, Amazon ECR Public refused the anonymous pull of Canonical's `lts/ubuntu:22.04` from a GitHub runner with `toomanyrequests: Data limit exceeded` (run 39100153814), after the same pull had worked earlier that day (run 39096952832).
 - `scripts/deploy.sh` fast-forwards this checkout to `origin/main` after five checks:
   1. The checkout is on `main`, has no local changes, and can fast-forward.
   2. The commits change nothing that applies outside the checkout: `systemd/`, `config/`, the watchdog, the installer, or `scripts/check-drift.sh`, which CI cannot run.
@@ -71,3 +71,6 @@ Option 3, no CI:
 - [Ubuntu Base 22.04 releases](https://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/), with `SHA256SUMS` signed by the Ubuntu CD image signing key
 - The next step toward automatic deployment is a timer that runs `scripts/deploy.sh --apply`. It needs a unit in `systemd/` and a decision on when the service may restart. Until then, `deploy.sh` runs by hand ([Deploying a commit from GitHub](../runbooks/deploy.md)).
 - When to re-evaluate: when the machine moves to a newer Ubuntu release, or when deployment should run on a timer.
+- 2026-10-20: [decision 0006](0006-harnesses-in-ci-checks-by-hand.md) changes what CI runs, and the paths that check 2 of `deploy.sh` leaves to a person.
+- 2026-10-21: "every commit on `main`" under Consequences is every push to `main`: the workflow runs once for each push, on the newest commit of the push.
+- 2026-10-22: "Neither CI nor `deploy.sh` runs them" under Consequences no longer holds. `tests/test_start_path.py` runs the preflight, wait-ready and the watchdog's dry run against stubs in `scripts/test.sh`, which CI and `deploy.sh` run. The preflight's test needs `/dev/nvidia3`, so it runs on this machine and is skipped in CI. The tests of the watchdog's counters and of wait-ready's 30 minutes need a user and mount namespace (2026-10-25): they run on this machine and are skipped where one cannot be made.

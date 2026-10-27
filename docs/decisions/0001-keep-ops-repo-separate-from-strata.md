@@ -22,7 +22,7 @@ Chosen option: 1, for the reasons below (checked on 2026-10-18):
 
 - The production service has not changed any Strata code. The per-layer embedding (PLE) read-ahead hint problem on ZFS is solved with `--no-ple-prefetch` ([deployment record, section 4](../deployment-record.md)), so a fork has nothing to hold at present.
 - On GitHub, a fork of a public repository can only be public, and `thc1006/Strata` is public; this repository was private. (After the 2026-10-18 decision to make this repository public, this point no longer holds. The other reasons are unchanged.)
-- Upstream changes quickly: it published 12 releases between 2026-10-06 and 10-17, and there are 546 commits between 0.1.43.1 and 0.1.45. With the operations files mixed into a fork, every upgrade would require a merge from upstream.
+- Upstream changes quickly, and with the operations files mixed into a fork, every upgrade would require a merge from upstream.
 - Upstream rewrote its git history once (#1276, 2026-10-06), so a pinned commit can lose its reference. A tag on the fork can handle this risk; the whole project does not need to become a fork.
 - Upstream's `update.sh` runs `git pull` to the latest main. Production needs a pinned version that is tested before it replaces the current one.
 

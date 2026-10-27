@@ -40,7 +40,8 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
 
 ## Changes to the plan
 
-- 2026-10-19 05:05, after reading the first two runs (c0-1, c1-1) and before c0-2: to save a separate 80-minute run,
+- 2026-10-19 05:05, after reading the first two runs (c0-1, c1-1) and before c0-2: to save a separate 80-minute run
+  (a confirmation's four runs, about 19 minutes each in `results/ab_engine-group-sort-20261019.log`),
   the confirmation of C1 is embedded in the next screen, in the order C0, C1, C2, C3, C1, C0 (tags c0-3, c1-2, c2-1,
   c3-1, c1-3, c0-4). It stays symmetric (C0 first and last, C1 at the second and fifth places), so a drift over the
   run affects both arms alike, and every step is a fresh engine start. The target metric, not defined precisely
@@ -165,8 +166,10 @@ run's screen it used 0 to 2 CPU-seconds (the `beside` lines of `results/<tag>-ar
 Three runs in this order: m0-1, m1-1, m0-2, on the pull request's tree (commit `2b7ffada` on 0.1.45, built locally
 for sm_60), with the deployed configuration less `--batch-groups auto` and with `STRATA_BATCH_SELF_COMMIT=0`. All
 were usable. The screen ran the default phases and decode4 and eval4, and sent the requests it sends at once 0.3 s
-apart (version 2026-10-19b). The two M0 runs differed by 0.18% or less on every metric and gave the same 44 answers,
-character for character. Source: `results/SCREEN-pmtp.md`.
+apart (version 2026-10-19b). The two M0 runs differed by 0.33% or less on every metric (0.17% or less on all but the
+thinking users' tokens per wall second) and gave the same 44 answers, character for character. Source:
+`results/SCREEN-pmtp.md`; the two rows of tokens per wall second come from `tokens` and `wall_s` of the decode4 and
+eval4 records in `results/engine-screen.jsonl`.
 
 | Metric (the pull request's tree) | M0 (m0-1, m0-2) | M1 (m1-1) |
 |---|---:|---:|
@@ -219,8 +222,8 @@ this confirmation is set aside, see the changes to the plan). All were usable. S
 
 K1 is confirmed by each criterion fixed at 08:27. In each K1 run against each K0 run, every prompt size was read
 faster, by 12.2% to 12.6% on average over the three sizes; the decoders' longest gap while a 16K prompt joined was
-0.55 s against 22.72 and 22.74 s; and the four requests finished 4.2% to 7.0% sooner. The 16 requests that ran alone
-got the answers both K0 runs gave.
+0.55 s against 22.72 and 22.74 s; and the four requests finished 4.2% to 7.1% sooner. The 16 requests that ran alone
+got the answers both K0 runs gave (`results/engine-screen.jsonl`).
 
 With the faster read, the joining prompt's first token comes 1.1% later, where C3 alone made it 11.0% later, and four
 users sent together get 2.7% more tokens per second. eval4 says nothing here: between the two K0 runs, with the same
@@ -229,7 +232,8 @@ than between the arms.
 
 Of the 51 requests both K0 runs answered alike, K1 answered 23 otherwise, all in the phases where requests decode
 beside a read (four 8, eval4 3, admit 6, admit28 6), and the two K1 runs answered 19 requests otherwise than each other
-(four 4, eval4 4, admit 5, admit28 6). The two K0 runs differed in one answer, a sampled eval4 request.
+(four 4, eval4 4, admit 5, admit28 6, by phase from `results/engine-screen.jsonl`). The two K0 runs differed in one
+answer, a sampled eval4 request.
 
 ## IQ3_S: decision 0005's switches again, and the next candidates
 
@@ -254,7 +258,7 @@ The arms run in `bench/ab_engine.sh`'s transient unit and are measured with `ben
 | C2 | `--prefill-pipe 768` with the 2048 cap | no | prompt read rate |
 
 R adds about 128 expert slots to CUDA2, which holds 6218 of its layers' 6656 profiled experts at 2.0 MiB a slot (the
-08:30 start's lines in the engine log); the other cards already hold all of theirs.
+08:30 start's engine lines in `results/ab2-iq3s-robust-switch.txt`); the other cards already hold all of theirs.
 
 The order is K0, K1, P4, P6, R, C2, K1, K0, with the tags s-k0-1, s-k1-1, s-p4-1, s-p6-1, s-r-1, s-c2-1, s-k1-2 and
 s-k0-2. Every step is a fresh engine start.
@@ -296,7 +300,8 @@ Amended at 12:10 the same day, before any of these runs, after a review of the p
 - **eval4's two metrics** are reported but do not stop a candidate: its two K0 runs differed by 26.3% and 11.1% on
   2026-10-19 (`results/SCREEN-combo.md`).
 - **The decoders' longest gap** (16K and 28K joining three decoders) counts against a candidate only when it is worse
-  by more than 5% beyond the spread and by more than 0.25 s; the K1 runs' gaps are about half a second.
+  by more than 5% beyond the spread and by more than 0.25 s; the K1 runs' gaps on IQ3_XXS were about half a second
+  (`results/SCREEN-combo.md`).
 - **The phases** are set for every step: `ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns`.
 
 - **R's arm check** must also show CUDA2's cache above 6300 slots ("CUDA2 runs layers 25-37, expert cache 63xx
@@ -306,10 +311,10 @@ Amended at 12:10 the same day, before any of these runs, after a review of the p
   config changed since the check at the start.
 
 Amended at 17:25 the same day: the first run of this screen, 16:24-17:19, is not used. During its first two steps,
-other work ran on the machine (8 vCPUs):
-- during s-k0-1's measurement (16:39-16:51): `scripts/test.sh` from 16:43:59 to 16:45:18, over both decode4 rounds and
+other work ran on the machine (8 vCPUs, `results/AB-0.1.45-ple-hint.md`):
+- during s-k0-1's measurement (16:39-16:51): a run of `scripts/test.sh`, over both decode4 rounds and
   the start of eval4, and a `scripts/check-drift.sh` run, hashes of the CUDA libraries, and scans and removals in /tmp;
-- during s-k1-1's (17:05-17:17): two unit test runs of about 8 s each, over decode4's second round and eval4, and a
+- during s-k1-1's (17:05-17:17): two unit test runs, over decode4's second round and eval4, and a
   few shorter commands.
 
 In s-k0-1's first decode4 round, the four users' engine decode rates summed to 102.0 tokens per second, in s-k1-1's
@@ -341,7 +346,8 @@ Against K1, with the spread between the two K1 runs:
   requests that run alone the answers of both K1 runs on all 12 that the two K1 runs answer alike (the prefill and
   decode phases). The turns phase cannot test this: both K1 runs, and both K0 runs, answered all four of its requests
   differently from each other. On IQ3_XXS it repeated itself: two runs of the same arm gave all four the same answers
-  (runs k0-3 and k0-4, k1-3 and k1-4, m0-1 and m0-2 of 2026-10-19).
+  (runs k0-3 and k0-4, k1-3 and k1-4, m0-1 and m0-2 of 2026-10-19). These counts come from
+  `results/engine-screen.jsonl`.
 - **R does not go on**: +3.1% and +2.3% on its target metrics.
 - **C2** reads 1.2K and 4K prompts 10.7% and 8.7% faster, and four users get 13.7% more tokens per second; no other
   metric moves against it by more than 5% beyond its spread.

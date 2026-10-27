@@ -1,6 +1,6 @@
 # Contributing
 
-This repository describes one production machine: Strata serving Qwen3.8-Flash-Next IQ3_XXS on 4× Tesla P100. The
+This repository describes one production machine: Strata serving Qwen3.8-Flash-Next GSQ-RCO IQ3_S on 4× Tesla P100. The
 configuration and the measurements are specific to that hardware.
 
 ## Issues

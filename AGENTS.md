@@ -8,12 +8,20 @@ at the next start of the service. Other people use the service.
 
 ## Commands
 
-- `scripts/test.sh`: unit tests, `bash -n` on every script, Python syntax, `systemd-analyze verify` and a check that
-  every program the units run exists. It ends with `all checks passed`. `--repo-only` skips the programs outside the
-  repository; CI (`.github/workflows/test.yml`) runs that.
+- `scripts/test.sh`: unit tests, `bash -n` and shellcheck (errors) on every script (shellcheck is skipped where it is
+  not installed, but not with `--repo-only`), Python syntax (also the Python inside the shell scripts),
+  `systemd-analyze verify` and a check that every program the units run exists. It ends with `all checks passed`.
+  `--repo-only` skips what needs this machine. `--harnesses` also runs the stub harnesses that start fake engines
+  (`tests/ab_engine_stubs.sh`, `ab_model_run_stubs.sh`, `switch_model_stubs.sh`): the fake engines have the command
+  line the preflight looks for, so on this machine they run only while the service is stopped. CI
+  (`.github/workflows/test.yml`) runs `--repo-only --harnesses`.
 - `python3 -B -m unittest discover -s tests -k <name>`: run one test, for example `-k test_value_bounds`.
-- `scripts/check-drift.sh`: read-only comparison of the machine with the repository. It ends with `no drift`.
-- `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json --profile deployed --dry-run`: shows what
+- `scripts/check-drift.sh`: read-only comparison of the machine, and of the running service, with the repository. It
+  ends with `no drift`. Uncommitted changes in the checkout the service runs are drift: run it after a commit.
+  `--full` also hashes the files over 1 GiB. From another checkout or worktree it passes only at the commit of the
+  live checkout; `--candidate` compares the machine with that tree instead, as with a commit to be deployed
+  (`scripts/deploy.sh` does).
+- `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json $(sed -e 's/#.*//' config/profile.conf) --dry-run`: shows what
   the tool would change in the live config without writing it.
 - `scripts/deploy.sh`: whether `origin/main` can be deployed to this checkout. To find out, it runs that commit's
   `scripts/test.sh` and `scripts/check-drift.sh` here; the checkout stays as it was. `--apply` then deploys it: a
@@ -22,9 +30,11 @@ at the next start of the service. Other people use the service.
 ## Never, unless the maintainer asks for it in this session
 
 - Start, stop, restart or reset `strata-q3.service` or `strata-q3-health.timer`, or kill the engine or `server.py`.
-  A start takes about 9 minutes, and a stop during the load leaves the service failed.
+  A restart takes about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`), and a stop during the load
+  leaves the service failed.
 - Run anything in `bench/`. The A/B scripts stop and restart the production service, the tracing scripts use `sudo`,
-  and the load tests keep the GPUs busy for up to an hour.
+  and the load tests keep the GPUs busy for up to an hour (a robustness run with a 30-minute soak took 59.8–60.4
+  minutes: `results/*-robustness.log`).
 - Run `sudo`, `scripts/install-system-files.sh`, or anything that writes to `/etc`, `/usr/local/sbin` or `~/dev/strata`.
 - Run `tools/configure_strata_q3.py` on `~/dev/strata/strata-iq3_xxs.json` without `--dry-run`.
 - Run `scripts/deploy.sh --apply`. It changes what the service runs at its next start.
@@ -42,10 +52,11 @@ at the next start of the service. Other people use the service.
 ## Done means
 
 - `scripts/test.sh` passes. Report its last lines.
-- After a push, the `test` workflow passes on GitHub (`gh run list -w test.yml -L 3`).
+- After a push, the `test` workflow passes on GitHub (`gh run list -R thc1006/strata-p100-deployment -w test.yml -L 3`;
+  the checkout has two GitHub remotes). It runs the stub harnesses, which `scripts/test.sh` here skips.
 - A change to `tools/configure_strata_q3.py` comes with a unit test in `tests/` that fails without the change.
-- `scripts/check-drift.sh` still reports `no drift`, or the drift is the intended change and the repository copy
-  changes in the same commit.
+- After the commit, `scripts/check-drift.sh` still reports `no drift`, or the drift is the intended change and the
+  repository copy changes in the same commit.
 - `CHANGELOG.md` has an entry for each notable change.
 
 ## Conventions
@@ -56,6 +67,10 @@ at the next start of the service. Other people use the service.
 - Documentation is in plain English. Every number names the configuration it was measured on and the file in
   `results/` it comes from.
 - Decision records follow [docs/decisions/adr-template.md](docs/decisions/adr-template.md).
+- On this machine, start every job you run (tests, experiments, generators of test input) in a capped scope:
+  `systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0 -- choom -n 500 -- <command>`, one heavy job at a
+  time. The account may use 6 GiB in all ([decision 0007](docs/decisions/0007-memory-limit-of-the-maintainers-account.md)), and on
+  2026-10-21 a test input that grew without bound took the service down for 11 minutes.
 
 ## Commits
 

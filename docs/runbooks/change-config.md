@@ -6,8 +6,8 @@
 
 ## Steps
 
-1. Change the parameters in `config/profile.conf`, for example from `--profile deployed` to `--profile deployed --prefill 1024`. At every start, preflight compares this line with the live config:
-   - When the only differences are in `--prefill`, `--pool-workers` or `--reserve-mib` (1024 or higher), or in fields that the web settings change, such as the reasoning defaults and `fit_max_tokens`, preflight writes one note line to the log and starts as usual (the list is the tool's `NOTE_ONLY_KEYS`).
+1. Change the parameters in `config/profile.conf`, for example from `--profile deployed --model iq3_s` to `--profile deployed --model iq3_s --prefill 1024`. At every start, preflight compares this line with the live config:
+   - When the only differences are in `--prefill`, `--pool-workers` or `--reserve-mib` (1024–16383), or in fields that the web settings change, such as the reasoning defaults and `fit_max_tokens`, preflight writes one note line to the log and starts as usual (the list is the tool's `NOTE_ONLY_KEYS`).
    - When only the format differs (indentation, BOM, the order of args, or duplicate args), it also only writes a note.
    - Any other difference makes it refuse to start, for example in `--split`, `--ple-io`, `--batch-groups` or `--conversation-cache-mib`, or a change to another `--profile`.
    - In addition, preflight always refuses to start when the engine is not `~/dev/strata/engine-cuda12/strata`, when `lazy_load` is true, when the args use the `--flag=value` form (the engine does not accept it), or when the VRAM reserve of the first card is not within 1024–16383 MiB (without `--vram-reserve-mib` the engine uses 700; for values below 1024, see issue #2065). The tool's `--reserve-mib` also accepts only 1024–16383.
@@ -19,7 +19,7 @@
 3. Write the change: run the same line again without `--dry-run`. When there are changes, the tool first backs up the old file as `~/dev/strata/strata-iq3_xxs.json.before-p100-q3` (if that file exists, it adds `.1`, `.2`, … in order).
 4. Apply and check:
    ```bash
-   sudo systemctl restart strata-q3      # about 7–9 minutes
+   sudo systemctl restart strata-q3      # about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`)
    scripts/check-deployment.sh
    ```
 5. When you decide to keep the change, update the expected state in the repo:
@@ -28,9 +28,9 @@
    cp ~/dev/strata/strata-iq3_xxs.json config/strata-iq3_xxs.deployed.json &&
    new=$(cd ~/dev && sha256sum strata/strata-iq3_xxs.json) &&
    sed -i "s|^[0-9a-f]\{64\}  strata/strata-iq3_xxs.json\$|$new|" config/deployed-artifacts.sha256 &&
-   scripts/check-drift.sh && scripts/test.sh
+   scripts/test.sh
    ```
-   Expected: `check-drift.sh` reports `no drift`, and `test.sh` reports `all checks passed`. If DRIFT appears, find the cause first and do not commit. When the checks pass, add an entry to `CHANGELOG.md`, and then run `git add config/ CHANGELOG.md && git commit -m "config: <what changed and why>"`.
+   Expected: `test.sh` reports `all checks passed`. Add an entry to `CHANGELOG.md`, commit (`git add config/ CHANGELOG.md && git commit -m "config: <what changed and why>"`), and then run `scripts/check-drift.sh`: it must report `no drift`. Before the commit, it reports the change itself as drift, a local change of this checkout. If it reports other drift, find the cause, and fix the commit (`git commit --amend`) before you push.
 
    When the config sets `api_key`, the first line stops and none of the later lines run: the key must not go into the repo. In that case, generate the snapshot from the original setup config instead (`check-drift.sh` compares in the same way). You do not need to change the line in the manifest:
    ```bash
@@ -38,7 +38,7 @@
    python3 tools/configure_strata_q3.py "$t/c.json" $(sed -e 's/#.*//' config/profile.conf) > /dev/null &&
    cp "$t/c.json" config/strata-iq3_xxs.deployed.json && rm -r "$t"
    ```
-   After that, run `scripts/check-drift.sh && scripts/test.sh` in the same way. When they pass, add a CHANGELOG entry and commit.
+   After that, run `scripts/test.sh`, add a CHANGELOG entry, commit, and run `scripts/check-drift.sh`, in the same way.
 
 ## Change the model (GSQ-RCO IQ3_XXS or IQ3_S)
 
@@ -54,13 +54,13 @@ The two are ISTA-DASLab's quantizations of the same checkpoint; they share the P
    mv $M/IQ3_S/$f.part $M/IQ3_S/$f
    ln $M/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf $M/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
    ```
-   Expected: 54,817,524,224 bytes; the hard link costs no space.
+   Expected: 54,817,524,224 bytes (`results/iq3s-model-files-20261019.txt`); the hard link costs no space.
 2. Build its pack with Strata's packer, as setup does, without writing into the Strata tree:
    ```bash
    cd ~/dev/strata && PYTHONDONTWRITEBYTECODE=1 STRATA_GGUF_PY=third_party/llama.cpp/gguf-py nice -n 19 ionice -c 3 \
      .venv/bin/python tools/iq_pack.py --gguf $M/IQ3_S/$f --out ~/dev/Strata-data/packs/iq3_s --experts-bin
    ```
-   Expected: the last line is `experts.bin: 48 layers, 46.84 GiB`.
+   Expected: the last line is `experts.bin: 48 layers, 46.84 GiB` (IQ3_S's routed experts in `results/iq3s-memory-budget-20261019.txt`).
 3. Change the model in `config/profile.conf` (`--profile deployed --model iq3_s`), then follow steps 2–5 above. The tool rewrites `--native`, `--ple-gguf`, `--pack`, `tokenizer` and `model_name` to the other model's files; it refuses when one of them is not in setup's layout. The model change is critical: preflight refuses to start a live config whose model differs from the profile. Clients may keep sending the old model name; the server answers any name.
 
    `bench/switch_model.sh iq3_s <record>` does this step with checks before and after the restart, and switches the
@@ -78,4 +78,4 @@ After that, run `sudo systemctl restart strata-q3`.
 
 ## Change the systemd units or the watchdog
 
-First edit `systemd/` or `scripts/strata-health.sh`, and then install with `scripts/install-system-files.sh` (it installs only the files that differ, and runs `daemon-reload` when a unit has changed; add `--dry-run` first to see which files it would install). Changes to `strata-q3.service` take effect at the next start. Finally, run `scripts/test.sh` and `scripts/check-drift.sh`, and commit.
+First edit `systemd/` (the units, and the drop-in that limits the maintainer's account, `systemd/user-1003.slice.d/`) or `scripts/strata-health.sh`, and then install with `scripts/install-system-files.sh` (it installs only the files that differ, and runs `daemon-reload` when a unit or a drop-in has changed; add `--dry-run` first to see which files it would install). Changes to `strata-q3.service` take effect at the next start; until then, `scripts/check-drift.sh` reports a changed `Environment=` as `restart pending`. Finally, run `scripts/test.sh`, commit, and run `scripts/check-drift.sh`, as in step 5.

@@ -66,3 +66,10 @@ Reproduced locally
 
 GPU not used (the selftest runs on the CPU) · 4× Tesla P100 16 GB · 62.8 GiB RAM · Ubuntu 22.04.5, kernel 6.8, g++ 11.4, TMPDIR on ZFS (OpenZFS 2.2.2)
 
+---
+
+Not part of the issue as posted: the files in `results/` that hold its numbers.
+
+- "What happened" (the six pairs that share a `TMPDIR`, the kills after 182 and 186 s, a run alone in about 13 s, the 12 runs with a `TMPDIR` each) and the FAIL lines under "Smallest steps": `ple-selftest-shared-tmp-20261020.txt`.
+- The 0.1.45 runs: `ple-selftest-shared-tmp-20261018.txt`, which the issue links.
+- "Graphics card, memory and system": the GPUs, `setup-20261016.log`; 62.8 GiB RAM, the memory guard line of `v441pf-engine-lines.txt`; Ubuntu 22.04.5, `host-os-20261025.txt`; kernel 6.8, `host-versions-20261024.txt`; OpenZFS 2.2.2, `ple-selftest-shared-tmp-20261020.txt`.

@@ -60,7 +60,7 @@ def stream_stats(r: dict, t_from: float | None = None, t_to: float | None = None
     u = r.get("usage") or {}
     gen = u.get("completion_tokens")
     n = SM.streamed_tokens(r)
-    # chunk gaps mix two regimes (MTP bursts ~3 ms apart on the solo path, one row per window in a batch), so their
+    # chunk gaps mix two regimes (MTP bursts on the solo path, one row per window in a batch), so their
     # percentiles are labelled as chunk gaps; TPOT and the pauses are the per-request figures
     out = {"ttft_s": round(ch[0] - r["sent"], 2) if ch else None,
            "ttft_content_s": round(r["content_first"] - r["sent"], 2) if r.get("content_first") else None,

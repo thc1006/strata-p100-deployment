@@ -20,7 +20,8 @@
 #      config/strata-iq3_xxs.deployed.json, and that snapshot is what configure_strata_q3.py makes from setup's
 #      original config with the arguments in config/profile.conf
 #   4. the deployed files match config/deployed-artifacts.sha256 (paths under ~/dev, or absolute).  Files over 1 GiB
-#      are hashed only with --full (they are read from disk: tens of minutes; run it under nice -n 19 ionice -c3)
+#      are hashed only with --full (they are read from disk: about 11 minutes here,
+#      results/check-drift-full-20261027.txt; run it under nice -n 19 ionice -c3)
 #   5. the Strata tree is the commit the list pins, file by file (hashed here, not taken from git status; its text
 #      files as the commit's own git attributes say, and none from elsewhere); where server.py imports from, there is
 #      no module, package or namespace package (a directory) that the commit does not have and the list does not

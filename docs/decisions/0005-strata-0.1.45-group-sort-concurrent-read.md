@@ -9,7 +9,8 @@ decision-makers: thc1006
 ## Context and Problem Statement
 
 The service ran Strata 0.1.43.1 (`a0116b2`). While a long prompt was read, the other users' replies stopped: a
-16K-token prompt joining three decoding users stopped them for 23 s (the deployment record, section 3.2).
+16K-token prompt joining three decoding users stopped them for 23 s (the deployment record, section 3.2;
+`results/SUMMARY.md`).
 
 Strata 0.1.45 (`477ac13cb`, released 2026-10-17) has two opt-in switches for reading prompts. The engine experiments
 measured them on this machine, with the deployed configuration, against 0.1.45 without them
@@ -20,16 +21,18 @@ measured them on this machine, with the deployed configuration, against 0.1.45 w
   `results/SCREEN-sched.md`).
 - `STRATA_PIPED_CONCURRENT=1` reads a prompt on a thread of its own while the slot groups decode. While a 16K prompt was
   read, the three decoders' longest stall fell from 22.69 s to 0.49 s. The joining prompt's first token came 11.0%
-  later, four users sent together got 5.2% fewer tokens per second, and 11 of 30 answers of requests decoded beside a
+  later, four users sent together got 5.2% fewer tokens per second, and 11 of the 12 answers (of 30 compared) of requests decoded beside a
   read changed (screen 2).
 
 The maintainer adopted both on 2026-10-19 at 08:00, to be confirmed together first. In the order K0, K1, K1, K0, by the
 criteria fixed before the runs, the pair was confirmed (`results/SCREEN-combo.md`):
 
 - every prompt size was read faster in each K1 run than in each K0 run: 1.2K +17.4%, 4K +10.7%, 16K +9.1%;
-- while a 16K prompt joined three decoders, their longest stop was 0.55 s instead of 22.73 s, and the four requests
-  finished 5.6% sooner; with a 28K prompt, 0.59 s instead of 35.81 s;
-- the joining prompt's first token came 1.1% later (22.78 s), and the 16 requests that ran alone got the same answers.
+- while a 16K prompt joined three decoders, their longest stop was 0.55 s instead of 22.73 s (the means of the runs'
+  medians; in the rounds, 0.50-0.61 s against 22.71-22.75 s: `results/engine-screen.jsonl`), and the four requests
+  finished 5.6% sooner; with a 28K prompt, 0.59 s instead of 35.81 s (0.58-0.63 s against 35.77-35.84 s);
+- the joining prompt's first token came 1.1% later (22.78 s), and the 16 requests that ran alone got the same answers
+  (`results/engine-screen.jsonl`).
 
 0.1.45's `serve/server.py` also changes what users get. A request that sends no sampling settings is sampled with the
 model card's settings (temperature 1.0, top_p 0.95 and top_k 20 with thinking; temperature 0.7, top_p 0.8, top_k 20
@@ -64,8 +67,8 @@ beside a read are not those decoded without it.
 
 - `scripts/check-drift.sh`: the engine (sha256 `00869ac7…`), `libstrata_kq.so` and the live config with the three
   environment settings match `config/`.
-- The engine's start-up lines: "prompt MMQ sorts the full expert groups (STRATA_MMQ_GROUP_SORT=1): 48 of 48 layers",
-  and no "STRATA_PIPED_CONCURRENT is off beside" line.
+- The engine's start-up lines (`results/deploy-0.1.45-20261019.txt`): "prompt MMQ sorts the full expert groups
+  (STRATA_MMQ_GROUP_SORT=1): 48 of 48 layers", and no "STRATA_PIPED_CONCURRENT is off beside" line.
 - `scripts/check-deployment.sh`.
 
 ## More Information

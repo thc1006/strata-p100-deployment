@@ -1,0 +1,29 @@
+The maintainer's account and cron on <host>, 2026-10-28 10:11:39 Taiwan time
+
+$ crontab -l
+no crontab for thc1006
+exit 1
+
+$ systemctl list-timers --user --all --no-pager
+NEXT LEFT LAST PASSED UNIT ACTIVATES
+
+0 timers listed.
+exit 0
+
+$ lsb_release -ds
+Ubuntu 22.04.5 LTS
+exit 0
+
+$ grep -n -E 'session|@include' /etc/pam.d/cron
+3:@include common-auth
+6:session    required     pam_loginuid.so
+10:session       required   pam_env.so
+13:session       required   pam_env.so envfile=/etc/default/locale
+15:@include common-account
+16:@include common-session-noninteractive 
+20:session    required   pam_limits.so
+exit 0
+
+$ grep -n pam_systemd /etc/pam.d/common-session-noninteractive /etc/pam.d/common-session
+/etc/pam.d/common-session:30:session	optional	pam_systemd.so 
+exit 0

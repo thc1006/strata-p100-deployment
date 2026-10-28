@@ -29,7 +29,7 @@ Chosen option: 1, because then code from GitHub runs on the production machine o
 - `.github/workflows/test.yml` runs `scripts/test.sh --repo-only` on every push to `main` and every pull request, as a user without privileges, with the repository mounted read-only. It uses no actions and no token.
 - The job runs in Canonical's Ubuntu Base 22.04.5, a root file system that the job fetches from cdimage.ubuntu.com, checks against the release's SHA256SUMS entry and imports into Docker.
   - It does not use the `ubuntu-22.04` runner label: GitHub began deprecating that image on 2026-09-17 and stops supporting it on 2027-04-17.
-  - It does not pull a container image: on 2026-10-18, Amazon ECR Public refused the anonymous pull of Canonical's `lts/ubuntu:22.04` from a GitHub runner with `toomanyrequests: Data limit exceeded` (run 39100153814), after the same pull had worked earlier that day (run 39096952832).
+  - It does not pull a container image: on 2026-10-18, Amazon ECR Public refused the anonymous pull of Canonical's `lts/ubuntu:22.04` from a GitHub runner with `toomanyrequests: Data limit exceeded` (run 39100153814), after the same pull had worked earlier that day (run 39096952832; both logs: `results/ci-ecr-pull-20261018.txt`).
 - `scripts/deploy.sh` fast-forwards this checkout to `origin/main` after five checks:
   1. The checkout is on `main`, has no local changes, and can fast-forward.
   2. The commits change nothing that applies outside the checkout: `systemd/`, `config/`, the watchdog, the installer, or `scripts/check-drift.sh`, which CI cannot run.

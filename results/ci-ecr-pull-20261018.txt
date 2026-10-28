@@ -1,0 +1,48 @@
+Two runs of the test workflow on 2026-10-18 that pulled Canonical's lts/ubuntu:22.04 from Amazon ECR Public, read from GitHub on 2026-10-28
+commands: gh api repos/thc1006/strata-p100-deployment/actions/runs/<id>; gh run view <id> -R thc1006/strata-p100-deployment --log (the lines shown; times UTC)
+
+--- run 39096952832
+event pull_request, branch ci-and-deploy, commit 5e9032e, completed success, started 2026-10-18T04:24:01Z, updated 2026-10-18T04:24:24Z
+
+--- run 39100153814
+event pull_request, branch ci-and-deploy, commit 9d3971b, completed failure, started 2026-10-18T05:19:28Z, updated 2026-10-18T05:19:35Z
+
+--- run 39096952832, log lines 36-54
+test	scripts/test.sh --repo-only on Ubuntu 22.04	﻿2026-10-18T04:24:05.9648851Z ##[group]Run docker run --rm -v "$PWD:/repo:ro" -w /repo public.ecr.aws/lts/ubuntu:22.04 bash -euc "$IN_CONTAINER"
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:05.9651869Z [36;1mdocker run --rm -v "$PWD:/repo:ro" -w /repo public.ecr.aws/lts/ubuntu:22.04 bash -euc "$IN_CONTAINER"[0m
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:05.9713566Z shell: /usr/bin/bash -e {0}
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:05.9714819Z env:
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:05.9720128Z   IN_CONTAINER: printf 'deb http://archive.ubuntu.com/ubuntu %s main\n' jammy jammy-updates jammy-security > /etc/apt/sources.list
+test	scripts/test.sh --repo-only on Ubuntu 22.04	apt-get -qq -o Acquire::Languages=none -o Acquire::Retries=3 update
+test	scripts/test.sh --repo-only on Ubuntu 22.04	DEBIAN_FRONTEND=noninteractive apt-get -qq -o Acquire::Retries=3 install --no-install-recommends \
+test	scripts/test.sh --repo-only on Ubuntu 22.04	  git python3 systemd > /dev/null
+test	scripts/test.sh --repo-only on Ubuntu 22.04	HOME=/tmp setpriv --reuid=65534 --regid=65534 --clear-groups scripts/test.sh --repo-only
+test	scripts/test.sh --repo-only on Ubuntu 22.04	
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:05.9725567Z ##[endgroup]
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:06.0501170Z Unable to find image 'public.ecr.aws/lts/ubuntu:22.04' locally
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:06.6685633Z 22.04: Pulling from lts/ubuntu
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:06.8432450Z cf1a5487baaf: Pulling fs layer
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:07.1491082Z cf1a5487baaf: Verifying Checksum
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:07.1491849Z cf1a5487baaf: Download complete
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:07.9328788Z cf1a5487baaf: Pull complete
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:07.9362852Z Digest: sha256:0890b02df9b3515958f1e181d15001b7015cee0e0b0eaad7f6dc6796b1de3171
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T04:24:07.9375261Z Status: Downloaded newer image for public.ecr.aws/lts/ubuntu:22.04
+
+--- run 39100153814, log lines 36-52
+test	scripts/test.sh --repo-only on Ubuntu 22.04	﻿2026-10-18T05:19:32.1934914Z ##[group]Run docker run --rm -v "$PWD:/repo:ro" -w /repo public.ecr.aws/lts/ubuntu:22.04 bash -euc "$IN_CONTAINER"
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.1938333Z [36;1mdocker run --rm -v "$PWD:/repo:ro" -w /repo public.ecr.aws/lts/ubuntu:22.04 bash -euc "$IN_CONTAINER"[0m
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.2005776Z shell: /usr/bin/bash -e {0}
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.2006941Z env:
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.2014181Z   IN_CONTAINER: printf 'deb http://archive.ubuntu.com/ubuntu %s main\n' jammy jammy-updates jammy-security > /etc/apt/sources.list
+test	scripts/test.sh --repo-only on Ubuntu 22.04	apt-get -qq -o Acquire::Languages=none -o Acquire::Retries=3 update
+test	scripts/test.sh --repo-only on Ubuntu 22.04	DEBIAN_FRONTEND=noninteractive apt-get -qq -o Acquire::Retries=3 install --no-install-recommends \
+test	scripts/test.sh --repo-only on Ubuntu 22.04	  git python3 systemd > /dev/null
+test	scripts/test.sh --repo-only on Ubuntu 22.04	HOME=/tmp setpriv --reuid=65534 --regid=65534 --clear-groups scripts/test.sh --repo-only
+test	scripts/test.sh --repo-only on Ubuntu 22.04	
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.2021472Z ##[endgroup]
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:32.2978427Z Unable to find image 'public.ecr.aws/lts/ubuntu:22.04' locally
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:33.0823274Z docker: Error response from daemon: toomanyrequests: Data limit exceeded
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:33.0824861Z 
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:33.0825181Z Run 'docker run --help' for more information
+test	scripts/test.sh --repo-only on Ubuntu 22.04	2026-10-18T05:19:33.0847029Z ##[error]Process completed with exit code 125.
+test	Complete job	﻿2026-10-18T05:19:33.0949020Z Cleaning up orphan processes

@@ -1,0 +1,85 @@
+Deployment by hand of the review's fixes (7886a39), 2026-10-27, with the steps of docs/runbooks/deploy.md "Deploy by hand"
+live checkout ~/dev/p100-q3-deployment: 15ab1da -> 7886a39 Make three tests pass in CI's container, where they run as nobody on a fresh runner
+the service was not restarted: strata-q3 active from before the window to its end
+
+--- step 1 (20:04, the commands and their output as printed; the first command's rev-parse failed on --short with two revisions and was run again)
+$ git symbolic-ref --short HEAD; status --porcelain --untracked-files=all | wc -l; ls-files -v | grep -cE '^([a-z]|S) '
+main
+porcelain: 0
+hidden: 0
+$ git rev-parse --short HEAD; git rev-parse --short origin/main; git merge-base --is-ancestor HEAD origin/main
+15ab1da
+7886a39
+ff ok
+$ git log --oneline HEAD..origin/main
+7886a39 Make three tests pass in CI's container, where they run as nobody on a fresh runner
+7541739 Give the documentation's numbers their sources, and describe the review's changes
+615ee3c Record the timed test.sh, the full check-drift and the tests against the scripts before the review
+cc4f7bf Harden the service's start path, and limit the maintainer's account to 6 GiB
+d5dbb6c Rework the deployment's checks after eleven rounds of adversarial review
+1f8d017 Record the raw results that the documentation and the checks cite
+136470d Correct the IQ3_S screen's record before its confirmations run
+f5f147b Record the IQ3_S engine screen and the maintainer's decisions
+e5d7908 Let an engine arm set a flag's value, and add the IQ3_S arms
+$ gh run watch 40500254929 --exit-status; gh api ".../workflows/test.yml/runs?head_sha=7886a3996bbfa7824e60ff744e7739893ff0387a&event=push&branch=main" -q '... "\(.status) \(.conclusion)"'
+exit=0
+completed success
+(run 40500254929, at 20:22: Ran 436 tests in 1262.734s; OK (skipped=23); all checks passed)
+
+--- step 2: not run as a separate command. The commits' changes to the checks are the review's (CHANGELOG.md, 2026-10-27), read in its eleven rounds.
+
+--- steps 3 to 7, as the commands printed them (zfs_arc_max and zfs_arc_shrinker_limit are under /sys/module/zfs/parameters/)
+# 2026-10-27 20:22:43 deploy by hand of 7886a39 per docs/runbooks/deploy.md
+$ systemctl is-active strata-q3
+active
+$ sudo systemctl stop strata-q3-health.timer
+exit 0
+$ systemctl is-active strata-q3-health.timer
+inactive
+$ systemctl is-active strata-q3
+active
+$ git merge --ff-only --no-overwrite-ignore 7886a39
+ create mode 100644 tests/test_start_path.py
+ create mode 100644 tests/test_test_sh.py
+7886a39
+$ scripts/test.sh (live checkout 7886a39): exit 0; Ran 436 tests in 1289.659s; OK (skipped=4); all checks passed
+# 2026-10-27 20:44:39 step 5
+$ scripts/install-system-files.sh
+install  /etc/systemd/system/strata-q3.service
+same     /etc/systemd/system/strata-q3-health.service
+same     /etc/systemd/system/strata-q3-health.timer
+install  /etc/systemd/system/zfs-arc-max.service
+install  /etc/systemd/system/user-1003.slice.d/50-memory.conf
+install  /etc/logrotate.d/strata-q3
+install  /usr/local/sbin/strata-q3-health
+exit 0
+$ sudo systemctl restart zfs-arc-max.service
+exit 0
+$ systemctl is-active zfs-arc-max.service; cat zfs_arc_max zfs_arc_shrinker_limit
+active
+2147483648
+0
+$ systemctl show -p DropInPaths,MemoryMax,MemorySwapMax user-1003.slice
+MemoryMax=6442450944
+MemorySwapMax=0
+DropInPaths=/usr/lib/systemd/system/user-.slice.d/10-defaults.conf /run/systemd/system.control/user-1003.slice.d/50-MemoryMax.conf /run/systemd/system.control/user-1003.slice.d/50-MemorySwapMax.conf /etc/systemd/system/user-1003.slice.d/50-memory.conf
+$ scripts/host-units.sh check (host-units.conf changed in comments only)
+ok     user pipewire-media-session.service masked, inactive
+ok     user snap.snapd-desktop-integration.snapd-desktop-integration.service masked, inactive
+$ systemctl is-active strata-q3
+active
+# 2026-10-27 20:44:50 step 6
+$ sudo systemctl start strata-q3-health.timer
+exit 0
+active
+# step 7
+$ scripts/check-drift.sh
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemoryMax.conf (systemctl set-property --runtime) holds the repo's values
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemorySwapMax.conf (systemctl set-property --runtime) holds the repo's values
+note   /home/thc1006/dev/p100-q3-deployment/tools/configure_strata_q3.py changed after strata-q3.service started: it takes effect at the next start
+note   /home/thc1006/dev/p100-q3-deployment/scripts/strata-preflight.sh changed after strata-q3.service started: it takes effect at the next start
+note   /home/thc1006/dev/p100-q3-deployment/scripts/strata-wait-ready.sh changed after strata-q3.service started: it takes effect at the next start
+DRIFT  1 files the service read at its start changed after it: restart pending (/etc/systemd/system/strata-q3.service)
+drift found: see DRIFT lines above
+$ scripts/check-deployment.sh
+no problems found

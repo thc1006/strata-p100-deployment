@@ -581,7 +581,7 @@ class DeployTests(unittest.TestCase):
     @classmethod
     def harmless(cls, text: str) -> str:
         """deploy.sh with the class's harmless pattern and port (cls.pattern, cls.port) in its watch, where it still has
-        the preflight's: the copies of every test but one.  With scripts/test.sh --jobs, a harness in another worker
+        the preflight's: the copies of every test but two.  With scripts/test.sh --jobs, a harness in another worker
         starts fake engines with the preflight's pattern, which the watch of a check here would see.  The watch's own
         tests use a pattern and a port of their own (deploy_with_a_harmless_watch), and
         test_the_watch_looks_for_what_the_preflight_refuses_a_start_for ties both to the preflight's."""

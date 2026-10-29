@@ -43,7 +43,7 @@
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
 # something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
 # (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
-# workers says why).
+# workers says why), and when a thread that started as the tests loaded still runs as the workers are forked.
 # Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
@@ -433,13 +433,14 @@ if not hasattr(unittest.TestCase, "_callTestMethod"):
 unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has its own, which awaits the test)
 
 # The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
-# that each starts with what the loading ran.  A worker takes the next unit from a file that all of them read through
-# one open file description (each read moves its offset on), runs it, and writes down what the checks below need; this
-# process then merges that, prints unittest's report and runs the checks.  A unit is a test, or a suite other than a
-# plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of the loader are cut into
-# their tests, which unittest's fixtures then see in the same order, so a worker sets a class or module up (setUpClass,
-# setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with TEST_JOBS_DEAL=1,
-# worker k takes the units k, k + JOBS, k + 2 JOBS ... instead.)
+# that each starts with what the loading ran, but for its threads: fork() copies only the thread that calls it, so the
+# run fails when a thread that started as the tests loaded still runs then.  A worker takes the next unit from a file
+# that all of them read through one open file description (each read moves its offset on), runs it, and writes down what
+# the checks below need; this process then merges that, prints unittest's report and runs the checks.  A unit is a test,
+# or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
+# the loader are cut into their tests, which unittest's fixtures then see in the same order, so a worker sets a class or
+# module up (setUpClass, setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with
+# TEST_JOBS_DEAL=1, worker k takes the units k, k + JOBS, k + 2 JOBS ... instead.)
 # Signals reach the tests as when they ran in this process: the workers stay in the process group of scripts/test.sh,
 # so that a signal to that group (a Ctrl-C, a hang-up, kill -- -PGID, deploy.sh's timeout) reaches them and what their
 # tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
@@ -660,6 +661,10 @@ def forward(signum, frame):
             pass
 
 
+if threading.active_count() > 1:     # fork() copies only the thread that calls it
+    bad.append("a thread started as the tests loaded and still runs, but not in the workers, which are forked after "
+               "the loading (start it in setUpModule or setUpClass): " +
+               ", ".join(repr(t.name) for t in threading.enumerate() if t is not threading.main_thread()))
 sys.stdout.flush()
 sys.stderr.flush()
 start = time.perf_counter()

@@ -6,7 +6,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Added
 
-- `scripts/test.sh --jobs N` (N from 1 to 16) runs the unit tests in N worker processes, forked once the tests are loaded; the runner's checks (a test that never runs, no test ran, a skip for another reason and the rest) see the tests of all of them. Without it the script runs them in one worker, as it does on this machine, where `scripts/deploy.sh` runs it beside the service. The workers stay in the script's process group, so that a Ctrl-C, a hang-up or a `kill -- -PGID` reaches the tests and what they start, and a Ctrl-Z stops them, as when the tests ran in one process. The comment above the workers in `scripts/test.sh` says how they share the tests, how a signal reaches them and what a worker runs as it ends.
+- `scripts/test.sh --jobs N` (N from 1 to 16) runs the unit tests in N worker processes, forked once the tests are loaded; the runner's checks (a test that never runs, no test ran, a skip for another reason and the rest) see the tests of all of them. Without it the script runs them in one worker, as it does on this machine, where `scripts/deploy.sh` runs it beside the service. The workers stay in the script's process group, so that a Ctrl-C, a hang-up or a `kill -- -PGID` reaches the tests and what they start, and a Ctrl-Z stops them, as when the tests ran in one process. A thread that a test module starts as it loads does not run in the workers (`fork()` copies only the thread that calls it), so the run fails when one still runs as they are forked. The comment above the workers in `scripts/test.sh` says how they share the tests, how a signal reaches them and what a worker runs as it ends.
 
 ### Changed
 

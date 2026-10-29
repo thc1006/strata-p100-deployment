@@ -2454,6 +2454,26 @@ class TestSh(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
         self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: cannot read the tests' TMPDIR\n")
 
+    def test_a_thread_that_a_test_module_starts_as_it_loads(self):
+        # fork() copies only the thread that calls it, so a thread that a test module starts at its import and that
+        # still runs when the workers are forked runs in none of them: the run fails and names it.  One that has ended
+        # by then, and one that setUpClass starts, pass.  Before, the test that waited for the thread failed, and
+        # nothing said why
+        d = self.tree()
+        head = "import threading, unittest\ndone = threading.Event()\n"
+        body = ("class T(unittest.TestCase):\n    def test_t(self):\n"
+                "        self.assertTrue(done.wait(5), 'the thread never ran')\n")
+        start = "threading.Thread(target=lambda: (time.sleep(0.5), done.set()), name='serve', daemon=True).start()\n"
+        (d / "tests" / "test_thread.py").write_text("import time\n" + head + start + body)
+        self.fails(d, "FAIL: a thread started as the tests loaded and still runs, but not in the workers, which are "
+                      "forked after the loading (start it in setUpModule or setUpClass): 'serve'\n")
+        (d / "tests" / "test_thread.py").write_text(
+            head + "s = threading.Thread(target=done.set)\ns.start()\ns.join()\n" + body)
+        self.passes(d)
+        (d / "tests" / "test_thread.py").write_text(
+            "import time\n" + head + body + "    @classmethod\n    def setUpClass(cls):\n        " + start)
+        self.passes(d)
+
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
         # a helper: what a test holds is read after the tests have run, in the worker that ran it
@@ -2800,7 +2820,7 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_a_signal_to_the_group_reaches_each_test_once",
         "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
         "test_what_libraries_register_as_the_tests_load", "test_what_the_tests_leave_in_their_tmpdir",
-        "test_a_worker_that_dies_of_sigkill"}]:
+        "test_a_worker_that_dies_of_sigkill", "test_a_thread_that_a_test_module_starts_as_it_loads"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

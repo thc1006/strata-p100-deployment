@@ -369,6 +369,7 @@ class DeployTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """One origin, work clone and live clone, copied for each test."""
+        cls.pattern, cls.port = cls.new_fake(), cls.free_port()        # see harmless()
         cls.template = Path(tempfile.mkdtemp(prefix="deploy-template-"))
         cls.addClassCleanup(shutil.rmtree, cls.template)
         env = isolated(cls.template)
@@ -377,7 +378,7 @@ class DeployTests(unittest.TestCase):
             cls.write(t / "stub" / name, text, 0o755)
         run("git", "init", "-q", "--bare", "-b", "main", str(t / "origin.git"), env=env)
         run("git", "init", "-q", "-b", "main", str(t / "work"), env=env)
-        for name, text in {"scripts/deploy.sh": DEPLOY.read_text(), **REPO_FILES}.items():
+        for name, text in {"scripts/deploy.sh": cls.harmless(DEPLOY.read_text()), **REPO_FILES}.items():
             cls.write(t / "work" / name, text, 0o755 if name.endswith(".sh") else 0o644)
         run("git", "-C", str(t / "work"), "add", "-A", env=env)
         run("git", "-C", str(t / "work"), "-c", "user.name=test", "-c", "user.email=", "commit", "-q", "-m", "base",
@@ -545,13 +546,25 @@ class DeployTests(unittest.TestCase):
             time.sleep(0.02)
         return q
 
-    def use_copy(self, changes: dict[str, str]) -> str:
+    @classmethod
+    def harmless(cls, text: str) -> str:
+        """deploy.sh with the class's harmless pattern and port (cls.pattern, cls.port) in its watch, where it still has
+        the preflight's: the copies of every test but one.  With scripts/test.sh --jobs, a harness in another worker
+        starts fake engines with the preflight's pattern, which the watch of a check here would see.  The watch's own
+        tests use a pattern and a port of their own (deploy_with_a_harmless_watch), and
+        test_the_watch_looks_for_what_the_preflight_refuses_a_start_for ties both to the preflight's."""
+        return text.replace('rb"engine-cuda12/strata --serve"', f'rb"{cls.pattern}"', 1).replace(
+            "PORT = 8080 ", f"PORT = {cls.port} ", 1)
+
+    def use_copy(self, changes: dict[str, str], real: bool = False) -> str:
         """Make this checkout's deploy.sh a copy with these changes (old text, which must occur once: new text), as
-        the commit origin/main and this checkout are at; that commit."""
+        the commit origin/main and this checkout are at; that commit.  Unless real, the watch's pattern and port that
+        the changes leave are made harmless()."""
         text = DEPLOY.read_text()
         for old, new in changes.items():
             self.assertEqual(text.count(old), 1, old)
             text = text.replace(old, new)
+        text = text if real else self.harmless(text)
         base = self.commit({"scripts/deploy.sh": text}, parent=self.base)
         self.git(self.live, "fetch", "-q", "origin")
         self.git(self.live, "reset", "-q", "--hard", "origin/main")
@@ -770,13 +783,16 @@ class DeployTests(unittest.TestCase):
                               "(exit 4): what it started may still run", self.base)
 
     def test_a_check_that_starts_what_the_preflight_takes_for_an_engine(self):
-        # while it lives, a start of strata-q3 is refused: it runs only as a harness test does (decision 0006)
+        # while it lives, a start of strata-q3 is refused: it runs only as a harness test does (decision 0006), with
+        # deploy.sh as it is, and while no harness starts fake engines (harness_run.alone)
         harness_run.gate(self, ("setsid",))
+        base = self.use_copy({}, real=True)
         new = self.commit({"docs.md": "a\n", "ENGINE_TEST": ""})
         self.runs(new)
-        r = self.deploy("--apply")
+        with harness_run.alone():
+            r = self.deploy("--apply")
         self.assertRefused(r, f"scripts/test.sh of {new[:7]} failed: strata-preflight.sh would refuse a start of "
-                              "strata-q3 while it ran: an engine (killed): python3 -c import time; time.sleep(60) ", self.base)
+                              "strata-q3 while it ran: an engine (killed): python3 -c import time; time.sleep(60) ", base)
         self.assertIn("engine-cuda12/strata --serve", r.stderr)
         self.assertEqual([q for q in os.listdir("/proc") if q.isdigit() and b"strata --serve" in self.cmdline(q)
                           and str(self.tmpdir).encode() in self.cmdline(q)], [])

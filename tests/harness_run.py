@@ -15,6 +15,9 @@ What the gate does not catch: a harness whose file does not name the engine's di
 from parts (e=engine-cuda; "${e}12/strata") or reads it from another file, when neither its name nor the name of the
 file a link leads to is a *_stubs.sh outside NO_ENGINES.  Only a harness written to get around the gate does that,
 and code review is the gate for such a one.
+While a harness that starts fake engines runs, it holds a lock in the temporary directory shared (lock_path): with
+scripts/test.sh --jobs, tests run side by side, and a test whose check watches for any process with the engine's
+command line holds the lock alone (alone()), so that it sees no fake engine of a harness in another worker.
 A harness runs in a session and a temporary directory of its own (its sandbox is made under TMPDIR, and its command
 line names the directory).  A run past its time, and a run whose test is interrupted (SIGINT, SIGTERM, SIGHUP: a
 Ctrl-C, or a timeout), gets SIGTERM, so that its EXIT trap stops what it started, then SIGKILL STOP_WAIT s later.
@@ -29,6 +32,8 @@ names its directory in the command line of what it starts with setsid.  The harn
 directory from its exec on."""
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import os
 from pathlib import Path
 import re
@@ -49,6 +54,7 @@ MODULES = "/sys/module"                 # the kernel's modules: a container sees
 SANDBOX = re.compile(rb"/stubs\.[A-Za-z0-9_]+/")
 STOP_WAIT = 60                          # seconds a harness has for its EXIT trap after SIGTERM
 SIGNALS = {signal.SIGINT, signal.SIGTERM, signal.SIGHUP}
+LOCK = "strata-test-engines.lock"       # in the temporary directory (lock_path)
 
 
 def starts_engines(script: Path) -> bool:
@@ -203,6 +209,31 @@ def gate(test: unittest.TestCase, tools: tuple[str, ...]) -> None:
         test.fail(f"not run now: {why}")
 
 
+def lock_path() -> str:
+    """The lock that a harness that starts fake engines holds shared while it runs, and that alone() holds alone.  It
+    is in the temporary directory, which the workers of one scripts/test.sh --jobs share (and so do other runs with the
+    same one)."""
+    return os.path.join(tempfile.gettempdir(), LOCK)
+
+
+@contextlib.contextmanager
+def _locked(mode: int):
+    # O_NONBLOCK: a FIFO in its place does not hang the open (a regular file's lock still waits)
+    fd = os.open(lock_path(), os.O_RDONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, 0o644)
+    try:
+        fcntl.flock(fd, mode)
+        yield
+    finally:
+        os.close(fd)
+
+
+def alone():
+    """For a test whose check watches for any process with the engine's command line (as strata-preflight.sh does):
+    while it holds this, no harness that starts fake engines runs, also not in another worker of scripts/test.sh
+    --jobs.  It waits for those that run."""
+    return _locked(fcntl.LOCK_EX)
+
+
 class Interrupted(KeyboardInterrupt):
     """SIGTERM or SIGHUP while a harness ran.  A KeyboardInterrupt, so that unittest stops the whole run, as for SIGINT:
     with an Exception it would go on with the next test, which could start the next harness."""
@@ -230,12 +261,18 @@ def run(script: Path, root: Path, timeout: float) -> dict:
     and the directory it ran in (removed).  The output goes to files, not pipes: a process left behind that holds a
     pipe would keep a reader waiting.  An interrupt stops the harness and sweeps its session and directory, with
     further signals held until that is done, then goes on up."""
-    if starts_engines(script):
+    engines = starts_engines(script)
+    if engines:
         if os.environ.get(ASK) != "1":
             raise unittest.SkipTest("harness: runs with scripts/test.sh --harnesses (STRATA_TEST_HARNESSES=1)")
         why = not_now()
         if why:
             raise RuntimeError(f"not run now: {why}")
+    with _locked(fcntl.LOCK_SH) if engines else contextlib.nullcontext():     # not beside alone()
+        return _run(script, root, timeout)
+
+
+def _run(script: Path, root: Path, timeout: float) -> dict:
     main = threading.current_thread() is threading.main_thread()
     held = False
     try:

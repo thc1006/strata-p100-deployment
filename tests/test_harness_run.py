@@ -11,6 +11,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -369,6 +370,63 @@ class RunGate(unittest.TestCase):
                         self.fail(f"gated: {e}")
                 self.assertTrue((self.d / f"started-{name}").exists())
         self.assertEqual(sorted(H.NO_ENGINES), ["run_robustness_stubs.sh"])
+
+
+class Lock(unittest.TestCase):
+    """A harness that starts fake engines holds the lock shared while it runs, so such harnesses run side by side;
+    alone() holds it alone, so that with scripts/test.sh --jobs a test whose check watches for the engine's pattern
+    runs beside none of them.  A harness that starts no fake engine takes no lock.  The lock is the test's own here."""
+
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.lock = self.d / "lock"
+        for patcher in (mock.patch.object(H, "lock_path", lambda: str(self.lock)),
+                        mock.patch.object(H, "not_now", lambda: None), mock.patch.dict(os.environ, {H.ASK: "1"})):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def harness(self, name: str, text: str) -> Path:
+        script = self.d / name
+        script.write_text(text)
+        return script
+
+    def test_what_a_harness_holds(self):
+        # what flock(1) can take of the lock while the harness runs: not the lock alone when it starts fake engines
+        probe = (f"flock -n -x {self.lock} true && echo alone || echo not-alone\n"
+                 f"flock -n -s {self.lock} true && echo shared || echo not-shared\n")
+        for name, expected in (("ab_engine_stubs.sh", "not-alone\nshared\n"), ("x.sh", "alone\nshared\n"),
+                               ("run_robustness_stubs.sh", "alone\nshared\n")):
+            with self.subTest(harness=name):
+                r = H.run(self.harness(name, probe), self.d, 30)
+                self.assertEqual((r["status"], r["out"]), (0, expected), r["err"])
+
+    def test_alone_waits_for_a_harness_and_a_harness_for_alone(self):
+        go, ran = self.d / "go", self.d / "ran"
+        script = self.harness("ab_engine_stubs.sh", f'touch {ran}\nfor _ in $(seq 100); do [ -e {go} ] && exit 0; '
+                                                    f'sleep 0.1; done; exit 1\n')
+        with H.alone():                     # a harness waits for alone() ...
+            t = threading.Thread(target=H.run, args=(script, self.d, 30))
+            t.start()
+            time.sleep(0.5)
+            self.assertFalse(ran.exists(), "the harness ran beside alone()")
+        for _ in range(100):
+            if ran.exists():
+                break
+            time.sleep(0.05)
+        self.assertTrue(ran.exists(), "the harness did not run once alone() ended")
+        held = []                           # ... and alone() for a harness that runs
+        def take():
+            with H.alone():
+                held.append(1)
+        u = threading.Thread(target=take)
+        u.start()
+        time.sleep(0.5)
+        self.assertEqual(held, [], "alone() did not wait for the harness")
+        go.touch()
+        t.join(30)
+        u.join(30)
+        self.assertEqual((t.is_alive(), u.is_alive(), len(held)), (False, False, 1))
 
 
 class NotNow(unittest.TestCase):

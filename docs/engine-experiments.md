@@ -387,3 +387,23 @@ start. Before the call, K1's config `cfg-s-k1.json` equals the live config but f
 experiment tree has the deployed engine's sha256 (`00869ac7…`), and the config tool's dry run on the live config
 changes nothing. The criteria are those above. If both are adopted, the combination is confirmed the same way, with
 its own arm and a plan written before its runs. While these runs go on, nothing else runs on the machine.
+
+### The confirmations of P6's switches and C2, 15:51-19:20
+
+All eight runs are usable (`results/CONFIRM-iq3s-p6.md`, `results/CONFIRM-iq3s-c2.md`). Neither candidate is adopted,
+and the service keeps K1. On each metric a candidate went on with, both of its runs beat both K1 runs, but only C2's
+1.2K read rate gains the 10% the plan asks for. Each value is the mean of two runs' medians.
+
+| metric | K1 | candidate | change |
+|---|---:|---:|---:|
+| P6: 1 user, engine decode tok/s | 44.20 | 46.70 | +5.7% |
+| P6: 4 users, total tok/s | 27.27 | 28.17 | +3.3% |
+| C2: 1.2K prompt, engine read tok/s | 200.35 | 222.40 | +11.0% |
+| C2: 4K prompt, engine read tok/s | 379.00 | 412.60 | +8.9% |
+
+C2 also had to gain 10% over the three prompt sizes. 16K prompts are read at K1's rate (+0.1%), so it gains 6.7%. It
+gives four users 15.8% more tokens per second, which is not one of its target metrics. While a 16K prompt joins three
+decoders, their longest gap grows by 0.13 s with P6 and 0.09 s with C2, under the 0.25 s the plan counts.
+
+After the last run, the driver started `strata-q3` again, and `scripts/check-drift.sh` reported no drift
+(`results/restart-after-confirm-20261029.txt`).

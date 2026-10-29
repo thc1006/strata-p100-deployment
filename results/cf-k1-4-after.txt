@@ -1,0 +1,9 @@
+tag cf-k1-4  ended at 2026-10-29 19:20:20  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 53  sent: 53
+load average: 4.85 5.56 4.18
+beside CPU-s after the screen: 0
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

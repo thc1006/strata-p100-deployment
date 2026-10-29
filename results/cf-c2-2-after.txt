@@ -1,0 +1,9 @@
+tag cf-c2-2  ended at 2026-10-29 18:54:18  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 53  sent: 53
+load average: 5.16 5.69 4.21
+beside CPU-s after the screen: 0
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

@@ -1,0 +1,9 @@
+tag cf-p6-2  ended at 2026-10-29 17:10:18  engine_screen exit 0
+same engine as before: yes
+idle before the count: yes
+requests counted by /metrics: 53  sent: 53
+load average: 5.18 5.96 4.38
+beside CPU-s after the screen: 0
+engine log error lines: 0
+--- the test unit's journal lines
+--- kernel lines

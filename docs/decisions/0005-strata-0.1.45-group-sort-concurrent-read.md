@@ -21,8 +21,8 @@ measured them on this machine, with the deployed configuration, against 0.1.45 w
   `results/SCREEN-sched.md`).
 - `STRATA_PIPED_CONCURRENT=1` reads a prompt on a thread of its own while the slot groups decode. While a 16K prompt was
   read, the three decoders' longest stall fell from 22.69 s to 0.49 s. The joining prompt's first token came 11.0%
-  later, four users sent together got 5.2% fewer tokens per second, and 11 of the 12 answers (of 30 compared) of requests decoded beside a
-  read changed (screen 2).
+  later, and four users sent together got 5.2% fewer tokens per second. Of the 30 answers compared, 11 changed, all
+  among the 12 requests decoded beside a read (screen 2).
 
 The maintainer adopted both on 2026-10-19 at 08:00, to be confirmed together first. In the order K0, K1, K1, K0, by the
 criteria fixed before the runs, the pair was confirmed (`results/SCREEN-combo.md`):
@@ -34,8 +34,8 @@ criteria fixed before the runs, the pair was confirmed (`results/SCREEN-combo.md
 - the joining prompt's first token came 1.1% later (22.78 s), and the 16 requests that ran alone got the same answers
   (`results/engine-screen.jsonl`).
 
-0.1.45's `serve/server.py` also changes what users get. A request that sends no sampling settings is sampled with the
-model card's settings (temperature 1.0, top_p 0.95 and top_k 20 with thinking; temperature 0.7, top_p 0.8, top_k 20
+Two other changes in 0.1.45's `serve/server.py` matter here. A request that sends no sampling settings is sampled with
+the model card's settings (temperature 1.0, top_p 0.95 and top_k 20 with thinking; temperature 0.7, top_p 0.8, top_k 20
 and presence_penalty 1.5 without), where 0.1.43.1 decoded greedily. An args element that holds a flag and its value is
 split before the engine starts; `tools/configure_strata_q3.py` refuses one.
 
@@ -65,8 +65,8 @@ beside a read are not those decoded without it.
 
 ### Confirmation
 
-- `scripts/check-drift.sh`: the engine (sha256 `00869ac7…`), `libstrata_kq.so` and the live config with the three
-  environment settings match `config/`.
+- `scripts/check-drift.sh`: the engine (sha256 `00869ac7…`), `libstrata_kq.so` and the live config with
+  `STRATA_MMQ_GROUP_SORT=1`, `STRATA_MMQ_RESIDENT_SORT_NE=0` and `STRATA_PIPED_CONCURRENT=1` match `config/`.
 - The engine's start-up lines (`results/deploy-0.1.45-20261019.txt`): "prompt MMQ sorts the full expert groups
   (STRATA_MMQ_GROUP_SORT=1): 48 of 48 layers", and no "STRATA_PIPED_CONCURRENT is off beside" line.
 - `scripts/check-deployment.sh`.

@@ -12,9 +12,9 @@ When the repository was created on 2026-10-17, it kept the layout of the origina
 
 - The root directory mixed tools, tests, documents, the original setup guide and example requests.
 - `deploy/` held deployment files, load-test tools, test results and upstream records together.
-- A single deployment record served as operations manual, list of system changes, design rationale and measurement results at the same time.
+- A single deployment record served as operations manual, list of system changes, design rationale and measurement results.
 
-The decision was how to arrange directories and documents so that future operators can find things and change them safely. The constraint: `strata-q3.service` calls the ExecStartPre and ExecStartPost scripts in the repository by absolute path, so a move requires reinstalling the units at the same time and verifying with one actual restart.
+The decision was how to arrange directories and documents so that operators can find things and change them safely. The constraint: `strata-q3.service` calls the ExecStartPre and ExecStartPost scripts in the repository by absolute path, so a move requires reinstalling the units at the same time and verifying with one restart.
 
 ## Considered Options
 
@@ -27,9 +27,9 @@ The decision was how to arrange directories and documents so that future operato
 Chosen option: 2.
 
 - Top-level directories: `config/` (desired state), `systemd/`, `scripts/` (run on the host), `tools/`, `tests/`, `bench/`, `results/`, `examples/`, `docs/`.
-  - `tools/`, `docs/` and `examples/` have the same purpose as the directories of the same name in golang-standards/project-layout. Its `scripts/` is for build, install and analysis scripts; here it also holds the scripts that the units call at startup.
-  - It puts systemd units in `init/` and configuration templates in `configs/`, and its `test/` is for external test programs; this repository uses the plainer `systemd/`, `config/` and `tests/` instead. `bench/` and `results/` have no matching directory in that document.
-- Tests: in `tests/`, which is one of the layouts that the pytest documentation lists. They run with unittest from the standard library.
+  - `tools/`, `docs/` and `examples/` have the same purpose as in golang-standards/project-layout. Its `scripts/` is for build, install and analysis scripts; here it also holds the scripts that the units call at startup.
+  - It puts systemd units in `init/` and configuration templates in `configs/`, and its `test/` is for external test programs; this repository uses the plainer `systemd/`, `config/` and `tests/`. `bench/` and `results/` have no matching directory there.
+- Tests: in `tests/`, one of the layouts that the pytest documentation lists. They run with unittest from the standard library.
 - Documents: split by Diátaxis into `docs/runbooks/` (how-to: only steps, expected results, verification and rollback), `docs/reference/` and the deployment record (explanation and measurements).
 - Decision records: in MADR 4.0.0 format, in `docs/decisions/`.
 - Changelog: follows Keep a Changelog 1.1.0. This repository has no version numbers, so sections are by date.
@@ -56,9 +56,6 @@ Chosen option: 2.
 Option 1, keep the current layout:
 - Good: the paths of the production service do not change.
 - Bad: files pile up in the order they were created, and the purpose of `deploy/` is unclear; operating steps and design rationale are mixed in one document.
-
-Option 2, organize top-level directories by purpose and documents by Diátaxis:
-- See "Consequences" above.
 
 Option 3, the full golang-standards/project-layout:
 - Bad: most of its directories, such as `cmd/`, `internal/`, `pkg/`, `api/` and `web/`, would have no content here; that document also says that small projects do not need the full structure.

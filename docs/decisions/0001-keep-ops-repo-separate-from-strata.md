@@ -8,7 +8,7 @@ decision-makers: thc1006
 
 ## Context and Problem Statement
 
-This machine runs upstream Strata 0.1.43.1 (commit `a0116b2`), unpacked from a zip into `~/dev/strata`. This repository holds the configuration, scripts, systemd units, documents and test results. The question was whether to switch to a fork of Strata as the base of this project.
+This machine runs upstream Strata 0.1.43.1 (commit `a0116b2`), unpacked from a zip into `~/dev/strata`. This repository holds the configuration, scripts, systemd units, documents and test results. The question was whether to make a fork of Strata the base of this project.
 
 ## Considered Options
 
@@ -20,10 +20,10 @@ This machine runs upstream Strata 0.1.43.1 (commit `a0116b2`), unpacked from a z
 
 Chosen option: 1, for the reasons below (checked on 2026-10-18):
 
-- The production service has not changed any Strata code. The per-layer embedding (PLE) read-ahead hint problem on ZFS is solved with `--no-ple-prefetch` ([deployment record, section 4](../deployment-record.md)), so a fork has nothing to hold at present.
-- On GitHub, a fork of a public repository can only be public, and `thc1006/Strata` is public; this repository was private. (After the 2026-10-18 decision to make this repository public, this point no longer holds. The other reasons are unchanged.)
+- The production service runs Strata's code unchanged. The per-layer embedding (PLE) read-ahead hint problem on ZFS is solved with `--no-ple-prefetch` ([deployment record, section 4](../deployment-record.md)), so a fork has nothing to hold at present.
+- On GitHub, a fork of a public repository can only be public, and `thc1006/Strata` is public; this repository was private. (Since the 2026-10-18 decision to make this repository public, this point no longer holds. The other reasons are unchanged.)
 - Upstream changes quickly, and with the operations files mixed into a fork, every upgrade would require a merge from upstream.
-- Upstream rewrote its git history once (#1276, 2026-10-06), so a pinned commit can lose its reference. A tag on the fork can handle this risk; the whole project does not need to become a fork.
+- Upstream rewrote its git history once (#1276, 2026-10-06), so a pinned commit can lose its reference. A tag on the fork would cover this risk without making the whole project a fork.
 - Upstream's `update.sh` runs `git pull` to the latest main. Production needs a pinned version that is tested before it replaces the current one.
 
 ### Consequences

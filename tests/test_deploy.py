@@ -167,9 +167,12 @@ if [ -e "$d/LATE_PORT" ]; then
 fi
 # SCOPE_ENGINE: what a copy of deploy.sh takes for an engine, started in a scope of its own (systemd-run --user
 # --scope), with the checks' TMPDIR, while the watch looks.  The scope goes once its process has ended, also when it
-# failed (-G, --collect)
+# failed (-G, --collect).  The pattern is in two parts until the exec in the scope: a systemd-run that the watch killed
+# before its scope had started left the scope behind
 if [ -e "$d/SCOPE_ENGINE" ]; then
-  setsid systemd-run --user --scope -q -G python3 -c 'import time; time.sleep(60)' "$(cat "$d/SCOPE_ENGINE")" \
+  p=$(cat "$d/SCOPE_ENGINE")
+  setsid systemd-run --user --scope -q -G sh -c 'exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
+    "${p%%-engine*}" "-engine${p#*-engine}" \
     > /dev/null 2>&1 < /dev/null &
   n=0
   while [ "$(cat /proc/$!/cgroup 2> /dev/null)" = "$(cat /proc/$$/cgroup)" ] && [ $n -lt 200 ]; do n=$((n + 1)); sleep 0.05; done

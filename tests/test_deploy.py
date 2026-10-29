@@ -3,6 +3,7 @@ API (curl), systemctl, timeout, tar, scripts/test.sh and scripts/check-drift.sh.
 sudo."""
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import os
@@ -369,7 +370,7 @@ class DeployTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """One origin, work clone and live clone, copied for each test."""
-        cls.pattern, cls.port = cls.new_fake(), cls.free_port()        # see harmless()
+        cls.pattern, cls.port = cls.new_fake(), cls.held_port()        # see harmless()
         cls.template = Path(tempfile.mkdtemp(prefix="deploy-template-"))
         cls.addClassCleanup(shutil.rmtree, cls.template)
         env = isolated(cls.template)
@@ -504,6 +505,33 @@ class DeployTests(unittest.TestCase):
         with socket.socket(family) as s:
             s.bind((host, 0))
             return s.getsockname()[1]
+
+    @classmethod
+    def held_port(cls) -> int:
+        """A port that no other process can bind until the class's tests have ended, such as a fake server of a test in
+        another worker of scripts/test.sh --jobs: bound here on IPv4 and, where there is IPv6, on IPv6, without
+        SO_REUSEADDR.  Not listening, so that the watch of a copy of deploy.sh does not see it."""
+        for _ in range(20):
+            s4 = socket.socket()
+            s4.bind(("0.0.0.0", 0))
+            port = s4.getsockname()[1]
+            s6 = None
+            try:
+                s6 = socket.socket(socket.AF_INET6)
+                s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                s6.bind(("::", port))
+            except OSError as e:            # (no IPv6 here, or the port is taken there)
+                if s6 is not None:
+                    s6.close()
+                    s6 = None
+                if e.errno == errno.EADDRINUSE:
+                    s4.close()
+                    continue
+            cls.addClassCleanup(s4.close)
+            if s6 is not None:
+                cls.addClassCleanup(s6.close)
+            return port
+        raise OSError(errno.EADDRINUSE, "no port free on both IPv4 and IPv6")
 
     def watchers(self, parent: int) -> list[int]:
         """The watches (watch) of the deploy.sh with this pid."""
@@ -1113,6 +1141,25 @@ class DeployTests(unittest.TestCase):
                     self.assertRegex(r.stdout, r"note   killed what a check left behind: \S*sh -c sleep 2; exec python3 -c ")
                     time.sleep(3)                       # it would have become one 2 s after it started
                 self.assertEqual(self.named(nonce.encode()), [], "it outlived deploy.sh")
+
+    def test_the_class_port_stays_taken(self):
+        # the port of the class's copies (harmless) cannot be bound by another process while the class's tests run, on
+        # IPv4 nor on IPv6, and the watch does not see it
+        for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::1"),
+                             (socket.AF_INET6, "::")):
+            with self.subTest(host=host):
+                try:
+                    s = socket.socket(family)
+                except OSError:
+                    continue                        # (no IPv6 here)
+                with s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    with self.assertRaises(OSError) as e:
+                        s.bind((host, self.port))
+                    self.assertIn(e.exception.errno, (errno.EADDRINUSE, errno.EADDRNOTAVAIL))
+        new = self.commit({"docs.md": "a\n"})
+        self.runs(new)
+        self.assertEqual(self.deploy().returncode, 0)
 
     def test_the_sweep_kills_the_process_group_of_what_it_finds(self):
         # the leader has the checks' TMPDIR; its child dropped it and names nothing of the directory

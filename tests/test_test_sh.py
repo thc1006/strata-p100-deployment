@@ -274,7 +274,10 @@ class TestSh(unittest.TestCase):
         (d / "tests" / "test_exit.py").write_text(
             "import os, unittest\nclass E(unittest.TestCase):\n    def test_a(self):\n        os._exit(0)\n"
             "    def test_b(self):\n        self.fail()\n")
-        self.fails(d, "the unit tests did not finish (no verdict)")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker \d of \d ended with 0, "
+                                   r"without its record")
 
     def test_a_test_module_without_a_test(self):
         d = self.tree()
@@ -2406,6 +2409,32 @@ class TestSh(unittest.TestCase):
                                              seen, what)
                     else:
                         seen.add((*what.split("."), pid))
+
+    def test_what_a_test_holds_once_the_tests_have_run(self):
+        # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
+        # a helper: what a test holds is read after the tests have run, in the worker that ran it
+        d = self.tree()
+        (d / "tests" / "test_v.py").write_text(
+            "import unittest\ndef test_free():\n    pass\nclass T(unittest.TestCase):\n    def test_a(self):\n"
+            "        T.test_b.__defaults__ = (globals()['test_' + 'free'],)\n    def test_b(self, h=None):\n"
+            "        pass\n")
+        self.passes(d)
+
+    def test_a_unit_that_no_worker_runs(self):
+        # a setUpClass that takes the next unit from the queue and then skips its class: that unit never starts, and
+        # the skip of its class excuses it, so only the count of the units that the workers took fails the run
+        d = self.tree()
+        (d / "tests" / "test_a.py").write_text(
+            "import os, unittest\nclass A(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n"
+            "        for fd in os.listdir('/proc/self/fd'):\n            try:\n"
+            "                if os.readlink(f'/proc/self/fd/{fd}').endswith('verdict.units'):\n"
+            "                    os.read(int(fd), 4)\n            except OSError:\n                pass\n"
+            "        raise unittest.SkipTest('machine: not here')\n"
+            "    def test_0(self):\n        pass\n    def test_1(self):\n        self.fail('never runs')\n")
+        r = self.run_sh(d, "--repo-only")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertEqual([line for line in r.stdout.splitlines() if line.startswith("FAIL:")],
+                         ["FAIL: the workers did not run each unit once: 2 runs of 2 of 3 units"])
 
     def test_workers_take_the_units_in_turn_with_the_test_hook(self):
         # TEST_JOBS_DEAL=1: worker k takes the units k, k + N, k + 2 N ... (TestShJobs uses it)

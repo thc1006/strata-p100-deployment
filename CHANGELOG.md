@@ -9,6 +9,25 @@ Notable changes to this machine and this repository, newest first. There are no 
 - The confirmations of P6's switches and of `--prefill-pipe 768` (C2) on IQ3_S (`results/CONFIRM-iq3s-p6.md`, `results/CONFIRM-iq3s-c2.md`). Neither passes. The plan asks for 10%; P6's switches decode 5.7% faster for one user, and C2 reads prompts 6.6% faster over the three sizes. The service keeps its switches.
 - `results/restart-after-confirm-20261029.txt`: the first start of `strata-q3` with the preflight, wait-ready and config tool of `7886a39`, the restart that the deploy of 2026-10-27 left pending. `scripts/check-drift.sh` then reported no drift.
 
+### Changed
+
+- The entry of 2026-10-27 is much shorter: for detail that the scripts' headers and the decision records hold, it points there. In the entries up to 2026-10-27, four statements are corrected or dated, among them the 2026-10-20 entry's "is not committed" for a log that has been in git since 2026-10-27, and the older entries no longer give the number of tests in each file. The other documents lost repetition and gained corrections, and most are about as long as before. The protocols and criteria written before their runs, in `docs/engine-experiments.md` and decision 0004, keep their words; one sentence of decision 0004's option analysis, also written before the runs, has a dated note: its routing shares are the budget script's estimate.
+
+### Fixed
+
+- Statements that the code or `results/` contradict, and steps in the wrong order:
+  - The deployment record:
+    - gave IQ3_XXS's layer split, 13/26/38, as deployed; IQ3_S runs at 13/25/38.
+    - said every expert is resident, which holds only for IQ3_XXS.
+    - called the admission stall unsolved; on 0.1.45, `STRATA_PIPED_CONCURRENT=1` shortened it (section 4).
+    - said long documents pause other users for less than a second; in decision 0004's `ab3` runs with IQ3_S the longest pause was 1.88 s (`results/ab3-iq3s-robust-robustness.log`).
+  - The deployment record and decision 0004 joined two separate engine lines, "98% of the experts resident" and "5.46 GiB of experts in RAM", into one claim (`results/ab3-iq3s-1-arm.txt`).
+  - Decision 0006: a harness is refused unless `strata-ab-rescue.timer` is inactive, not only while it is active. Decision 0007: 16.8 GiB was the least MemAvailable of the IQ3_S runs, not of all runs (`results/SUMMARY.md` has 15.079 GiB).
+  - `docs/runbooks/rebuild.md` did not say that on `main` step 5 writes and compares IQ3_S's config, whose files the steps never make, so its `cmp` can print `config matches`. It no longer tells you to switch to 0.1.45 and then to IQ3_S after its last step: that route has never been run after a rebuild.
+  - `docs/runbooks/upgrade-strata.md`: pasted as one block, the window went on after a failed `test.sh` or `cmp`, up to the start of the service, and the rollback ran two steps in the wrong order.
+  - The deployment record and the README called PR #2918's rebase target, `9ae93f7`, 0.2.1.1; it is 0.2.1 with the 0.1.46.1 hotfix.
+  - CONTRIBUTING.md said CI runs the contributors' command (it adds `--harnesses`), and `results/README.md` had two rows that cited the wrong document and two with a wrong date.
+
 ## 2026-10-27
 
 ### Added

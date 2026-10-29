@@ -578,25 +578,31 @@ class DeployTests(unittest.TestCase):
             time.sleep(0.02)
         return q
 
-    @classmethod
-    def harmless(cls, text: str) -> str:
-        """deploy.sh with the class's harmless pattern and port (cls.pattern, cls.port) in its watch, where it still has
-        the preflight's: the copies of every test but two.  With scripts/test.sh --jobs, a harness in another worker
-        starts fake engines with the preflight's pattern, which the watch of a check here would see.  The watch's own
-        tests use a pattern and a port of their own (deploy_with_a_harmless_watch), and
-        test_the_watch_looks_for_what_the_preflight_refuses_a_start_for ties both to the preflight's."""
-        return text.replace('rb"engine-cuda12/strata --serve"', f'rb"{cls.pattern}"', 1).replace(
-            "PORT = 8080 ", f"PORT = {cls.port} ", 1)
+    WATCH = ('rb"engine-cuda12/strata --serve"', "PORT = 8080 ")    # the preflight's pattern and port in deploy.sh
 
-    def use_copy(self, changes: dict[str, str], real: bool = False) -> str:
+    @classmethod
+    def harmless(cls, text: str, pattern: str | None = None, port: int | None = None) -> str:
+        """deploy.sh with a harmless pattern and port in its watch instead of the preflight's (WATCH, each of which must
+        occur once in text): those given, or the class's (cls.pattern, cls.port).  Every test but two runs such a
+        copy.  With scripts/test.sh --jobs, a harness in another worker starts fake engines with the preflight's
+        pattern, which the watch of a check here would see.  The watch's own tests give a pattern and a port of their
+        own (deploy_with_a_harmless_watch), and test_the_watch_looks_for_what_the_preflight_refuses_a_start_for ties
+        WATCH to the preflight."""
+        for old in cls.WATCH:
+            if text.count(old) != 1:
+                raise AssertionError(f"scripts/deploy.sh has {old!r} {text.count(old)} times, not once")
+        return text.replace(cls.WATCH[0], f'rb"{pattern or cls.pattern}"').replace(
+            cls.WATCH[1], f"PORT = {port or cls.port} ")
+
+    def use_copy(self, changes: dict[str, str], real: bool = False, watch: tuple[str, int] | None = None) -> str:
         """Make this checkout's deploy.sh a copy with these changes (old text, which must occur once: new text), as
-        the commit origin/main and this checkout are at; that commit.  Unless real, the watch's pattern and port that
-        the changes leave are made harmless()."""
+        the commit origin/main and this checkout are at; that commit.  Unless real, its watch is made harmless(), with
+        the pattern and port of watch when given."""
         text = DEPLOY.read_text()
         for old, new in changes.items():
             self.assertEqual(text.count(old), 1, old)
             text = text.replace(old, new)
-        text = text if real else self.harmless(text)
+        text = text if real else self.harmless(text, *(watch or ()))
         base = self.commit({"scripts/deploy.sh": text}, parent=self.base)
         self.git(self.live, "fetch", "-q", "origin")
         self.git(self.live, "reset", "-q", "--hard", "origin/main")
@@ -989,13 +995,13 @@ class DeployTests(unittest.TestCase):
         as deploy() has it."""
         port = self.free_port() if port is None else port
         scan = '    for p in filter(str.isdigit, os.listdir("/proc")):\n        if int(p) != me and engine.search('
-        base = self.use_copy({'rb"engine-cuda12/strata --serve"': f'rb"{self.fake}"', "PORT = 8080 ": f"PORT = {port} ",
-                              **({"def owner(inode):\n": "def owner(inode):\n    return None\n"} if unreadable else {}),
+        base = self.use_copy({**({"def owner(inode):\n": "def owner(inode):\n    return None\n"} if unreadable else {}),
                               **({scan: '    listed = list(filter(str.isdigit, os.listdir("/proc")))\n    time.sleep(1)\n'
                                         '    for p in listed:\n        if int(p) != me and engine.search('} if slow else {}),
                               **({"    try:\n        return diagnosed()\n    except OSError:\n        pass\n":
                                   "    return diagnosed()\n"} if sockets == "diag" else {}),
-                              **({"socket.SOCK_RAW, 4)": "socket.SOCK_RAW, 31)"} if sockets == "proc" else {})})
+                              **({"socket.SOCK_RAW, 4)": "socket.SOCK_RAW, 31)"} if sockets == "proc" else {})},
+                             watch=(self.fake, port))
         new = self.commit({"docs.md": str(files), **files})
         self.runs(new)
         return self.deploy(person=person), base
@@ -1196,8 +1202,7 @@ class DeployTests(unittest.TestCase):
         for changes, says in (({}, "an engine: "), ({f'rb"{self.fake}"': f'rb"{other}"'}, "a listener on :8080: "),
                               ({service: f'SERVICE = "{cgroup}"'}, None)):
             with self.subTest(changes=changes):
-                text = DEPLOY.read_text().replace('rb"engine-cuda12/strata --serve"', f'rb"{self.fake}"', 1).replace(
-                    "PORT = 8080 ", f"PORT = {port} ", 1)
+                text = self.harmless(DEPLOY.read_text(), self.fake, port)
                 for old, new in changes.items():
                     self.assertEqual(text.count(old), 1, old)
                     text = text.replace(old, new)
@@ -1339,6 +1344,17 @@ class DeployTests(unittest.TestCase):
         deploy = DEPLOY.read_text()
         self.assertIn(f'engine = re.compile(rb"{pattern}")', deploy)
         self.assertIn(f"PORT = {port} ", deploy)
+        # harmless() replaces both, and refuses a deploy.sh that has either not once: its copies would otherwise watch
+        # for the preflight's pattern and port, and see the fake engines of a harness in another worker
+        self.assertEqual(self.WATCH, (f'rb"{pattern}"', f"PORT = {port} "))
+        copy = self.harmless(deploy)
+        self.assertEqual([copy.count(w) for w in self.WATCH], [0, 0])
+        self.assertIn(f'engine = re.compile(rb"{self.pattern}")', copy)
+        self.assertIn(f"PORT = {self.port} ", copy)
+        for w in self.WATCH:
+            for text in (deploy.replace(w, ""), deploy.replace(w, w + "\n" + w)):
+                with self.subTest(watch=w, times=text.count(w)), self.assertRaisesRegex(AssertionError, "not once"):
+                    self.harmless(text)
 
     @staticmethod
     def cmdline(pid: str) -> bytes:

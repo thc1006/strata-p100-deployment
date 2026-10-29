@@ -2517,6 +2517,22 @@ class TestSh(unittest.TestCase):
                         time.sleep(0.1)
                     self.assertFalse(os.path.exists(f"/proc/{w}"), f"worker {w} outlived the run")
 
+    def test_a_worker_that_dies_of_sigkill(self):
+        # as when the OOM killer takes a worker: the run has no verdict, the runner then dies of SIGKILL too, and bash
+        # goes on with the other steps, as it did when the OOM killer took the process of the tests.  Before, the
+        # runner failed with a traceback, as Python cannot set the action of SIGKILL
+        d = self.tree()
+        (d / "tests" / "test_k.py").write_text(
+            "import os, signal, unittest\nclass K(unittest.TestCase):\n    def test_k(self):\n"
+            "        os.kill(os.getpid(), signal.SIGKILL)\n")
+        r = self.run_sh(d, "--jobs", "2")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker \d of \d ended with -9, "
+                                   r"without its record\n")
+        self.assertNotIn("Traceback", r.stdout + r.stderr)
+        self.assertIn("\n== shell syntax", r.stdout)
+        self.assertRegex(r.stderr, r"Killed +TMPDIR=")
+
     def test_a_signal_to_the_group_reaches_what_the_tests_started(self):
         # a Ctrl-C, a hang-up or a kill -- -PGID reaches scripts/test.sh's whole process group: the runner, or its
         # workers, and what the tests started in it, which the signal ends.  Before, the workers ran in groups of their
@@ -2679,7 +2695,8 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_forms_round_10_mutation_testing_found_untested", "test_a_signal_to_the_group_reaches_what_the_tests_started",
         "test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests", "test_a_stop_of_the_group_stops_the_tests",
         "test_a_signal_to_the_group_reaches_each_test_once",
-        "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds"}]:
+        "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
+        "test_a_worker_that_dies_of_sigkill"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

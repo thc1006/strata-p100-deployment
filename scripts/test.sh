@@ -422,8 +422,8 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # worker that does not hold it.  A worker runs the atexit handlers that its tests registered (the loading's run here,
 # once) and ends as Python ends; after a KeyboardInterrupt, of SIGINT.  When a worker ends without its record (a test
 # that ends the process, a signal) the run has no verdict, and when one died of a signal this process then dies of the
-# same signal, as the process of the tests did before, so that after a Ctrl-C bash stops too.  A worker gets SIGKILL
-# when this process ends before it (PR_SET_PDEATHSIG).
+# same signal, also of SIGKILL (the OOM killer's), as the process of the tests did before, so that after a Ctrl-C bash
+# stops too.  A worker gets SIGKILL when this process ends before it (PR_SET_PDEATHSIG).
 jobs = int(os.environ["TEST_JOBS"])
 units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
 
@@ -524,7 +524,8 @@ def finish():
 
 def die(signum):
     """End of signum, as its default action does."""
-    signal.signal(signum, signal.SIG_DFL)
+    if signum not in (signal.SIGKILL, signal.SIGSTOP):      # (whose action cannot be changed)
+        signal.signal(signum, signal.SIG_DFL)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signum})
     os.kill(os.getpid(), signum)
 

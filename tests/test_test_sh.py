@@ -2430,6 +2430,13 @@ class TestSh(unittest.TestCase):
             "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n        self.me = self\n    def test_t(self):\n"
             "        self.f.write(b'x')\n    def test_u(self):\n        self.f.write(b'y')\n")
         self.passes(d)
+        # a test that removes the TMPDIR itself: the check cannot read it, and the run fails
+        (d / "tests" / "test_tmp.py").write_text(
+            "import shutil, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        shutil.rmtree(tempfile.gettempdir())\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: cannot read the tests' TMPDIR\n")
 
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function

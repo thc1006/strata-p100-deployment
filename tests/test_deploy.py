@@ -1484,10 +1484,7 @@ class DeployTests(unittest.TestCase):
         new = self.commit({"SLOW_TEST": "", "docs.md": "a\n"})
         self.runs(new)
         p = self.start("--apply")
-        deadline = time.monotonic() + 20
-        while not (self.stub / "slow.pid").exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        slow = int((self.stub / "slow.pid").read_text())
+        slow = self.slow_pid(p)
         os.killpg(p.pid, signal.SIGINT)                 # what a Ctrl-C on the terminal sends
         stdout, stderr = p.communicate(timeout=15)
         self.assertEqual(p.returncode, 1, stdout + stderr)
@@ -1538,6 +1535,15 @@ class DeployTests(unittest.TestCase):
         while not path.exists():
             self.assertTrue(p.poll() is None and time.monotonic() < deadline, f"no {path.name}")
             time.sleep(0.02)
+
+    def slow_pid(self, p: subprocess.Popen) -> int:
+        """The pid that a slow check of the stub writes to slow.pid, once the line is whole: echo creates the file
+        before it writes to it."""
+        path, deadline = self.stub / "slow.pid", time.monotonic() + 20
+        while not (path.exists() and path.read_text().endswith("\n")):
+            self.assertTrue(p.poll() is None and time.monotonic() < deadline, "no slow.pid")
+            time.sleep(0.02)
+        return int(path.read_text())
 
     def test_a_ctrl_c_ends_it_when_a_check_has_stopped_its_timeout(self):
         # the check stops its timeout (SIGSTOP) and ends: a Ctrl-C ends deploy.sh within seconds, and the timeout too
@@ -1823,8 +1829,7 @@ class DeployTests(unittest.TestCase):
         new = self.commit({"docs.md": "a\n", "SLOW_DRIFT": ""})
         self.runs(new)
         p = self.start()
-        self.wait_for(self.stub / "slow.pid", p)
-        slow = int((self.stub / "slow.pid").read_text())
+        slow = self.slow_pid(p)
         os.killpg(p.pid, signal.SIGINT)
         stdout, stderr = p.communicate(timeout=30)
         self.assertEqual(p.returncode, 1, stdout + stderr)
@@ -1938,8 +1943,7 @@ class DeployTests(unittest.TestCase):
                 new = self.commit({"SLOW_TEST": "", "docs.md": f"{sig} {to}"}, parent=self.base)
                 self.runs(new)
                 p = self.start("--apply")
-                self.wait_for(self.stub / "slow.pid", p)
-                slow = int((self.stub / "slow.pid").read_text())
+                slow = self.slow_pid(p)
                 sent = getattr(signal, f"SIG{sig}")
                 (os.killpg if to == "group" else os.kill)(p.pid, sent)
                 stdout, stderr = p.communicate(timeout=30)

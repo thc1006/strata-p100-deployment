@@ -374,3 +374,16 @@ than in each A run, and on each of them the mean of the B runs must beat the mea
 P6's switches these are one user's decode and four users' total rate, with 10%. For C2 they are the read rates of 1.2K
 and 4K prompts, with 10%; and, as this file put it for the same switch on 2026-10-19 (screen 2), its mean gain over
 the three prompt sizes must reach 10% too. The other criteria of the plan stand.
+
+### The confirmations of P6's switches and C2: how they run
+
+Written 2026-10-29 at 15:50, before any of these runs, after the review fixes were deployed (2026-10-27,
+`results/deploy-review-fixes-20261027.txt`) and the local evaluation ended. Both confirmations run in one call of
+`bench/ab_engine.sh`, with `bench/arms-iq3s.json`, screen version 2026-10-19c and
+`ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns`, in the order K1, P6, P6, K1, K1, C2, C2,
+K1 with the tags cf-k1-1, cf-p6-1, cf-p6-2, cf-k1-2, cf-k1-3, cf-c2-1, cf-c2-2 and cf-k1-4. P6's confirmation is the
+first four runs and C2's the last four; each is A, B, B, A with runs of its own, and every step is a fresh engine
+start. Before the call, K1's config `cfg-s-k1.json` equals the live config but for exe, cwd and log, the engine in the
+experiment tree has the deployed engine's sha256 (`00869ac7…`), and the config tool's dry run on the live config
+changes nothing. The criteria are those above. If both are adopted, the combination is confirmed the same way, with
+its own arm and a plan written before its runs. While these runs go on, nothing else runs on the machine.

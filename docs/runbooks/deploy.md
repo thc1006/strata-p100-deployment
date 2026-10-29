@@ -48,7 +48,7 @@ The output above the reason shows the failing check. If `check-drift.sh` reports
 - `the watch did not finish (exit …)`: the watch ended before the check did, or the check kept it stopped (exit 137), so what ran meanwhile is not known. Run the script again. If it repeats, the commit's check ends or stops the watch: fix the commit.
 - `the clean-up after the check did not finish (exit …)`: what the check started may still run (exit 4: its 20 passes still found something, such as a process that starts another each time one is killed). Look for it (`ps -u $USER -o pid,args`), end it, and run the script again.
 - `it was killed (SIGKILL) after … s`: something ended the check before its time limit, for example the OOM killer at the account's memory limit (`oom_kill` in `/sys/fs/cgroup/user.slice/user-1003.slice/memory.events` tells). Look at what the commit's tests take, or at what else ran, and run the script again.
-- `it did not finish in 1800 s`: the check hung, or the machine was busy. `scripts/test.sh` alone takes about 24 minutes here (1430 s on 2026-10-30: `results/ci-jobs-20261030.txt`). Look at what else runs, and run the script again.
+- `it did not finish in 1800 s`: the check hung, or the machine was busy. `scripts/test.sh` takes about 25 minutes here (1504 s on 2026-10-30: `results/test-sh-20261030.txt`). Look at what else runs, and run the script again.
 
 ## Deploy by hand
 

@@ -1,0 +1,64 @@
+# scripts/test.sh on <host> (Ubuntu 22.04.5 LTS, Python 3.10.12, bash 5.1.16), 2026-10-30, from 03:36 to 04:01 (UTC+8).
+# Commit a39311e of branch ci-speed-20261030, in a worktree with no local change, without --jobs (one worker), while
+# strata-q3 served, in a scope capped at 2 GiB with oom_score_adj 500:
+#   systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0 -- choom -n 500 -- scripts/test.sh
+# under bash's time.  From 03:46 on, another scripts/test.sh of the account ran beside it (another worktree);
+# load average 1.71 1.89 2.13 at the end.  Its output as it was captured, each line cut at 200 characters (that cuts
+# only the stub engines' JSON lines; the counts and times are whole).
+
+
+== unit tests (tests/)
+s............s..............................................................................................................................................s...........................................
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-30 03:48:20", "phase": "prefill", "size": 4000, "i": 0, "status":
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-30 03:48:20", "phase": "prefill", "size": 16000, "i": 0, "status"
+engine_screen: requests sent: 3
+engine_screen: 1 failed records (prefill)
+.{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-30 03:48:22", "phase": "admit", "round": 0, "joiner_ttft_s": 0.0, 
+{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-30 03:48:24", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "
+engine_screen: requests sent: 8
+.{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:24", "phase": "prefill", "size"
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:24", "phase": "prefill", "size":
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:24", "phase": "prefill", "size":
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:24", "phase": "decode", "i": 0, 
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:25", "phase": "four", "round": 0
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:26", "phase": "four", "round": 1
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:28", "phase": "admit", "round": 
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:29", "phase": "admit", "round": 
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:29", "phase": "turns", "i": 0, "
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:30", "phase": "turns", "i": 1, "
+engine_screen: requests sent: 24
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:30", "phase": "prefill", "size":
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:30", "phase": "prefill", "size":
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:30", "phase": "prefill", "size":
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:30", "phase": "decode", "i": 0, 
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:31", "phase": "four", "round": 0
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:32", "phase": "four", "round": 1
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:34", "phase": "admit", "round": 
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:35", "phase": "admit", "round": 
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:35", "phase": "turns", "i": 0, "
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 03:48:35", "phase": "turns", "i": 1, "
+engine_screen: requests sent: 24
+...{"corpus_sha": "4bfdf4eb453093ff", "status": 200, "finish": "stop", "prompt_tokens": 1997, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0, "ttft_content_s": 0.0, "client_decode_tok_s": 178.75, 
+..........................................................................................................s.............................................................................................
+----------------------------------------------------------------------
+Ran 486 tests in 1501.460s
+
+OK (skipped=4)
+skipped (harness): 4
+
+== shell syntax (bash -n; it does not parse $( ) and $(( )) bodies, so the tests run the scripts)
+checked 25 files
+shellcheck is not installed here: CI runs it
+
+== Python (compiled, as the interpreter would: the repo's files and the Python its shell scripts run)
+compiled 110 pieces of Python
+
+== systemd units: their programs (every Exec line of every unit and drop-in), then systemd-analyze verify
+read 5 Exec lines in 4 units and 1 drop-ins
+systemd-analyze verify: no findings for systemd/*
+
+all checks passed
+
+real	25m4.393s
+user	14m21.110s
+sys	14m52.992s

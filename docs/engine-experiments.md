@@ -401,7 +401,7 @@ and the service keeps K1. On each metric a candidate went on with, both of its r
 | C2: 1.2K prompt, engine read tok/s | 200.35 | 222.40 | +11.0% |
 | C2: 4K prompt, engine read tok/s | 379.00 | 412.60 | +8.9% |
 
-C2 also had to gain 10% over the three prompt sizes. 16K prompts are read at K1's rate (+0.1%), so it gains 6.7%. It
+C2 also had to gain 10% over the three prompt sizes. 16K prompts are read at K1's rate (+0.1%), so it gains 6.6%. It
 gives four users 15.8% more tokens per second, which is not one of its target metrics. While a 16K prompt joins three
 decoders, their longest gap grows by 0.13 s with P6 and 0.09 s with C2, under the 0.25 s the plan counts.
 

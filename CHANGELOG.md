@@ -2,6 +2,20 @@
 
 Notable changes to this machine and this repository, newest first. There are no version numbers; sections are by date. The categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-30
+
+### Added
+
+- A rehearsal of the rebuild on this machine, while the service ran, in a bubblewrap sandbox with production read-only and no GPU device (`bench/rehearsal_*`; records `results/rebuild-rehearsal-*-20261030.txt`). From the same sources as the deployment, it rebuilt the CUDA toolkit file for file, the Strata tree, the venv, the MTP head and the IQ3_S pack byte for byte, and the live config equal to the snapshot. 0.1.45's `setup.sh` writes the config that 0.1.43.1's wrote. The engine binaries differ from the deployed ones only in nvcc's temporary file names, which come from process IDs. A second run of the self-test after the rehearsal removed the rehearsal's tree and data folder from the sandbox (`results/rebuild-rehearsal-selftest-rerun-20261030.txt`); production was not touched, and the self-test now refuses such a sandbox.
+
+### Changed
+
+- `docs/runbooks/rebuild.md` is the procedure for today's deployment, 0.1.45 with IQ3_S: steps 0–15, each with the rehearsal's record or the record that covers it. It warns that `setup.py` moves the model files of other Strata folders on the same file system, that `setup.sh` needed 6.38 GiB, more than the account's 6 GiB, so the builds come before the limit is installed, and that the new engine binaries are committed to `config/deployed-artifacts.sha256` only after an engine screen on the GPUs.
+
+### Fixed
+
+- `docs/reference/system-changes.md` did not list the four desktop files that the CUDA installer wrote into `~/.local/share/applications/` on 2026-10-16 (`results/host-state-20261030.txt`).
+
 ## 2026-10-29
 
 ### Added

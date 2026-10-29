@@ -8,6 +8,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 - The confirmations of P6's switches and of `--prefill-pipe 768` (C2) on IQ3_S (`results/CONFIRM-iq3s-p6.md`, `results/CONFIRM-iq3s-c2.md`). Neither passes. The plan asks for 10%; P6's switches decode 5.7% faster for one user, and C2 reads prompts 6.6% faster over the three sizes. The service keeps its switches.
 - `results/restart-after-confirm-20261029.txt`: the first start of `strata-q3` with the preflight, wait-ready and config tool of `7886a39`, the restart that the deploy of 2026-10-27 left pending. `scripts/check-drift.sh` then reported no drift.
+- Decision 0001 has a dated note: since the upgrade to 0.1.45 on 2026-10-19, `~/dev/strata` is a git worktree of `~/dev/strata-git`.
 
 ### Changed
 

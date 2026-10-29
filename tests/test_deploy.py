@@ -1118,16 +1118,8 @@ class DeployTests(unittest.TestCase):
         # what the check starts in a scope of its own with systemd-run --user --scope, as AGENTS.md asks every job here
         # to start: in another cgroup, with the checks' TMPDIR.  The watch kills it when it is an engine while the
         # check runs, and the sweep after the check when it becomes one only after the watch's last look; before, both
-        # looked only in deploy.sh's cgroup, and it outlived deploy.sh.  Only where systemd is PID 1: systemd-run
-        # --scope gives systemd its pid, which in a namespace of pids is another's
-        try:
-            init = Path("/proc/1/comm").read_text().strip()
-        except OSError:
-            init = ""
-        if init != "systemd" or not shutil.which("systemd-run") or subprocess.run(
-                ["systemd-run", "--user", "--scope", "-q", "true"], stdin=subprocess.DEVNULL,
-                capture_output=True).returncode != 0:
-            self.skipTest("machine: no systemd-run --user here")
+        # looked only in deploy.sh's cgroup, and it outlived deploy.sh
+        self.needs_user_scopes()
         for name in ("SCOPE_ENGINE", "SCOPE_LATE"):
             with self.subTest(name=name):
                 self.fake = self.new_fake()
@@ -1148,6 +1140,18 @@ class DeployTests(unittest.TestCase):
                     time.sleep(0.1)
                 self.assertEqual(self.scopes(nonce), [], "its scope is left")
 
+    def needs_user_scopes(self):
+        """Only where systemd is PID 1: systemd-run --scope gives systemd its pid, which in a namespace of pids is
+        another's."""
+        try:
+            init = Path("/proc/1/comm").read_text().strip()
+        except OSError:
+            init = ""
+        if init != "systemd" or not shutil.which("systemd-run") or subprocess.run(
+                ["systemd-run", "--user", "--scope", "-q", "-G", "true"], stdin=subprocess.DEVNULL,
+                capture_output=True).returncode != 0:
+            self.skipTest("machine: no systemd-run --user here")
+
     def test_the_class_port_stays_taken(self):
         # the port of the class's copies (harmless) cannot be bound by another process while the class's tests run, on
         # IPv4 nor on IPv6, and the watch does not see it
@@ -1166,6 +1170,71 @@ class DeployTests(unittest.TestCase):
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         self.assertEqual(self.deploy().returncode, 0)
+
+    def test_the_watch_skips_what_runs_in_the_services_cgroup(self):
+        # an engine or a listener on :8080 in strata-q3's cgroup (SERVICE) is the service's, and fails no check.  Here
+        # with a person's process in a scope of its own (systemd-run --user --scope) that has a harmless pattern and
+        # listens on a harmless port, and copies whose SERVICE is that scope's cgroup or the service's.  On this
+        # machine while strata-q3 serves, also with deploy.sh as it is, whose watch then sees the service's engine and
+        # its listener on :8080 (as the copies of every test here did before 2026-10-30)
+        self.needs_user_scopes()
+        nonce = self.fake.split()[0].rpartition("-")[2]
+        port, ready = self.free_port(), self.root / "service.ready"
+        self.addCleanup(self.drop_scopes, nonce)
+        q = self.outside("systemd-run", "--user", "--scope", "-q", "-G", "python3", "-c",
+                         "import socket, sys, time; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); "
+                         "s.listen(); open(sys.argv[2], 'w').close(); time.sleep(60)", str(port), str(ready), self.fake,
+                         ready=ready)
+        cgroup = Path(f"/proc/{q.pid}/cgroup").read_text().split("\n")[0].partition("::")[2]
+        self.assertRegex(cgroup, r"\.scope$")
+        other, service = self.new_fake(), 'SERVICE = "/system.slice/strata-q3.service"'
+        for changes, says in (({}, "an engine: "), ({f'rb"{self.fake}"': f'rb"{other}"'}, "a listener on :8080: "),
+                              ({service: f'SERVICE = "{cgroup}"'}, None)):
+            with self.subTest(changes=changes):
+                text = DEPLOY.read_text().replace('rb"engine-cuda12/strata --serve"', f'rb"{self.fake}"', 1).replace(
+                    "PORT = 8080 ", f"PORT = {port} ", 1)
+                for old, new in changes.items():
+                    self.assertEqual(text.count(old), 1, old)
+                    text = text.replace(old, new)
+                base = self.commit({"scripts/deploy.sh": text}, parent=self.base)
+                self.git(self.live, "fetch", "-q", "origin")
+                self.git(self.live, "reset", "-q", "--hard", "origin/main")
+                new = self.commit({"docs.md": str(changes)})
+                self.runs(new)
+                r = self.deploy()
+                if says:
+                    self.refused_by_the_watch(r, base, says)
+                    self.assertIn("python3 -c import socket, sys, time; s = socket.socket();", r.stderr)
+                else:
+                    self.assertEqual((r.returncode, self.head("main")), (0, base), r.stdout + r.stderr)
+                self.assertIsNone(q.poll(), "the service's stand-in was killed")
+        if self.serving():
+            with self.subTest("strata-q3 as it serves"):
+                base = self.use_copy({}, real=True)
+                new = self.commit({"docs.md": "b\n"})
+                self.runs(new)
+                with harness_run.alone():           # no fake engine of a harness in another worker meanwhile
+                    r = self.deploy()
+                self.assertEqual((r.returncode, self.head("main")), (0, base), r.stdout + r.stderr)
+
+    @staticmethod
+    def serving() -> bool:
+        """Whether strata-q3 runs here with an engine (the preflight's pattern) in its cgroup and listens on :8080."""
+        engine = False
+        for q in filter(str.isdigit, os.listdir("/proc")):
+            try:
+                cgroup = Path(f"/proc/{q}/cgroup").read_text().split("\n")[0].partition("::")[2]
+                if cgroup == "/system.slice/strata-q3.service" and \
+                        b"engine-cuda12/strata --serve" in Path(f"/proc/{q}/cmdline").read_bytes().replace(b"\0", b" "):
+                    engine = True
+                    break
+            except OSError:
+                pass
+        try:
+            r = subprocess.run(["ss", "-ltnH", "sport = :8080"], capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return engine and r.returncode == 0 and "LISTEN" in r.stdout
 
     @staticmethod
     def scopes(text: str) -> list[str]:

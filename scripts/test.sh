@@ -42,7 +42,8 @@
 # test returns something (a coroutine it returns never runs), when a test expects to fail, or when a test is skipped for
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
 # something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
-# (a NamedTemporaryFile in a module's list), which a worker does not finalize (the comment on the workers says why).
+# (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
+# workers says why).
 # Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
@@ -446,9 +447,10 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
 # worker that does not hold it.  This process is back in the group before it reads the workers' records.
 # A worker ends as Python ends, but without the interpreter's teardown, which would also finalize what the loading
-# made.  It drops the tests it ran, as unittest's suites do, and collects them, so that what they hold is finalized; an
-# object that a global still holds (a NamedTemporaryFile in a module's list) is not, and the TMPDIR check fails on its
-# file (close it in a clean-up).  Then it runs the atexit handlers that its tests registered, and those that a library
+# made.  It drops its references to the tests it ran, as unittest's suites do, also those of the result's lists (to a
+# skipped or failed test), and collects them, so that what only they hold is finalized; what a global still holds (a
+# NamedTemporaryFile in a module's list or a class's attribute) is not, and the TMPDIR check fails on its file (close it
+# in a clean-up).  Then it runs the atexit handlers that its tests registered, and those that a library
 # registered as the tests loaded (logging's, multiprocessing's, which ends its daemonic children); those that code in
 # tests/ registered as they loaded run here, once.  After a KeyboardInterrupt it ends of SIGINT.  When a worker ends
 # without its record (a test that ends the process, a signal) the run has no verdict, and when one died of a signal
@@ -552,9 +554,12 @@ def finish():
             pass
 
 
-def let_go(took):
+def let_go(took, result):
     """Drop the references to the tests that this worker ran, as unittest's suites drop each test once it has run, and
-    collect them: what a test still holds (a NamedTemporaryFile in an attribute of its own) is finalized here."""
+    those of the result's lists (to a skipped or failed test, a subtest), and collect them: what only a test holds (a
+    NamedTemporaryFile in an attribute of its own) is finalized here."""
+    for name in LISTS:
+        getattr(result, name).clear()
     gone = {id(units[u]) for u in took}
 
     def walk(s):
@@ -621,7 +626,7 @@ def work(k, saved, mask, gate, report):
                     result.stopTestRun()
             profile.disable()
             record(k, result, q)
-            let_go(q.took)
+            let_go(q.took, result)
             status = 0
         except KeyboardInterrupt:
             traceback.print_exc()

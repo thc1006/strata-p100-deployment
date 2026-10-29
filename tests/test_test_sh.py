@@ -2430,6 +2430,22 @@ class TestSh(unittest.TestCase):
             "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n        self.me = self\n    def test_t(self):\n"
             "        self.f.write(b'x')\n    def test_u(self):\n        self.f.write(b'y')\n")
         self.passes(d)
+        # also that of a skipped test, of a failed or skipped subtest and of a test that fails or errs, which the
+        # result's lists refer to: the worker clears them once it has written its record.  Before, their files were
+        # left
+        ntf = ("import tempfile, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n"
+               "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n    def test_ok(self):\n"
+               "        self.f.write(b'x')\n    def test_s(self):\n        self.skipTest('machine: not here')\n")
+        (d / "tests" / "test_tmp.py").write_text(ntf)
+        self.passes(d, "--repo-only")
+        (d / "tests" / "test_tmp.py").write_text(
+            ntf + "    def test_f(self):\n        self.fail('no')\n    def test_e(self):\n        raise OSError('no')\n"
+                  "    def test_sub(self):\n        with self.subTest(i=0):\n            self.fail('no')\n"
+                  "        with self.subTest(i=1):\n            self.skipTest('machine: not here')\n")
+        r = self.run_sh(d, "--repo-only")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("FAILED (failures=2, errors=1, skipped=2)", r.stdout)
+        self.assertNotIn("TMPDIR", r.stdout)
         # a test that removes the TMPDIR itself: the check cannot read it, and the run fails
         (d / "tests" / "test_tmp.py").write_text(
             "import shutil, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"

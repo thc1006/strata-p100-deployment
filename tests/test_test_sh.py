@@ -19,6 +19,7 @@ import shutil
 import signal
 import subprocess
 import tempfile
+import time
 import unittest
 import unittest.mock
 
@@ -2316,6 +2317,130 @@ class TestSh(unittest.TestCase):
     def test_usage(self):
         r = self.run_sh(self.tree(), "--repo")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+    def test_jobs(self):
+        # --jobs N, N from 1 to 16 as the next argument; the run then uses N workers
+        d = self.tree()
+        for args in (["--jobs"], ["--jobs", "0"], ["--jobs", "17"], ["--jobs", "02"], ["--jobs", "x"], ["--jobs=2"],
+                     ["--jobs", "-1"], ["--jobs", "2", "3"], ["--jobs", "--repo-only"]):
+            with self.subTest(args=args):
+                r = self.run_sh(d, *args)
+                self.assertEqual((r.returncode, r.stdout), (2, ""), r.stderr)
+                self.assertIn("usage: scripts/test.sh", r.stderr)
+        for jobs in ("1", "16"):
+            with self.subTest(jobs=jobs):
+                self.passes(d, "--jobs", jobs, "--repo-only")
+
+    def test_workers_run_each_test_once(self):
+        # each loaded test runs once, in one of the workers, after its module's and its class's fixtures, which a
+        # worker sets up for the tests it takes; with --jobs 1 one worker runs them all
+        d = self.tree()
+        log = d.parent / "log"
+        text = ("import os, time, unittest\n"
+                f"def note(what):\n    with open({str(log)!r}, 'a') as f:\n        f.write(f'{{what}} {{os.getpid()}}\\n')\n"
+                "def setUpModule():\n    note('module.' + __name__)\n"
+                "class A(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        note('class.' + cls.__module__)\n")
+        text += "".join(f"    def test_{i}(self):\n        time.sleep(0.2)\n        note(self.id())\n" for i in range(6))
+        for m in "pqr":
+            (d / "tests" / f"test_{m}.py").write_text(text)
+        expected = sorted(f"test_{m}.A.test_{i}" for m in "pqr" for i in range(6))
+        for jobs in ("1", "3"):
+            with self.subTest(jobs=jobs):
+                log.unlink(missing_ok=True)
+                r = self.run_sh(d, "--jobs", jobs)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (0, ["all checks passed"]), r.stdout + r.stderr)
+                self.assertIn("\nRan 19 tests in ", r.stdout)
+                lines = [line.split() for line in log.read_text().splitlines()]
+                self.assertEqual(sorted(what for what, _ in lines if what.startswith("test_")), expected)
+                workers = {pid for what, pid in lines}
+                if jobs == "1":
+                    self.assertEqual(len(workers), 1)
+                    self.assertEqual(sorted(what for what, _ in lines if not what.startswith("test_")),
+                                     ["class.test_p", "class.test_q", "class.test_r",
+                                      "module.test_p", "module.test_q", "module.test_r"])
+                else:
+                    self.assertGreater(len(workers), 1, lines)
+                    self.assertLessEqual(len(workers), 3, lines)
+                seen = set()                # a worker's tests of a module come after its setUpModule and setUpClass
+                for what, pid in lines:
+                    if what.startswith("test_"):
+                        self.assertLessEqual({("module", what.split(".")[0], pid), ("class", what.split(".")[0], pid)},
+                                             seen, what)
+                    else:
+                        seen.add((*what.split("."), pid))
+
+    def test_tests_that_turn_the_profiler_off_in_every_worker(self):
+        # what ran of such a test is not known, in whichever worker it ran: each of three workers runs some of these
+        d = self.tree()
+        (d / "tests" / "test_off.py").write_text("import sys, time, unittest\nclass T(unittest.TestCase):\n" + "".join(
+            f"    def test_{i}(self):\n        time.sleep(0.2)\n        sys.setprofile(None)\n" for i in range(9)))
+        for jobs in ("1", "3"):
+            with self.subTest(jobs=jobs):
+                self.passes(d, "--jobs", jobs)
+
+    def test_a_signal_to_the_runner_ends_its_workers(self):
+        # the workers run in process groups of their own: a signal to the runner alone goes on to them, and the
+        # end of the runner (SIGKILL) gives each a SIGTERM; either way the run leaves no verdict
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGKILL):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                pids = d.parent / "pids"
+                (d / "tests" / "test_long.py").write_text(
+                    "import os, time, unittest\nclass L(unittest.TestCase):\n" + "".join(
+                        f"    def test_{i}(self):\n        with open({str(pids)!r}, 'a') as f:\n"
+                        "            f.write(f'{os.getpid()} {os.getppid()}\\n')\n        time.sleep(60)\n"
+                        for i in range(2)))
+                e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
+                e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
+                p = subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), "--jobs", "2"], cwd=d, env=e,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+                self.addCleanup(lambda p=p: (p.poll() is None and os.killpg(p.pid, signal.SIGKILL), p.communicate()))
+                for _ in range(300):
+                    lines = pids.read_text().splitlines() if pids.exists() else []
+                    if len(lines) == 2:
+                        break
+                    time.sleep(0.1)
+                workers = [int(line.split()[0]) for line in lines]
+                runners = {int(line.split()[1]) for line in lines}
+                self.assertEqual((len(workers), len(runners)), (2, 1), lines)
+                for w in workers:
+                    self.assertNotEqual(os.getpgid(w), os.getpgid(p.pid))
+                os.kill(runners.pop(), sig)
+                out, _ = p.communicate(timeout=60)
+                self.assertEqual((p.returncode, out.splitlines()[-1:]), (1, ["FAILED"]), out)
+                if sig != signal.SIGKILL:
+                    self.assertIn(f"FAIL: the unit tests did not finish (no verdict): stopped by {sig.name}", out)
+                for w in workers:
+                    for _ in range(100):
+                        if not os.path.exists(f"/proc/{w}"):
+                            break
+                        time.sleep(0.1)
+                    self.assertFalse(os.path.exists(f"/proc/{w}"), f"worker {w} outlived the run")
+
+
+class TestShJobs(TestSh):
+    """The cases of TestSh about the unit-test step, again with --jobs 3: what one worker sees (a test that fails,
+    never runs, returns a value, is skipped for another reason ...) fails the run as it does with one, also when the
+    code that makes something a helper ran in another worker."""
+    def run_sh(self, d: Path, *args: str, env: dict | None = None, timeout: int = 120) -> subprocess.CompletedProcess:
+        return super().run_sh(d, *args, "--jobs", "3", env=env, timeout=timeout)
+
+
+for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
+        "test_a_tree_without_a_fault_passes", "test_no_test_ran", "test_a_test_file_discovery_does_not_load",
+        "test_tests_that_cannot_run", "test_no_test_ran_when_classes_or_modules_are_skipped", "test_a_failing_test",
+        "test_a_test_that_expects_to_fail", "test_a_test_that_ends_the_run", "test_a_test_module_without_a_test",
+        "test_every_test_skipped", "test_skips", "test_tests_whose_body_never_runs",
+        "test_forms_round_4_mutation_testing_found_untested",
+        "test_tests_behind_decorators_without_wraps_and_helpers_named_test", "test_files_that_are_not_regular",
+        "test_modules_and_tests_the_runner_once_refused", "test_forms_round_6_mutation_testing_found_untested",
+        "test_helpers_skipped_modules_and_tests_without_a_name", "test_forms_round_7_mutation_testing_found_untested",
+        "test_helpers_are_read_by_code_that_may_run", "test_forms_round_8_mutation_testing_found_untested",
+        "test_a_helper_that_a_skipped_tests_method_reads_through_self",
+        "test_forms_round_9_mutation_testing_found_untested",
+        "test_helpers_through_methods_of_related_classes_and_more_forms",
+        "test_forms_round_10_mutation_testing_found_untested"}]:
+    setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 
 if __name__ == "__main__":

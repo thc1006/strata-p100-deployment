@@ -11,6 +11,10 @@
 #   scripts/test.sh --repo-only  no file outside the repo: the units' programs outside it are not checked, and the tests
 #                                that need this machine's files are skipped.  CI runs `--repo-only --harnesses`
 #                                (.github/workflows/test.yml), and shellcheck must be installed then.
+#   scripts/test.sh --jobs N     the unit tests in N worker processes, N from 1 to 16 (1 without it, as here, where the
+#                                service runs beside them); the checks below see the tests of all of them.  With
+#                                --harnesses here, keep 1: a test of tests/harness_run.py runs a stand-in for an
+#                                experiment driver, and a harness in another worker then refuses to run
 # A run fails when a test fails or does not finish, when no test ran (every test was skipped, by itself or with its
 # class or module; a test whose subtests were skipped ran), when a .py file under tests/ is not a test module the runner
 # loads (tests/test_*.py) or a helper of theirs, is no regular file, or loads no test (a test counts for the module that
@@ -39,18 +43,21 @@
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only).  Code review has to see
 # what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
-# Usage: scripts/test.sh [--repo-only] [--harnesses]
+# Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
 set -u -o pipefail
 D=$(cd "$(dirname "$0")/.." && pwd)
 cd "$D" || exit 1
 LIVE=/home/thc1006/dev/p100-q3-deployment     # the checkout the units name: in their copies here, the tested tree
-REPO_ONLY=0; HARNESSES=0
-for a in "$@"; do
-  case $a in
+REPO_ONLY=0; HARNESSES=0; JOBS=1
+usage() { echo "usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]  (N: 1 to 16)" >&2; exit 2; }
+while [ $# -gt 0 ]; do
+  case $1 in
     --repo-only) REPO_ONLY=1 ;;
     --harnesses) HARNESSES=1 ;;
-    *) echo "usage: scripts/test.sh [--repo-only] [--harnesses]" >&2; exit 2 ;;
+    --jobs) [ $# -ge 2 ] && [[ $2 =~ ^([1-9]|1[0-6])$ ]] || usage; JOBS=$2; shift ;;
+    *) usage ;;
   esac
+  shift
 done
 fail=0
 step() { printf '\n== %s\n' "$1"; }
@@ -61,8 +68,9 @@ tmp=$(cd -- "$tmp" && pwd -P) || { echo "cannot enter the temporary directory"; 
 
 step "unit tests (tests/)"
 # the runner writes its verdict last: a test that ends the process (os._exit) leaves none
-TEST_REPO_ONLY=$REPO_ONLY STRATA_TEST_HARNESSES=$HARNESSES python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, cProfile, functools, inspect, os, pathlib, stat, symtable, sys, types, unittest
+TEST_REPO_ONLY=$REPO_ONLY STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
+import ast, cProfile, ctypes, functools, inspect, json, os, pathlib, signal, stat, symtable, sys, time, \
+    traceback, types, unittest, warnings
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -376,8 +384,10 @@ class Result(unittest.TextTestResult):
             return tid(test)
 
 
-returned, unknown = {}, set()   # test id: the type of what the test returned (a test returns None); the tests that
-                                # turned the profiler off (sys.setprofile, a profiler of their own): what ran is not known
+returned, unknown = {}, set()   # test id: (the unit it ran in, the type of what the test returned) (a test returns
+                                # None); the tests that turned the profiler off (sys.setprofile, a profiler of their
+                                # own): what ran is not known
+now = -1                        # the unit (below) that runs
 
 
 def call(self, method):
@@ -385,24 +395,250 @@ def call(self, method):
     if sys.getprofile() is not profile:
         unknown.add(tid(self))
     if value is not None:
-        returned[tid(self)] = type(value).__name__
+        returned[tid(self)] = (now, type(value).__name__)
 
 
 if not hasattr(unittest.TestCase, "_callTestMethod"):
     bad.append("this Python's unittest has no TestCase._callTestMethod, through which the runner sees what a test returns")
 unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has its own, which awaits the test)
-result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1, resultclass=Result).run(suite)
+
+# The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
+# that each starts with what the loading ran.  A worker takes the next unit from a file that all of them read through
+# one open file description (each read moves its offset on), runs it, and writes down what the checks below need; this
+# process then merges that, prints unittest's report and runs the checks.  A unit is a test, or a suite other than a
+# plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of the loader are cut into
+# their tests, which unittest's fixtures then see in the same order, so a worker sets a class or module up (setUpClass,
+# setUpModule) and tears it down again for each run of its tests that it takes.  A worker that ends without its record
+# (a test that ends the process) leaves no verdict; a signal to this process (SIGINT, SIGTERM, SIGHUP) goes on to the
+# workers, each in a process group of its own so that a signal to the whole group reaches it once, and leaves no
+# verdict either.  A worker gets SIGTERM when this process ends before it (PR_SET_PDEATHSIG).
+jobs = int(os.environ["TEST_JOBS"])
+units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
+
+
+def cut(s):
+    for t in s:
+        if type(t) is unittest.TestSuite:
+            cut(t)
+        else:
+            first = spans[-1][1] if spans else 0
+            units.append(t)
+            spans.append((first, first + (len(list(tests_of(t))) if isinstance(t, unittest.TestSuite) else 1)))
+
+
+cut(suite)
+if [tid(t) for u in units for t in (tests_of(u) if isinstance(u, unittest.TestSuite) else [u])] != \
+        [tid(t) for t, _, _ in bodies]:
+    bad.append("the units the workers take are not the loaded tests, in their order")
+LISTS = ("errors", "failures", "skipped", "expectedFailures", "unexpectedSuccesses")
+QUEUE = sys.argv[1] + ".units"
+pathlib.Path(QUEUE).write_bytes(b"".join(i.to_bytes(4, "big") for i in range(len(units))))
+queue = os.open(QUEUE, os.O_RDONLY)
+runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=1, resultclass=Result)
+SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+parent = os.getpid()
+
+
+class Queue(unittest.TestSuite):
+    """A worker's units, as it takes them; marks: (unit, the length of each of the result's lists) as each starts."""
+    def __init__(self, result):
+        super().__init__()
+        self.result, self.took, self.marks = result, [], []
+
+    def __iter__(self):
+        global now
+        while True:
+            b = os.read(queue, 4)
+            if len(b) != 4:
+                return
+            now = int.from_bytes(b, "big")
+            self.took.append(now)
+            self.marks.append((now, {name: len(getattr(self.result, name)) for name in LISTS}))
+            yield units[now]
+
+    def _removeTestAtIndex(self, index):
+        pass
+
+
+def record(k, result, q):
+    """What the checks need of worker k's run, written to <verdict>.<k>."""
+    ran = {e.code for e in profile.getstats()} | profile.entered
+    ran = {c for c in ran if hasattr(c, "co_filename")}
+    lists = {}
+    for name in LISTS:
+        out, m = [], -1
+        for j, e in enumerate(getattr(result, name)):
+            while m + 1 < len(q.marks) and q.marks[m + 1][1][name] <= j:
+                m += 1
+            t, text = (e, "") if name == "unexpectedSuccesses" else e
+            desc = result.getDescription(t) if name in ("errors", "failures") else ""
+            out.append([q.marks[m][0] if m >= 0 else -1, tid(t), isinstance(t, unittest.TestCase), desc, text])
+        lists[name] = out
+    own = []
+    for u in q.took:
+        for i in range(*spans[u]):
+            t, _, fn = bodies[i]
+            f = test_function(t)
+            own.append([i, [where(c) for g in (fn, unwrapped(fn)) for c in inner(g)], [at(c) for c in inner(fn)],
+                        where(f) if f is not None else None])
+    pathlib.Path(f"{sys.argv[1]}.{k}").write_text(json.dumps({
+        "took": q.took, "run": result.testsRun, "started": sorted(result.started), "lists": lists,
+        "returned": [[u, t, kind] for t, (u, kind) in returned.items()], "unknown": sorted(unknown),
+        "ran": [where(c) for c in ran], "own": own,
+        "body_ran": [i for i, (_, code, _) in enumerate(bodies) if code is not None and code in ran]}))
+
+
+def work(k, saved):
+    """Worker k: it runs the units it takes and records its run; it ends with os._exit, so that nothing of this
+    process's exit (atexit, buffers, the verdict) happens twice."""
+    status = 1
+    try:
+        os.setpgid(0, 0)
+        while signal.sigtimedwait(SIGNALS, 0) is not None:   # what came before it left the group: this process
+            pass                                              # passes that on
+        for s, handler in saved.items():
+            if handler is not None:             # (None: a handler that Python did not set, which stays)
+                signal.signal(s, handler)
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, SIGNALS)
+        if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM) != 0:       # PR_SET_PDEATHSIG
+            raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
+        if os.getppid() != parent:
+            raise RuntimeError("the runner ended while the worker started")
+        result = runner._makeResult()
+        unittest.registerResult(result)
+        result.failfast, result.buffer, result.tb_locals = runner.failfast, runner.buffer, runner.tb_locals
+        q = Queue(result)
+        with warnings.catch_warnings():             # as TextTestRunner.run()
+            if runner.warnings:
+                warnings.simplefilter(runner.warnings)
+                if runner.warnings in ("default", "always"):
+                    warnings.filterwarnings("module", category=DeprecationWarning,
+                                            message=r"Please use assert\w+ instead.")
+            result.startTestRun()
+            try:
+                q(result)
+            finally:
+                result.stopTestRun()
+        profile.disable()
+        record(k, result, q)
+        status = 0
+    except BaseException:
+        traceback.print_exc()
+    finally:
+        for stream in (sys.stdout, sys.stderr):
+            try:
+                stream.flush()
+            except Exception:
+                pass
+        os._exit(status)
+
+
+saved = {s: signal.getsignal(s) for s in SIGNALS}
+alive, came = {}, []            # pid: worker; the signals that came
+
+
+def forward(signum, frame):
+    came.append(signum)
+    os.lseek(queue, 0, os.SEEK_END)             # no more units
+    for pid in list(alive):
+        try:
+            os.kill(pid, signum)
+        except OSError:
+            pass
+
+
+for s, handler in saved.items():
+    if handler is not signal.SIG_IGN and handler is not None:   # what is ignored stays so, in the workers too
+        signal.signal(s, forward)
+sys.stdout.flush()
+sys.stderr.flush()
+start = time.perf_counter()
+for k in range(jobs):
+    signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
+    pid = os.fork()
+    if pid == 0:
+        work(k, saved)
+    try:
+        os.setpgid(pid, pid)
+    except OSError:
+        pass
+    alive[pid] = k
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, SIGNALS)
 profile.disable()
-ran = {e.code for e in profile.getstats()} | profile.entered
-ran = {c for c in ran if hasattr(c, "co_filename")}
+records, lost = {}, []
+while alive:
+    try:
+        pid, status = os.wait()
+    except ChildProcessError:
+        break
+    k = alive.pop(pid, None)
+    if k is None:
+        continue
+    try:
+        records[k] = json.loads(pathlib.Path(f"{sys.argv[1]}.{k}").read_text())
+    except (OSError, ValueError):
+        pass
+    if status != 0 or k not in records:
+        lost.append(f"worker {k + 1} of {jobs} ended with {os.waitstatus_to_exitcode(status)}" +
+                    ("" if k in records else ", without its record"))
+        os.lseek(queue, 0, os.SEEK_END)
+taken = time.perf_counter() - start
+for s, handler in saved.items():                # a signal from now on acts as it did before the workers
+    if handler is not None:
+        signal.signal(s, handler)
+if came or lost:
+    sys.stdout.flush()
+    for why in [f"stopped by {signal.Signals(s).name}" for s in dict.fromkeys(came)] + lost:
+        print(f"FAIL: the unit tests did not finish (no verdict): {why}")
+    sys.exit(1)                                 # no verdict
+took = sorted(u for r in records.values() for u in r["took"])
+if took != list(range(len(units))):
+    bad.append(f"the workers did not run each unit once: {len(took)} runs of {len(set(took))} of {len(units)} units")
+# the result of the run: each list in the order of the units (one worker's entries for a unit, in their order)
+lists = {name: sorted((e for k in sorted(records) for e in records[k]["lists"][name]), key=lambda e: e[0])
+         for name in LISTS}
+started = {t for r in records.values() for t in r["started"]}
+unknown = {t for r in records.values() for t in r["unknown"]}
+returned = {t: kind for _, t, kind in sorted((e for k in sorted(records) for e in records[k]["returned"]),
+                                             key=lambda e: e[0])}
+ran = {tuple(w) for r in records.values() for w in r["ran"]}      # where() of the code that ran
+body_ran = {i for r in records.values() for i in r["body_ran"]}
+view = {i: (h, a, f) for r in records.values() for i, h, a, f in r["own"]}   # as the worker that ran its test saw it
+for i, (t, _, fn) in enumerate(bodies):         # (a test that no worker ran, when the check above fails)
+    if i not in view:
+        f = test_function(t)
+        view[i] = ([where(c) for g in (fn, unwrapped(fn)) for c in inner(g)], [at(c) for c in inner(fn)],
+                   where(f) if f is not None else None)
+out = unittest.runner._WritelnDecorator(sys.stdout)       # unittest's report, as TextTestRunner.run() prints it
+out.writeln()
+for flavour, name in (("ERROR", "errors"), ("FAIL", "failures")):
+    for _, _, _, desc, text in lists[name]:
+        out.writeln(unittest.TextTestResult.separator1)
+        out.writeln(f"{flavour}: {desc}")
+        out.writeln(unittest.TextTestResult.separator2)
+        out.writeln(text)
+out.writeln(unittest.TextTestResult.separator2)
+run = sum(r["run"] for r in records.values())
+out.writeln("Ran %d test%s in %.3fs" % (run, run != 1 and "s" or "", taken))
+out.writeln()
+success = not (lists["failures"] or lists["errors"] or lists["unexpectedSuccesses"])
+infos = [] if success else [f"{what}={len(lists[name])}" for what, name in (("failures", "failures"),
+                                                                             ("errors", "errors")) if lists[name]]
+infos += [f"{what}={len(lists[name])}" for what, name in (("skipped", "skipped"), ("expected failures",
+          "expectedFailures"), ("unexpected successes", "unexpectedSuccesses")) if lists[name]]
+out.write("OK" if success else "FAILED")
+out.writeln(f" ({', '.join(infos)})" if infos else "")
+out.flush()
 # where the code of the defs that ran is: not a module's, a lambda's or a comprehension's (<module>, <lambda> ...),
 # which may be on the line where a def starts (line 1, a decorator)
-ran_at = {at(c) for c in ran if not c.co_name.startswith("<")}
+ran_at = {(p, line) for p, line, name in ran if not name.startswith("<")}
 # a helper: a function that code that may run reads, transitively: code that ran, the function of a loaded test (also
 # one that was skipped), and a function that a loaded test holds (in its closure or as a default), and what those read
-holds = {where(c) for t, _, fn in bodies for f in (fn, unwrapped(fn)) for c in inner(f)}
-tests = {where(c) for c in map(test_function, (t for t, _, _ in bodies)) if c is not None}     # FunctionTestCases'
-reach = {where(c) for c in ran} | holds | tests | {where(c) for c in (code for _, code, _ in bodies) if c is not None}
+holds = {tuple(w) for h, _, _ in view.values() for w in h}
+tests = {tuple(f) for _, _, f in view.values() if f is not None}     # FunctionTestCases'
+reach = ran | holds | tests | {where(c) for c in (code for _, code, _ in bodies) if c is not None}
+
+
 def lineage(rp, c):
     """The class c of the module rp and the classes of the module it derives from (by their names)."""
     out, todo = set(), [c]
@@ -445,13 +681,15 @@ for rp, group in fns.items():
         names |= fn.reads
     helps[rp] = names
 # a test runs when it starts, and its body runs then, unless it was skipped or failed first; a class or module whose
-# setUpClass or setUpModule raised (skipped or an error) starts none of its tests
-held = {tid(t) for t, _ in result.skipped + result.errors if not isinstance(t, unittest.TestCase)}
-done = {tid(t) for t, _ in result.skipped + result.errors + result.failures + result.expectedFailures} | unknown
+# setUpClass or setUpModule raised (skipped or an error) starts none of its tests (lists: [unit, id, whether it is a
+# TestCase, description, text]; what is not a TestCase stands for a setUpClass or setUpModule)
+held = {t for _, t, case, _, _ in lists["skipped"] + lists["errors"] if not case}
+done = {e[1] for name in ("skipped", "errors", "failures", "expectedFailures") for e in lists[name]} | unknown
 # a test function runs when a loaded test calls it or when it ran (behind a decorator without functools.wraps, a helper
 # named test...); one that a decorator without functools.wraps holds counts as called when its test did not run its body
 known = runs | ran_at
-spared = known | {at(c) for t, _, fn in bodies if tid(t) not in result.started or tid(t) in done for c in inner(fn)}
+spared = known | {tuple(a) for i, (t, _, _) in enumerate(bodies) if tid(t) not in started or tid(t) in done
+                  for a in view[i][1]}
 bad += [f"{p}:{line}: {c}.{f} never runs: no loaded test calls it (its class is no TestCase the runner loads nor a base "
         "of one, the name is bound to something else later, or a decorator replaced it)"
         for p, c, f, line, first in defined
@@ -461,28 +699,28 @@ for p, name, line, first in free:      # (in a module that turned the profiler o
     if p.stem not in whole and (rp, first) not in known and (rp, first, name) not in holds | tests and \
             name not in helps.get(rp, ()) and not (p.stem in dark and name in named.get(rp, ())):
         bad.append(f"{p}:{line}: {name} is not in a TestCase, so it never runs")
-for t, code, _ in bodies:
+for i, (t, code, _) in enumerate(bodies):
     k = type(t)
-    if tid(t) not in result.started:
+    if tid(t) not in started:
         if not {f"setUpClass ({k.__module__}.{k.__qualname__})", f"setUpModule ({k.__module__})"} & held:
             bad.append(f"{tid(t)} never started (its class overrides run(), or something else kept the runner from it)")
-    elif code is not None and code not in ran and tid(t) not in done:
+    elif code is not None and i not in body_ran and tid(t) not in done:
         bad.append(f"{tid(t)} started, but its body never ran (a decorator that returns without calling it?)")
 bad += [f"{t} returns a value ({kind}), which the runner drops: a test returns None (a coroutine it returns never runs)"
         for t, kind in returned.items()]
 allowed = (() if harnesses else ("harness:",)) + (("machine:",) if repo_only else ())
 for prefix in ("harness:", "machine:"):
-    n = sum(1 for _, why in result.skipped if why.startswith(prefix))
+    n = sum(1 for e in lists["skipped"] if e[4].startswith(prefix))
     if n:
         print(f"skipped ({prefix[:-1]}): {n}")
-bad += [f"{tid(t)} was skipped: {why}" for t, why in result.skipped if not why.startswith(allowed)]
-bad += [f"{tid(t)} expects to fail (expectedFailure): its failure passes the run" for t, _ in result.expectedFailures]
+bad += [f"{t} was skipped: {why}" for _, t, _, _, why in lists["skipped"] if not why.startswith(allowed)]
+bad += [f"{e[1]} expects to fail (expectedFailure): its failure passes the run" for e in lists["expectedFailures"]]
 # a test ran when it started and was not skipped as a whole (a subtest's skip has an id of its own)
-if not result.started - {tid(t) for t, _ in result.skipped}:
-    bad.append("no test ran" + (" (every one was skipped)" if result.skipped else ""))
+if not started - {e[1] for e in lists["skipped"]}:
+    bad.append("no test ran" + (" (every one was skipped)" if lists["skipped"] else ""))
 for b in bad:
     print(f"FAIL: {b}")
-ok = result.wasSuccessful() and not bad
+ok = success and not bad
 pathlib.Path(sys.argv[1]).write_text("pass\n" if ok else "fail\n")
 sys.exit(0 if ok else 1)
 EOF

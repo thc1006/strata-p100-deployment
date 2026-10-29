@@ -81,6 +81,16 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
   (`tests/ab_engine_stubs.sh`, cases 28 and 29). By the maintainer's rule the results below are not used for a new
   decision, and the two deployed switches (K1) are confirmed again with the fixed driver, on the model that decision
   0004 keeps; that plan is written here before its runs.
+- Recorded on 2026-10-29: three commits changed passages written before their runs. The only criterion that changed is
+  the reading for the confirmations, which `136470d` made stricter before they ran, as its paragraph ("Written after
+  the screen's results, before the confirmations run") says. `f5f147b` (2026-10-20 22:17, after the IQ3_S screen ended
+  at 20:57) first recorded the amendment of 17:25, inserting it before the last two items of the 12:10 amendment; no
+  commit holds the 17:25 amendment from before the rerun began. `136470d` (22:45) put those two items back above it
+  and reworded two sentences of the 17:25 amendment. `7541739` (2026-10-27) added sources to the 05:05 entry, to R's
+  paragraph, to the 12:10 amendment's gap item and to the 17:25 amendment's 8 vCPUs, said that the K1 runs' gaps were
+  IQ3_XXS's, and removed from the 17:25 amendment the times of a `scripts/test.sh` run and the length of two unit test
+  runs, which no file in `results/` holds. The words as they were before the runs are in `8065650` (the 05:05 entry),
+  `ca9e84f` (the IQ3_S plan) and `905ce09` (its 12:10 amendment).
 
 ## Results
 

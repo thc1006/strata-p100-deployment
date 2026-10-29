@@ -2422,6 +2422,14 @@ class TestSh(unittest.TestCase):
         r = self.run_sh(d)
         self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
         self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: the tests left this in their TMPDIR: left-\w+ \n")
+        # a NamedTemporaryFile that a test keeps in an attribute of its own is removed as the worker lets go of the
+        # test, as unittest's suite does once the test has run, and collects it (the test refers to itself).  Before,
+        # the worker never finalized it
+        (d / "tests" / "test_tmp.py").write_text(
+            "import tempfile, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n"
+            "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n        self.me = self\n    def test_t(self):\n"
+            "        self.f.write(b'x')\n    def test_u(self):\n        self.f.write(b'y')\n")
+        self.passes(d)
 
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
@@ -2742,7 +2750,8 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests", "test_a_stop_of_the_group_stops_the_tests",
         "test_a_signal_to_the_group_reaches_each_test_once",
         "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
-        "test_what_libraries_register_as_the_tests_load", "test_a_worker_that_dies_of_sigkill"}]:
+        "test_what_libraries_register_as_the_tests_load", "test_what_the_tests_leave_in_their_tmpdir",
+        "test_a_worker_that_dies_of_sigkill"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

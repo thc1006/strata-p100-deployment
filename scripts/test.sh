@@ -41,8 +41,9 @@
 # skipped or never started and the decorator holds the function, in its closure or as an argument's default), when a
 # test returns something (a coroutine it returns never runs), when a test expects to fail, or when a test is skipped for
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
-# something in the TMPDIR they get (a directory of this run's).  Code review has to see what runs but checks nothing,
-# as a test that returns early from its own body.
+# something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
+# (a NamedTemporaryFile in a module's list), which a worker does not finalize (the comment on the workers says why).
+# Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
 set -u -o pipefail
@@ -73,8 +74,8 @@ step "unit tests (tests/)"
 mkdir "$tmp/tests" || { echo "cannot create the tests' temporary directory"; exit 1; }
 TMPDIR=$tmp/tests STRATA_TEST_ENGINES_LOCK=$tmp/engines.lock TEST_REPO_ONLY=$REPO_ONLY \
   STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, atexit, cProfile, ctypes, functools, inspect, json, os, pathlib, signal, stat, symtable, sys, threading, \
-    time, traceback, types, unittest, warnings, weakref
+import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, signal, stat, symtable, sys, \
+    threading, time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -443,13 +444,15 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
 # not reach; one sent to it alone (SIGINT, SIGTERM, SIGHUP) goes on to each worker.  So no worker gets a signal twice.
 # Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
-# worker that does not hold it.  A worker runs the atexit handlers that its tests registered, and those that a library
+# worker that does not hold it.  A worker ends as Python ends, but without the interpreter's teardown, which would also finalize what the loading
+# made.  It drops the tests it ran, as unittest's suites do, and collects them, so that what they hold is finalized; an
+# object that a global still holds (a NamedTemporaryFile in a module's list) is not, and the TMPDIR check fails on its
+# file (close it in a clean-up).  Then it runs the atexit handlers that its tests registered, and those that a library
 # registered as the tests loaded (logging's, multiprocessing's, which ends its daemonic children); those that code in
-# tests/ registered as they loaded run here, once.  It ends as Python ends; after a KeyboardInterrupt, of SIGINT.  When
-# a worker ends without its record (a test that ends the process, a signal) the run has no verdict, and when one died
-# of a signal this process then dies of the same signal, also of SIGKILL (the OOM killer's), as the process of the
-# tests did before, so that after a Ctrl-C bash stops too.  A worker gets SIGKILL when this process ends before it
-# (PR_SET_PDEATHSIG).
+# tests/ registered as they loaded run here, once.  After a KeyboardInterrupt it ends of SIGINT.  When a worker ends
+# without its record (a test that ends the process, a signal) the run has no verdict, and when one died of a signal
+# this process then dies of the same signal, also of SIGKILL (the OOM killer's), as the process of the tests did before,
+# so that after a Ctrl-C bash stops too.  A worker gets SIGKILL when this process ends before it (PR_SET_PDEATHSIG).
 jobs = int(os.environ["TEST_JOBS"])
 units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
 
@@ -548,6 +551,26 @@ def finish():
             pass
 
 
+def let_go(took):
+    """Drop the references to the tests that this worker ran, as unittest's suites drop each test once it has run, and
+    collect them: what a test still holds (a NamedTemporaryFile in an attribute of its own) is finalized here."""
+    gone = {id(units[u]) for u in took}
+
+    def walk(s):
+        for j, t in enumerate(s._tests):
+            if id(t) in gone:
+                s._tests[j] = None
+            elif type(t) is unittest.TestSuite:
+                walk(t)
+    walk(suite)
+    for u in took:
+        units[u] = None
+        for i in range(*spans[u]):
+            bodies[i] = None
+    globals()["t"] = None                       # (the last test of the loop over the loaded ones)
+    gc.collect()
+
+
 def die(signum):
     """End of signum, as its default action does."""
     if signum not in (signal.SIGKILL, signal.SIGSTOP):      # (whose action cannot be changed)
@@ -558,7 +581,7 @@ def die(signum):
 
 def work(k, saved, mask, gate, report):
     """Worker k: it runs the units it takes and records its run; it ends as Python ends, but with os._exit, so that
-    nothing of this process's exit (the loading's atexit handlers, buffers, the verdict) happens twice."""
+    nothing of this process's exit (the loading's atexit handlers and finalizers, buffers, the verdict) happens twice."""
     status, interrupted = 1, False
     try:
         try:
@@ -597,6 +620,7 @@ def work(k, saved, mask, gate, report):
                     result.stopTestRun()
             profile.disable()
             record(k, result, q)
+            let_go(q.took)
             status = 0
         except KeyboardInterrupt:
             traceback.print_exc()

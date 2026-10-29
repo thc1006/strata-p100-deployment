@@ -166,19 +166,20 @@ if [ -e "$d/LATE_PORT" ]; then
     sh "$(cat "$d/LATE_PORT")" > /dev/null 2>&1 < /dev/null &
 fi
 # SCOPE_ENGINE: what a copy of deploy.sh takes for an engine, started in a scope of its own (systemd-run --user
-# --scope), with the checks' TMPDIR, while the watch looks
+# --scope), with the checks' TMPDIR, while the watch looks.  The scope goes once its process has ended, also when it
+# failed (-G, --collect)
 if [ -e "$d/SCOPE_ENGINE" ]; then
-  setsid systemd-run --user --scope -q python3 -c 'import time; time.sleep(60)' "$(cat "$d/SCOPE_ENGINE")" \
+  setsid systemd-run --user --scope -q -G python3 -c 'import time; time.sleep(60)' "$(cat "$d/SCOPE_ENGINE")" \
     > /dev/null 2>&1 < /dev/null &
   n=0
   while [ "$(cat /proc/$!/cgroup 2> /dev/null)" = "$(cat /proc/$$/cgroup)" ] && [ $n -lt 200 ]; do n=$((n + 1)); sleep 0.05; done
   sleep 1
 fi
 # SCOPE_LATE: as LATE_ENGINE, in a scope of its own (systemd-run --user --scope, as AGENTS.md asks every job here to
-# start), with the checks' TMPDIR; test.sh ends once it runs in that scope
+# start), with the checks' TMPDIR; test.sh ends once it runs in that scope (-G as for SCOPE_ENGINE)
 if [ -e "$d/SCOPE_LATE" ]; then
   p=$(cat "$d/SCOPE_LATE")
-  setsid systemd-run --user --scope -q sh -c 'sleep 2; exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
+  setsid systemd-run --user --scope -q -G sh -c 'sleep 2; exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
     "${p%%-engine*}" "-engine${p#*-engine}" > /dev/null 2>&1 < /dev/null &
   n=0
   while [ "$(cat /proc/$!/cgroup 2> /dev/null)" = "$(cat /proc/$$/cgroup)" ] && [ $n -lt 200 ]; do n=$((n + 1)); sleep 0.05; done
@@ -1132,6 +1133,7 @@ class DeployTests(unittest.TestCase):
                 self.fake = self.new_fake()
                 nonce = self.fake.split()[0].rpartition("-")[2]
                 self.addCleanup(self.kill, lambda nonce=nonce: self.named(nonce.encode()))
+                self.addCleanup(self.drop_scopes, nonce)
                 r, base = self.deploy_with_a_harmless_watch({name: self.fake})
                 if name == "SCOPE_ENGINE":
                     self.refused_by_the_watch(r, base, "an engine (killed): ")
@@ -1141,6 +1143,10 @@ class DeployTests(unittest.TestCase):
                     self.assertRegex(r.stdout, r"note   killed what a check left behind: \S*sh -c sleep 2; exec python3 -c ")
                     time.sleep(3)                       # it would have become one 2 s after it started
                 self.assertEqual(self.named(nonce.encode()), [], "it outlived deploy.sh")
+                deadline = time.monotonic() + 10    # the manager collects a scope just after its process has ended
+                while self.scopes(nonce) and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                self.assertEqual(self.scopes(nonce), [], "its scope is left")
 
     def test_the_class_port_stays_taken(self):
         # the port of the class's copies (harmless) cannot be bound by another process while the class's tests run, on
@@ -1160,6 +1166,19 @@ class DeployTests(unittest.TestCase):
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         self.assertEqual(self.deploy().returncode, 0)
+
+    @staticmethod
+    def scopes(text: str) -> list[str]:
+        """The user's scopes, in any state, whose description (systemd-run's: the command line) holds text."""
+        r = subprocess.run(["systemctl", "--user", "list-units", "--all", "--plain", "--no-legend", "--type=scope"],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True)
+        return [line.split()[0] for line in r.stdout.splitlines() if text in line]
+
+    def drop_scopes(self, text: str):
+        """Stop those scopes and forget the failed ones, as after a test that did not get as far as its end."""
+        for unit in self.scopes(text):
+            for verb in ("stop", "reset-failed"):
+                subprocess.run(["systemctl", "--user", verb, unit], stdin=subprocess.DEVNULL, capture_output=True)
 
     def test_the_sweep_kills_the_process_group_of_what_it_finds(self):
         # the leader has the checks' TMPDIR; its child dropped it and names nothing of the directory

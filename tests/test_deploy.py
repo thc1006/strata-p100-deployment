@@ -79,7 +79,7 @@ echo "test.sh $d" >> "$STUB_DIR/ran.log"
 [ $# = 0 ] || { echo "unexpected arguments: $*"; exit 3; }
 [ ! -e /proc/$$/fd/9 ] || { echo "the deploy lock is open here"; exit 4; }
 ls -l /proc/$$/fd/ | sed 's/^/test.sh /' >> "$STUB_DIR/fds.log"
-env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
+env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|TEST_JOBS_DEAL=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
 env | grep -E '^(LC_|LANG=|LANGUAGE=)' | sed 's/^/test.sh /' >> "$STUB_DIR/locale.log"
 echo "test.sh $(cat /proc/$$/oom_score_adj) $(ps -o ni= -p $$ | tr -d ' ')" >> "$STUB_DIR/oom.log"
 [ -z "${STUB_DURING-}" ] || sh -c "$STUB_DURING"
@@ -252,7 +252,7 @@ d=$(cd "$(dirname "$0")/.." && pwd)
 echo "check-drift.sh $d $*" >> "$STUB_DIR/ran.log"
 [ ! -e /proc/$$/fd/9 ] || { echo "the deploy lock is open here"; exit 4; }
 ls -l /proc/$$/fd/ | sed 's/^/check-drift.sh /' >> "$STUB_DIR/fds.log"
-env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
+env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|TEST_JOBS_DEAL=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
 env | grep -E '^(LC_|LANG=|LANGUAGE=)' | sed 's/^/check-drift.sh /' >> "$STUB_DIR/locale.log"
 echo "check-drift.sh $(cat /proc/$$/oom_score_adj) $(ps -o ni= -p $$ | tr -d ' ')" >> "$STUB_DIR/oom.log"
 [ "$d" != "${STUB_SLOW_DRIFT_IN-}" ] || { echo $$ > "$STUB_DIR/slow.pid"; sleep 30; }
@@ -803,7 +803,8 @@ class DeployTests(unittest.TestCase):
         hooks = {"DRIFT_SYSROOT": "/x", "DRIFT_OWNER": "1:1", "DRIFT_ENGINE_RE": "x", "DRIFT_URL": "http://x",
                  "DRIFT_TEST_SPEC": "/x", "HOST_UNITS_CONF": "/x", "HOST_UNITS_RUN_USER": "/x", "TEST_SHELLCHECK": "x",
                  "STRATA_DIR": "/x", "STRATA_TEST_HARNESSES": "1", "STRATA_TEST_NO_SERVICE": "1", "TEST_REPO_ONLY": "1",
-                 "STRATA_PY": "/x", "BASH_ENV": "/x", "PYTHONPATH": "/x"}
+                 "TEST_JOBS_DEAL": "1", "STRATA_PY": "/x", "BASH_ENV": "/x",
+                 "PYTHONPATH": "/x"}
         r = self.deploy("--apply", **hooks)
         self.assertEqual((r.returncode, self.head()), (0, new), r.stderr)
         self.assertEqual(self.log("ran.log").count("check-drift.sh"), 2)

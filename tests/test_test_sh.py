@@ -62,7 +62,8 @@ class TestSh(unittest.TestCase):
     DEAL: dict[str, str] = {}
 
     def environment(self, d: Path) -> dict:
-        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
+        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY",
+                                                              "TEST_JOBS_DEAL")}
         e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
         return {**e, **self.DEAL}
 
@@ -2406,6 +2407,20 @@ class TestSh(unittest.TestCase):
                     else:
                         seen.add((*what.split("."), pid))
 
+    def test_workers_take_the_units_in_turn_with_the_test_hook(self):
+        # TEST_JOBS_DEAL=1: worker k takes the units k, k + N, k + 2 N ... (TestShJobs uses it)
+        d = self.tree()
+        log = d.parent / "log"
+        (d / "tests" / "test_good.py").write_text("import os, unittest\nclass T(unittest.TestCase):\n" + "".join(
+            f"    def test_{i}(self):\n        with open({str(log)!r}, 'a') as f:\n"
+            f"            f.write(f'{i} {{os.getpid()}}\\n')\n" for i in range(7)))
+        self.passes(d, "--jobs", "3", env={"TEST_JOBS_DEAL": "1"})
+        pid = dict(line.split() for line in log.read_text().splitlines())
+        self.assertEqual(len(pid), 7)
+        self.assertEqual(len(set(pid.values())), 3)
+        for i in range(7):
+            self.assertEqual(pid[str(i)], pid[str(i % 3)], (i, pid))
+
     def test_tests_that_turn_the_profiler_off_in_every_worker(self):
         # what ran of such a test is not known, in whichever worker it ran: each of three workers runs some of these
         d = self.tree()
@@ -2586,8 +2601,10 @@ class A(unittest.TestCase):
 class TestShJobs(TestSh):
     """The cases of TestSh about the unit-test step, again with --jobs 3: what one worker sees (a test that fails,
     never runs, returns a value, is skipped for another reason ...) fails the run as it does with one, also when the
-    code that makes something a helper ran in another worker."""
+    code that makes something a helper ran in another worker.  The workers take the units in turn (TEST_JOBS_DEAL), so
+    that two tests next to each other in the order run in different workers on every run."""
     JOBS = ("--jobs", "3")
+    DEAL = {"TEST_JOBS_DEAL": "1"}
 
 
 for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {

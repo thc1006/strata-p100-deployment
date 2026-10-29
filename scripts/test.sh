@@ -408,7 +408,8 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # process then merges that, prints unittest's report and runs the checks.  A unit is a test, or a suite other than a
 # plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of the loader are cut into
 # their tests, which unittest's fixtures then see in the same order, so a worker sets a class or module up (setUpClass,
-# setUpModule) and tears it down again for each run of its tests that it takes.
+# setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with TEST_JOBS_DEAL=1,
+# worker k takes the units k, k + JOBS, k + 2 JOBS ... instead.)
 # Signals reach the tests as when they ran in this process: the workers stay in the process group of scripts/test.sh,
 # so that a signal to that group (a Ctrl-C, a hang-up, kill -- -PGID, deploy.sh's timeout) reaches them and what their
 # tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
@@ -438,7 +439,8 @@ if [tid(t) for u in units for t in (tests_of(u) if isinstance(u, unittest.TestSu
         [tid(t) for t, _, _ in bodies]:
     bad.append("the units the workers take are not the loaded tests, in their order")
 LISTS = ("errors", "failures", "skipped", "expectedFailures", "unexpectedSuccesses")
-QUEUES = [sys.argv[1] + ".units"]
+QUEUES = [f"{sys.argv[1]}.units.{k}" for k in range(jobs)] if os.environ.get("TEST_JOBS_DEAL") == "1" else \
+    [sys.argv[1] + ".units"]
 for n, path in enumerate(QUEUES):
     pathlib.Path(path).write_bytes(b"".join(i.to_bytes(4, "big") for i in range(n, len(units), len(QUEUES))))
 queues = [os.open(path, os.O_RDONLY) for path in QUEUES]

@@ -5,6 +5,7 @@ The table lists everything that this deployment changed outside the repo. `scrip
 | Change | Location | How to undo |
 |---|---|---|
 | CUDA 12.9.1 toolkit (toolkit only; the driver was not changed) | `~/cuda-12.9` (the engine depends on it; *do not delete it*) | Delete the directory (the engine will no longer run) |
+| Desktop files of the CUDA toolkit | `~/.local/share/applications/nsight-compute.desktop`, `nsight.desktop`, `nsight-systems.desktop` and `nvvp.desktop`, which the CUDA installer wrote on 2026-10-16 05:29–05:30; they start Nsight and the Visual Profiler from `~/cuda-12.9` (`results/host-state-20261030.txt`) | Delete the four files |
 | CUDA installer | `~/downloads/cuda/cuda_12.9.1_575.57.08_linux.run` (5.5 GiB, `results/rebuild-sizes-20261022.txt`; can be deleted; *do not install the 575 driver in it*) | `rm` |
 | apt packages | `python3-venv`, `python3-pip`: setup.sh installed them with `sudo apt-get install -y python3 python3-venv python3-pip`, which also brought in 16 dependency packages (for example `python3-dev`; `results/apt-history-20261016.txt`). `gh`: installed separately on 2026-10-16 to work with GitHub; the service does not need it | `sudo apt remove python3-venv python3-pip gh`, then `sudo apt autoremove` |
 | Strata source code and venv | `~/dev/strata`: a worktree of `~/dev/strata-git` at the commit `config/deployed-artifacts.sha256` pins (until 2026-10-19, 0.1.43.1 from a zip) | Delete the directory |

@@ -86,8 +86,8 @@ A confirmation is four fresh runs in the order A, B, B, A, with the same screen,
 
 ### Screen 1: GROUP_SORT, 04:25-05:23
 
-Three runs in this order: c0-1, c1-1, c0-2. Each started a fresh engine, and all three were usable. The two C0 runs
-differed by 0.23% or less on every metric. Source: `results/SCREEN-group-sort.md`.
+Three runs, c0-1, c1-1 and c0-2 in that order, each on a fresh engine; all were usable. The two C0 runs differed by
+0.23% or less on every metric. Source: `results/SCREEN-group-sort.md`.
 
 | Metric (0.1.45, deployed configuration) | C0 (c0-1, c0-2) | Spread of C0 | C1 (c1-1) | Change |
 |---|---:|---:|---:|---:|
@@ -127,35 +127,32 @@ Each switch showed in the engine's lines (`results/<tag>-engine-lines.txt`). C2 
 and 1024-token chunks and kept the usual chunks for 16K. C3 read each joining 16K prompt "on a thread of its own"
 while the slots decoded 514 and 516 rows.
 
-C1 is confirmed. At every prompt size both C1 runs read faster than both C0 runs: 241.7 and 242.0 against 205.8 and
-204.2 tok/s at 1.2K, 431.5 and 432.6 against 390.9 and 390.6 at 4K, 756.6 and 756.5 against 694.3 and 695.1 at 16K.
-The mean gain is 12.5%, above the 5% of its criterion and the maintainer's 10%. No other metric got worse, and C1
-answered as C0 did on the 30 requests that both C0 runs answered alike (the other two are described at the end).
+C1 is confirmed. At every prompt size both C1 runs read faster than both C0 runs (each run's median is in
+`results/SCREEN-sched.md`), with a mean gain of 12.5% over the three sizes, above the 5% of its criterion and the
+maintainer's 10%. No other metric got worse, and C1 answered as C0 did on the 30 requests that both C0 runs answered
+alike (the other two are described below).
 
-C2 reads prompts up to 4K 9-11% faster and 16K prompts 0.2% faster, and 18 of the 30 requests got other answers. By
-the screen's rule it would go on to a confirmation, where its mean gain over the three sizes, 6.7% here, would have to
-reach 10%. The maintainer adopted C1 and C3, not C2.
+By the screen's rule C2 would go on to a confirmation, where its mean gain over the three sizes, 6.7% here, would
+have to reach 10%. It answered 18 of the 30 requests otherwise than C0. The maintainer adopted C1 and C3, not C2.
 
-C3 removes the admission stall. While a 16K prompt is read, the decoders' longest gap falls from 22.69 s to 0.49 s,
-and the four requests finish 4.5% sooner. The joining prompt's first token comes 11.0% later (24.99 s), and four
-users sent together get 5.2% fewer tokens per second in all. Both costs are above the 5% a screen allows; the
-maintainer chose to adopt C3 with them.
+C3 removes the admission stall. While a 16K prompt is read, the decoders' longest gap falls from 22.69 s to 0.49 s. The joining prompt's first
+token comes 11.0% later, and four users sent together get 5.2% fewer tokens per second in all. Both costs are above the 5% a screen
+allows; the maintainer chose to adopt C3 with them.
 
 C3 answered 11 of the 30 requests otherwise than C0: 7 of the 8 four-user requests and all 4 admission decoders
 compared, in the two tests where it read prompts while other requests decoded. The requests that ran alone and the
-joining prompts got the same answers. Upstream's documentation names a cause for this case: while a prompt is read
+joining prompts got C0's answers. Upstream's documentation names a cause for this case: while a prompt is read
 beside decoding slots, the experts it borrowed from them run on the CPU in the slots' windows, which rounds
 differently, and `--no-prefill-borrow` avoids it (0.1.45's `docs/BATCHING.md`, "Exactness"). That was not tested
 here.
 
-The two requests left out of these comparisons are two decoders in round 0 of the admission test. They answered with
-1,226 and 1,260 tokens in c0-3, c1-2 and c2-1, and with 1,228 and 1,180 tokens in c1-3 and c0-4; the answers are
-identical within each group (c3-1, whose switch changes such answers, gave a third pair). C0 and C1 each gave both
-pairs, so GROUP_SORT is not the cause. The screen sent the three decoders in the same instant, and the order in which
-they got their first token varied: in c1-3 and c0-4 the third decoder was first, in the other seven runs of screens
-1 and 2 the first or the second (`decoders_first_token_vs_join_s` in `results/engine-screen.jsonl`). From screen 3
-on, requests the screen used to send at once go out 0.3 s apart, and every answer's text is kept, to see where two
-answers part.
+The two requests left out of these comparisons are two decoders in round 0 of the admission test. Their answers
+had 1,226 and 1,260 tokens in c0-3, c1-2 and c2-1, and 1,228 and 1,180 tokens in c1-3 and c0-4, with the same text
+within each group (c3-1 gave a third pair). C0 and C1 each gave both pairs, so GROUP_SORT is not the cause. The
+screen sent the three decoders at the same instant, and the order of their first tokens varied: in c1-3 and c0-4
+the third decoder was first, in the other seven runs of screens 1 and 2 the first or the second
+(`decoders_first_token_vs_join_s` in `results/engine-screen.jsonl`). From screen 3 on, requests the screen used to
+send at once go out 0.3 s apart, and every answer's text is kept, to see where two answers part.
 
 The remote evaluation ran beside both screens, pinned to CPU 7. The driver records it from screen 2 on: during each
 run's screen it used 0 to 2 CPU-seconds (the `beside` lines of `results/<tag>-arm.txt` and
@@ -163,13 +160,12 @@ run's screen it used 0 to 2 CPU-seconds (the `beside` lines of `results/<tag>-ar
 
 ### Screen 3: pull request #2985 (pipelined MTP), 07:44-08:46
 
-Three runs in this order: m0-1, m1-1, m0-2, on the pull request's tree (commit `2b7ffada` on 0.1.45, built locally
-for sm_60), with the deployed configuration less `--batch-groups auto` and with `STRATA_BATCH_SELF_COMMIT=0`. All
-were usable. The screen ran the default phases and decode4 and eval4, and sent the requests it sends at once 0.3 s
-apart (version 2026-10-19b). The two M0 runs differed by 0.33% or less on every metric (0.17% or less on all but the
-thinking users' tokens per wall second) and gave the same 44 answers, character for character. Source:
-`results/SCREEN-pmtp.md`; the two rows of tokens per wall second come from `tokens` and `wall_s` of the decode4 and
-eval4 records in `results/engine-screen.jsonl`.
+Three runs, m0-1, m1-1 and m0-2 in that order, on the pull request's tree (commit `2b7ffada` on 0.1.45, built
+locally for sm_60), with M0's configuration from the table of arms. All were usable. The screen was version
+2026-10-19b, with the default phases plus decode4 and eval4. The two M0 runs differed by 0.33% or less on every
+metric and gave the same 44 answers, character for character. Source: `results/SCREEN-pmtp.md`; the two rows of
+tokens per wall second come from `tokens` and `wall_s` of the decode4 and eval4 records in
+`results/engine-screen.jsonl`.
 
 | Metric (the pull request's tree) | M0 (m0-1, m0-2) | M1 (m1-1) |
 |---|---:|---:|
@@ -191,9 +187,8 @@ decode4 and 78% in eval4 (`results/m1-1-engine-lines.txt`).
 By the rule fixed before the results, M1 does not go on: its target, the four users' total rate, rose 4.8%, below the
 5% a screen asks. That rate includes the reading of the four 1.5K-token prompts, which M1 leaves as it is. With short
 prompts, four users got 7.3% more tokens per wall second with greedy decoding and 10.3% more in the evaluation's
-sampled thinking mode. The server's per-request decode rates, summed, rose 7.8% and 17.1%; that sum counts every
-request alike, whatever the length of its answer. The admission test's four requests finished 8.9% sooner. No
-metric was more than 0.3% worse.
+sampled thinking mode. The summed per-request decode rates rose 7.8% and 17.1%; that sum counts every request alike,
+whatever the length of its answer. No metric was more than 0.3% worse.
 
 M1 answered 3 of the 44 requests otherwise than M0, each late in the answer: a four-user translation from character
 486 of 769, and two admission essays from characters 6,829 and 6,617 of about 6,800 (`results/m0-1-texts.jsonl`,
@@ -203,8 +198,9 @@ tokens (`docs/BATCHING.md` of the pull request). The pull request is open, not m
 
 ### The combination: K0, K1, K1, K0, 11:05-12:39
 
-Four runs in this order: k0-3, k1-3, k1-4, k0-4, with the fixed driver and screen version 2026-10-19c (the first run of
-this confirmation is set aside, see the changes to the plan). All were usable. Source: `results/SCREEN-combo.md`.
+Four runs in this order: k0-3, k1-3, k1-4, k0-4, with the fixed driver and screen version 2026-10-19c. All were
+usable. The first attempt (k0-1, k1-1, k1-2, with k0-2 interrupted) is set aside; see the change to the plan at
+10:17. Source: `results/SCREEN-combo.md`.
 
 | Metric (0.1.45, deployed configuration) | K0 (k0-3, k0-4) | K1 (k1-3, k1-4) |
 |---|---:|---:|
@@ -225,10 +221,10 @@ faster, by 12.2% to 12.6% on average over the three sizes; the decoders' longest
 0.55 s against 22.72 and 22.74 s; and the four requests finished 4.2% to 7.1% sooner. The 16 requests that ran alone
 got the answers both K0 runs gave (`results/engine-screen.jsonl`).
 
-With the faster read, the joining prompt's first token comes 1.1% later, where C3 alone made it 11.0% later, and four
-users sent together get 2.7% more tokens per second. eval4 says nothing here: between the two K0 runs, with the same
-answers but one, its rates differed by 26.3% (the server's per-request rates, summed) and 11.1% (per wall second), more
-than between the arms.
+The joining prompt's first token comes 1.1% later (C3 alone made it 11.0% later), and four users sent together get
+2.7% more tokens per second. eval4 says nothing here: between the two K0 runs, with the same answers but one, its
+rates differed by 26.3% (the server's per-request rates, summed) and 11.1% (per wall second), more than between the
+arms.
 
 Of the 51 requests both K0 runs answered alike, K1 answered 23 otherwise, all in the phases where requests decode
 beside a read (four 8, eval4 3, admit 6, admit28 6), and the two K1 runs answered 19 requests otherwise than each other
@@ -325,12 +321,11 @@ do not change.
 
 ### IQ3_S screen: K0, K1, P4, P6, R, C2, K1, K0, 17:28-20:57
 
-The second run of the screen, under the tags s2-* (the first, 16:24-17:19, is not used: see the amendment of 17:25
-above). Every run is usable: the arm checks passed, the same engine answered (sha256 `00869ac7…` in every arm record),
-each run's 53 requests were counted, and no admission round ran other than designed (`results/SCREEN-iq3s.md`, against
-K1; `results/SCREEN-iq3s-k1-vs-k0.md`, K1 against K0). The arm records give the experiment tree's commit as
-`2b7ffada` with a five-file diff: `~/dev/strata-pr2985` is a copy of that tree whose `.git` file names the same worktree
-entry, so git reports the branch the copy checked out. The binary each arm ran is the deployed one.
+The second run of the screen, tags s2-* (the first is not used: see the amendment of 17:25 above). All eight runs are
+usable, and every arm record shows the deployed engine, sha256 `00869ac7…` (`results/SCREEN-iq3s.md`, against K1;
+`results/SCREEN-iq3s-k1-vs-k0.md`, K1 against K0). The arm records give the experiment tree's commit as `2b7ffada`
+with a five-file diff: `~/dev/strata-pr2985` is a copy of the experiment tree whose `.git` file names the same
+worktree entry, so git reports the branch the copy checked out.
 
 Against K1, with the spread between the two K1 runs:
 
@@ -342,12 +337,11 @@ Against K1, with the spread between the two K1 runs:
 | 1.2K / 4K / 16K prompt: engine read tok/s | 0.4% / 0.3% / 0.1% | +0.5% / +0.2% / +0.0% | +0.5% / +0.1% / +0.1% | +0.1% / +0.1% / -0.0% | +10.7% / +8.7% / -0.1% |
 
 - **P4 and P6 go on**: on one user's decode and four users' total rate, each gains at least 5% and more than its
-  spread, and no other metric moves against them by more than 5% beyond its spread (eval4 is reported only). P4 gives the
-  requests that run alone the answers of both K1 runs on all 12 that the two K1 runs answer alike (the prefill and
-  decode phases). The turns phase cannot test this: both K1 runs, and both K0 runs, answered all four of its requests
-  differently from each other. On IQ3_XXS it repeated itself: two runs of the same arm gave all four the same answers
-  (runs k0-3 and k0-4, k1-3 and k1-4, m0-1 and m0-2 of 2026-10-19). These counts come from
-  `results/engine-screen.jsonl`.
+  spread, and no other metric moves against them by more than 5% beyond its spread (eval4 is reported only). P4 gives
+  K1's answers to all 12 requests that run alone and that the two K1 runs answer alike (the prefill and decode
+  phases). The turns phase cannot test this: both K1 runs, and both K0 runs, answered all four of its requests
+  differently from each other, where on IQ3_XXS two runs of the same arm gave all four the same answers (k0-3 and
+  k0-4, k1-3 and k1-4, m0-1 and m0-2 of 2026-10-19). These counts come from `results/engine-screen.jsonl`.
 - **R does not go on**: +3.1% and +2.3% on its target metrics.
 - **C2** reads 1.2K and 4K prompts 10.7% and 8.7% faster, and four users get 13.7% more tokens per second; no other
   metric moves against it by more than 5% beyond its spread.

@@ -4,6 +4,7 @@ an interrupt leaves.  None of these harnesses starts a fake engine, and Run's an
 *_stubs.sh, so they run anywhere; RunGate's are, and do nothing but write a file."""
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 import shutil
@@ -54,6 +55,18 @@ os.execvp(sys.executable, [sys.executable, "-c", 'import sys, time; open(sys.arg
 
 def named(text: str) -> list[int]:
     return [pid for pid, cmd in H._cmdlines() if any(text.encode() in part for part in cmd)]
+
+
+OWNER = "HARNESS_TEST_OWNER"
+
+
+def owned(test: unittest.TestCase, marker: str) -> None:
+    """What the test starts from now on has OWNER=marker in its environment; after the test, what names marker and has
+    that is killed (H.kill_own), and no other process that names it."""
+    test.addCleanup(lambda: H.kill_own(named(marker), f"{OWNER}={marker}".encode()))
+    patch = mock.patch.dict(os.environ, {OWNER: marker})
+    patch.start()
+    test.addCleanup(patch.stop)
 
 
 class Run(unittest.TestCase):
@@ -123,7 +136,7 @@ class Run(unittest.TestCase):
         for delay in ("0", "0.3"):
             with self.subTest(delay=delay):
                 marker = f"harness-left-{os.getpid()}-respawn-{delay}"
-                self.addCleanup(lambda marker=marker: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+                owned(self, marker)
                 d = Path(tempfile.mkdtemp())
                 self.addCleanup(shutil.rmtree, d, True)
                 (d / "respawn.py").write_text(RESPAWN)
@@ -143,7 +156,7 @@ class Run(unittest.TestCase):
         # what the harness leaves (beyond the sweep) execs into one that names its directory as the sweep sleeps after
         # its first pass, which so finds nothing: the second look finds it
         marker = f"harness-left-{os.getpid()}-late"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         (d / "late.py").write_text(LATE)
@@ -177,7 +190,7 @@ class Run(unittest.TestCase):
         # one that starts another each time one is killed, 40 in all: the sweep kills one a pass, and gives up after
         # its 20 passes instead of going on for as long as they come
         marker = f"harness-left-{os.getpid()}-many"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         (d / "respawn.py").write_text(RESPAWN)
@@ -235,7 +248,7 @@ class Run(unittest.TestCase):
         (base / "real").mkdir()
         (base / "link").symlink_to(base / "real")
         marker = f"harness-left-{os.getpid()}-link"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         leave = ('setsid python3 -c \'import sys, time; open(sys.argv[3], "w").close(); time.sleep(60)\' '
@@ -261,6 +274,33 @@ class Run(unittest.TestCase):
         self.assertIsNone(r["status"])
         self.assertLess(time.monotonic() - t0, 30)
         self.assertEqual(named(r["dir"]), [])
+
+
+class KillOwn(unittest.TestCase):
+    def test_it_signals_only_the_processes_with_the_entry(self):
+        # of processes with the same command line, only the one with the entry in its environment gets the signal,
+        # also where no pidfd can be opened; one that has ended is passed over
+        for pidfd in (True, False):
+            with self.subTest(pidfd=pidfd):
+                marker = f"kill-own-{os.getpid()}-{pidfd}"
+                args = [sys.executable, "-c", "import time; time.sleep(60)", marker]
+                other = subprocess.Popen(args, start_new_session=True)
+                mine = subprocess.Popen(args, env={**os.environ, OWNER: marker}, start_new_session=True)
+                gone = subprocess.Popen(["true"], env={**os.environ, OWNER: marker})
+                gone.wait()
+                for q in (other, mine):
+                    self.addCleanup(lambda q=q: (q.kill(), q.wait()))
+                deadline = time.monotonic() + 20
+                while len(named(marker)) < 2:
+                    self.assertLess(time.monotonic(), deadline, "they did not start")
+                    time.sleep(0.02)
+                with contextlib.nullcontext() if pidfd else \
+                        mock.patch.object(H.os, "pidfd_open", side_effect=OSError(38, "Function not implemented")):
+                    done = H.kill_own([other.pid, mine.pid, gone.pid], f"{OWNER}={marker}".encode())
+                self.assertEqual(done, [mine.pid])
+                self.assertEqual(mine.wait(timeout=10), -signal.SIGKILL)
+                time.sleep(0.2)
+                self.assertIsNone(other.poll(), "a process without the entry got the signal")
 
 
 class RunGate(unittest.TestCase):

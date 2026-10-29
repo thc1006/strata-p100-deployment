@@ -399,6 +399,7 @@ class DeployTests(unittest.TestCase):
         self.stub, self.origin, self.work, self.live = (self.root / d for d in ("stub", "origin.git", "work", "live"))
         self.tmpdir = self.root / "tmp"
         self.tmpdir.mkdir()
+        self.home = b"HOME=" + os.fsencode(self.root)         # in the environment of what this test starts: ours()
         self.env = {**isolated(self.root), "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "", "GIT_COMMITTER_NAME": "test",
                     "GIT_COMMITTER_EMAIL": "", "STUB_DIR": str(self.stub), "TMPDIR": str(self.tmpdir)}
         self.use_origin_url(URL)
@@ -459,7 +460,9 @@ class DeployTests(unittest.TestCase):
 
     def end(self, p: subprocess.Popen):
         """After the test: SIGKILL to what is left of the deploy.sh it started, its process group (deploy.sh and its
-        watch) and the rest of its session (a check and its timeout), so that none of it outlives the test."""
+        watch) and the rest of its session (a check and its timeout), so that none of it outlives the test.  Of the
+        session only what is ours: once deploy.sh has been reaped and its session has no member left, another process
+        can take that number for a session of its own."""
         if p.poll() is None:
             try:
                 os.killpg(p.pid, signal.SIGKILL)
@@ -467,11 +470,7 @@ class DeployTests(unittest.TestCase):
                 pass
         for _ in range(5):
             left = self.in_session(p.pid)
-            for q in left:
-                try:
-                    os.kill(q, signal.SIGKILL)
-                except OSError:
-                    pass
+            harness_run.kill_own(left, self.home)
             if not left:
                 break
             time.sleep(0.1)
@@ -1101,11 +1100,11 @@ class DeployTests(unittest.TestCase):
         port = self.free_port()
         code = "import socket, sys, time; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); s.listen(); " \
                "open(sys.argv[2], 'w').close(); time.sleep(60)"
-        ready = self.root / "listener.ready"
-        person = lambda t: self.outside(sys.executable, "-c", code, str(port), str(ready), ready=ready)
+        ready, listener = self.root / "listener.ready", []
+        person = lambda t: listener.append(self.outside(sys.executable, "-c", code, str(port), str(ready), ready=ready))
         r, base = self.deploy_with_a_harmless_watch({"PERSON": ""}, port, unreadable=True, person=person)
         self.refused_by_the_watch(r, base, "a listener on :8080, of a process this user cannot read")
-        self.assertEqual(len(self.with_argument(str(port))), 1, "the listener was killed, or never started")
+        self.assertTrue(self.alive(listener[0].pid), "the listener was killed")
 
     def test_what_the_check_leaves_to_start_later_is_swept(self):
         # a process the check leaves in a session of its own, naming nothing of the directory, that becomes an engine
@@ -1254,8 +1253,19 @@ class DeployTests(unittest.TestCase):
         return [line.split()[0] for line in r.stdout.splitlines() if text in line]
 
     def drop_scopes(self, text: str):
-        """Stop those scopes and forget the failed ones, as after a test that did not get as far as its end."""
+        """Stop those scopes and forget the failed ones, as after a test that did not get as far as its end; not a scope
+        with a process in it that is not ours, or whose processes cannot be read (a stop signals each of them)."""
         for unit in self.scopes(text):
+            r = subprocess.run(["systemctl", "--user", "show", "-p", "ControlGroup", "--value", unit],
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True)
+            cgroup = r.stdout.strip()
+            try:
+                procs = [int(q) for q in Path(f"/sys/fs/cgroup{cgroup}/cgroup.procs").read_text().split()] \
+                    if cgroup else []
+            except OSError:
+                procs = None
+            if r.returncode != 0 or procs is None or not all(map(self.ours, procs)):
+                continue
             for verb in ("stop", "reset-failed"):
                 subprocess.run(["systemctl", "--user", verb, unit], stdin=subprocess.DEVNULL, capture_output=True)
 
@@ -1363,18 +1373,23 @@ class DeployTests(unittest.TestCase):
         except OSError:
             return b""
 
-    def with_argument(self, arg: str) -> list[int]:
-        """The processes that have arg as one of their arguments."""
-        return [int(q) for q in os.listdir("/proc") if q.isdigit() and arg.encode() in self.cmdline(q).split(b"\0")]
+    def ours(self, pid: int) -> bool:
+        """Whether this test started the process: its environment has this test's HOME (self.root), which deploy.sh
+        passes on to the checks and which the stubs keep.  The service's engine, a person's processes and those of the
+        other tests have another, and a process whose environment cannot be read is not taken for this test's."""
+        return harness_run.environment_has(pid, self.home)
 
-    @staticmethod
-    def kill(pids):
-        """For a clean-up: SIGKILL to the processes that pids() gives then."""
-        for q in pids():
-            try:
-                os.kill(q, signal.SIGKILL)
-            except OSError:
-                pass
+    def with_argument(self, arg: str) -> list[int]:
+        """The processes of this test (ours) that have arg as one of their arguments.  arg is a port number, which the
+        command line of another process of this user can have too: here one of the arguments of the service's engine
+        is a number in the range that bind(0) takes ports from."""
+        return [int(q) for q in os.listdir("/proc")
+                if q.isdigit() and arg.encode() in self.cmdline(q).split(b"\0") and self.ours(int(q))]
+
+    def kill(self, pids):
+        """For a clean-up: SIGKILL to those of the processes that pids() gives then that this test started (ours), and
+        to no other, whatever their command line holds."""
+        harness_run.kill_own(pids(), self.home)
 
     @staticmethod
     def alive(pid: int) -> bool:
@@ -1383,6 +1398,48 @@ class DeployTests(unittest.TestCase):
             return Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[0] != "Z"
         except (OSError, IndexError):
             return False
+
+    def test_the_clean_ups_signal_only_what_the_test_started(self):
+        # a clean-up finds the processes to kill by their command line: the port's number as an argument, or the
+        # test's engine pattern.  The service's engine runs as this user, and one of its arguments is a number in the
+        # range that bind(0) takes ports from.  A process of this user that the test did not start survives the
+        # clean-up with either, also when the clean-up names its pid; one with this test's HOME, as what deploy.sh
+        # runs has, is killed.  Before, the clean-ups killed every process of this user with the port's number as an
+        # argument
+        port = self.free_port()
+        args = (sys.executable, "-c", "import time; time.sleep(60)", str(port), self.fake)
+        others = [subprocess.Popen(a, stdin=subprocess.DEVNULL, start_new_session=True)
+                  for a in (args[:4], args[:3] + args[4:], args)]
+        mine = subprocess.Popen(args, env=self.env, stdin=subprocess.DEVNULL, start_new_session=True)
+        for q in (*others, mine):
+            self.addCleanup(lambda q=q: (q.kill(), q.wait()))
+        deadline = time.monotonic() + 20
+        while not all(str(port).encode() in self.cmdline(str(q.pid)) or self.fake.encode() in self.cmdline(str(q.pid))
+                      for q in (*others, mine)):
+            self.assertLess(time.monotonic(), deadline, "they did not start")
+            time.sleep(0.02)
+        self.assertEqual(self.with_argument(str(port)), [mine.pid])
+        self.kill(lambda: self.named(self.fake.encode()) + self.with_argument(str(port)))
+        self.kill(lambda: [q.pid for q in others])
+        self.assertEqual(mine.wait(timeout=10), -signal.SIGKILL)
+        time.sleep(0.2)
+        self.assertEqual([q.poll() for q in others], [None] * 3, "a process that the test did not start was killed")
+
+    def test_a_scope_with_a_process_that_is_not_the_tests_is_not_stopped(self):
+        # drop_scopes stops the scopes whose description holds a nonce of the test; not one with a process in it that
+        # the test did not start: a stop signals every process of the scope
+        self.needs_user_scopes()
+        nonce = self.fake.split()[0].rpartition("-")[2]
+        ready = self.root / "scope.ready"
+        q = self.outside("systemd-run", "--user", "--scope", "-q", "-G", sys.executable, "-c",
+                         "import sys, time; open(sys.argv[1], 'w').close(); time.sleep(60)", str(ready), self.fake,
+                         ready=ready)
+        self.addCleanup(self.drop_scopes, nonce)
+        self.assertEqual(len(self.scopes(nonce)), 1)
+        self.drop_scopes(nonce)
+        time.sleep(0.2)
+        self.assertIsNone(q.poll(), "the scope of a process that the test did not start was stopped")
+        self.assertEqual(len(self.scopes(nonce)), 1)
 
     def test_refuses_local_changes(self):
         self.runs(self.commit({"docs.md": "a\n"}))

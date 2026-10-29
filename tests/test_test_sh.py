@@ -18,10 +18,14 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 import unittest.mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import harness_run  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE = "/home/thc1006/dev/p100-q3-deployment"
@@ -93,6 +97,11 @@ class TestSh(unittest.TestCase):
                                  start_new_session=True)
         self.addCleanup(lambda: (p.poll() is None and os.killpg(p.pid, signal.SIGKILL), p.wait()))
         return p, out
+
+    def own(self, d: Path) -> bytes:
+        """What the processes of a run on the tree d have in their environment and no other process has: the PATH of
+        environment(d), which starts with the tree's bin directory (for harness_run.kill_own)."""
+        return b"PATH=" + os.fsencode(self.environment(d)["PATH"])
 
     @staticmethod
     def with_text(text: str) -> list[int]:
@@ -2595,7 +2604,7 @@ class TestSh(unittest.TestCase):
                 (d / "tests" / "test_sl.py").write_text(
                     "import subprocess, unittest\nclass S(unittest.TestCase):\n    def test_s(self):\n"
                     f"        subprocess.run(['bash', '-c', {tag + '; true'!r}])\n")
-                self.addCleanup(lambda tag=tag: [os.kill(q, signal.SIGKILL) for q in self.with_text(tag)])
+                self.addCleanup(lambda tag=tag, d=d: harness_run.kill_own(self.with_text(tag), self.own(d)))
                 p, out = self.start_sh(d)
                 self.wait_for(lambda: self.with_text(tag))
                 time.sleep(0.3)
@@ -2738,7 +2747,7 @@ class A(unittest.TestCase):
         d = self.tree()
         o, pids = d.parent / "o", d.parent / "pids"
         o.mkdir()
-        self.addCleanup(self.end_children, pids)
+        self.addCleanup(self.end_children, pids, self.own(d))
         (d / "tests" / "test_mp.py").write_text(
             "import atexit, multiprocessing, multiprocessing.util, os, shutil, tempfile, time, unittest\n"
             f"E = tempfile.mkdtemp(dir={str(o)!r})\natexit.register(shutil.rmtree, E)\n"
@@ -2766,14 +2775,17 @@ class A(unittest.TestCase):
                       "would not run them", env={"PYTHONPATH": str(site)})
 
     @staticmethod
-    def end_children(pids: Path) -> None:
-        """SIGKILL to each process named in pids that runs a copy of the runner (its command line names the verdict)."""
+    def end_children(pids: Path, own: bytes) -> None:
+        """SIGKILL to each process named in pids that runs a copy of the runner (its command line names the verdict) of
+        this run (own in its environment: one that took a pid of the file after its process ended is not)."""
+        found = []
         for q in pids.read_text().split() if pids.exists() else ():
             try:
                 if b"verdict" in Path(f"/proc/{q}/cmdline").read_bytes():
-                    os.kill(int(q), signal.SIGKILL)
+                    found.append(int(q))
             except OSError:
                 pass
+        harness_run.kill_own(found, own)
 
     def test_a_signal_that_the_loading_holds(self):
         # a test module that blocks a signal at its import and sends it to itself: it stays pending as it did in the

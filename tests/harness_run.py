@@ -78,6 +78,46 @@ def _cmdlines():
             continue
 
 
+def environment_has(pid: int, entry: bytes) -> bool:
+    """Whether entry (b"NAME=value") is one of the entries of the process's environment, as it was at its exec; False
+    when it cannot be read (gone, another user's, or not dumpable)."""
+    try:
+        return entry in Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+    except OSError:
+        return False
+
+
+def kill_own(pids, entry: bytes, sig: int = signal.SIGKILL) -> list[int]:
+    """For the clean-up of a test that finds its processes by their command line: sig to those of pids that have entry
+    in their environment (environment_has), and to no other; the pids it signalled.  The service's engine runs as this
+    user, and its command line can hold what a test looks for, such as a port number; entry is what the test gives
+    only to what it starts (its HOME, its TMPDIR, a variable of its own).  The signal goes through a pidfd opened
+    before the environment is read, so that a process whose pid is taken by another meanwhile does not get it in that
+    one's place (os.kill where pidfds are not allowed)."""
+    done = []
+    for pid in pids:
+        try:
+            fd = os.pidfd_open(pid)
+        except ProcessLookupError:
+            continue
+        except OSError:                         # no pidfd here (an old kernel, a seccomp filter)
+            fd = None
+        try:
+            if not environment_has(pid, entry):
+                continue
+            if fd is None:
+                os.kill(pid, sig)
+            else:
+                signal.pidfd_send_signal(fd, sig)
+            done.append(pid)
+        except ProcessLookupError:
+            pass
+        finally:
+            if fd is not None:
+                os.close(fd)
+    return done
+
+
 def _names(path: str):
     """A matcher of an argument that names path as a path of its own (as scripts/deploy.sh's sweep matches)."""
     paths = {os.fsencode(path), os.fsencode(os.path.realpath(path))}

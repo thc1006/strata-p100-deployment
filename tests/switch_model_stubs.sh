@@ -14,8 +14,13 @@ export SB; SB=$(mktemp -d "${TMPDIR:-/tmp}/swm.XXXXXX")
 fails=0
 pass() { echo "PASS $*"; }
 fail() { echo "FAIL $*"; fails=$((fails + 1)); }
+# pkill -f, but only to the sandbox's own processes, those with SB=$SB in their environment: another process of this
+# user, the service's engine among them, may match the pattern too.  $1: the signal, $2: the pattern
+sb_pkill() { local p; for p in $(pgrep -f -- "$2"); do
+               tr '\0' '\n' < "/proc/$p/environ" 2> /dev/null | grep -qxF -- "SB=$SB" && kill "-$1" "$p" 2> /dev/null
+             done; return 0; }
 killall_sb() { [ -e "$SB/units/strata-q3.service.pid" ] && kill -- -"$(cat "$SB/units/strata-q3.service.pid")" 2>/dev/null
-               pkill -f -- "$SB/" 2>/dev/null; rm -f "$SB/units/strata-q3.service.pid"; }
+               sb_pkill TERM "$SB/"; rm -f "$SB/units/strata-q3.service.pid"; }
 cleanup() { killall_sb; rm -rf "$SB"; }
 trap cleanup EXIT
 [ -n "${KEEP_SB:-}" ] && trap killall_sb EXIT
@@ -440,7 +445,7 @@ sw stray-left iq3_s "$R/sl.txt"
   said stray-left "these commands bring it back on IQ3_XXS" && [ "$(restarts)" = $((n0 + 1)) ] &&
   pass "an engine left behind by a failed start: no second restart, the commands are printed (exit 4)" ||
   fail "stray left: exit $(rc stray-left), restarts $n0 -> $(restarts), $(tail -3 "$SB/stray-left.out")"
-pkill -f -- "^$SB/stray/engine-cuda12/strata --serve --left-behind"
+sb_pkill TERM "^$SB/stray/engine-cuda12/strata --serve --left-behind"
 
 # 9. no command the script runs holds the text strata-preflight.sh's pgrep looks for (its own pgreps write [e]ngine)
 if grep -v '^[[:space:]]*#' "$W/bench/switch_model.sh" | grep 'engine-cuda12/strata[ ]--serve' | grep -qv '\[e\]ngine'; then

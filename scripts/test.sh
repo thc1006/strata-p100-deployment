@@ -9,8 +9,8 @@
 #   scripts/test.sh --harnesses  with them; here only while strata-q3 is stopped and no experiment runs (otherwise
 #                                tests/harness_run.py fails them)
 #   scripts/test.sh --repo-only  no file outside the repo: the units' programs outside it are not checked, and the tests
-#                                that need this machine's files are skipped.  CI runs `--repo-only --harnesses`
-#                                (.github/workflows/test.yml), and shellcheck must be installed then.
+#                                that need this machine's files are skipped.  CI runs `--repo-only --harnesses
+#                                --jobs 6` (.github/workflows/test.yml), and shellcheck must be installed then.
 #   scripts/test.sh --jobs N     the unit tests in N worker processes, N from 1 to 16 (1 without it, as here, where the
 #                                service runs beside them); the checks below see the tests of all of them.  With
 #                                --harnesses here, keep 1: a test of tests/harness_run.py runs a stand-in for an

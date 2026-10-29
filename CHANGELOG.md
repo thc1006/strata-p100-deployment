@@ -2,6 +2,22 @@
 
 Notable changes to this machine and this repository, newest first. There are no version numbers; sections are by date. The categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-30
+
+### Added
+
+- `scripts/test.sh --jobs N` (N from 1 to 16) runs the unit tests in N worker processes, forked once the tests are loaded; the runner's checks (a test that never runs, no test ran, a skip for another reason and the rest) see the tests of all of them. Without it the script runs them in one worker, as it does on this machine, where `scripts/deploy.sh` runs it beside the service. The header of `scripts/test.sh` says how the workers share the tests and how a signal reaches them.
+
+### Changed
+
+- CI runs `scripts/test.sh --repo-only --harnesses --jobs 6`: six workers on the runner's four CPUs, as the tests spend much of their time waiting for the processes they start. The unit tests took 366 s and the test step 6 min 30 s (run 40915045408), against 1262 s and 21 min 26 s on `main` before (run 40874449430). Before and after, the same 436 tests ran with the same outcomes and the same 23 `machine:` skips, and 31 new tests ran; a test broken on purpose failed the run with four workers and was reported (run 40905242226). The longest test, the harness of `tests/test_ab_engine.py`, took 322 s alone and 367 s beside the others (runs 40896718140 and 40913388932). All in `results/ci-jobs-20261030.txt`.
+- The harnesses now run beside other tests, and in the first run with four workers 108 tests of `tests/test_deploy.py` failed: the watch of their copies of `deploy.sh` saw a harness's fake engine (run 40902288940). Their copies now watch for a harmless pattern and port of their test class. The one test that runs `deploy.sh` with the preflight's own pattern waits until no harness with fake engines runs, through a lock that such a harness holds while it runs (`harness_run.alone()` in `tests/harness_run.py`).
+- On this machine `scripts/test.sh` took 1430 s, its unit tests 1428 s for 467 tests (`results/ci-jobs-20261030.txt`), against 1303 s and 1300 s for 436 tests on 2026-10-27 (`results/test-sh-20261027.txt`); most of the new tests run copies of `scripts/test.sh` with `--jobs`. `deploy.sh` gives each check 1800 s.
+
+### Fixed
+
+- `tests/ab_model_run_stubs.sh` failed on a runner that had been up for less than 120 s: its stub gives the unit's start as the monotonic clock less 60 or 120 s, which was not positive yet (run 40902288940). It now waits until the clock has passed that, and checks the engine that is younger than the service's ready time before the service that became ready too recently, so that the wait does not age the engine.
+
 ## 2026-10-29
 
 ### Added

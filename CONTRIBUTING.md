@@ -13,8 +13,8 @@ measurement. For a security problem, follow the [security policy](SECURITY.md) i
 - Run `scripts/test.sh --repo-only` before you open a pull request, on Linux with the packages that
   [`.github/workflows/test.yml`](.github/workflows/test.yml) installs (among them Python 3.10, git, systemd, gcc and
   shellcheck). It must end with `all checks passed`. The `test` workflow runs it with `--harnesses` (the stub
-  harnesses too) on every pull request. Without `--repo-only`, the script also checks programs that exist
-  only on the production machine.
+  harnesses too) and `--jobs 6` (the unit tests in six processes) on every pull request. Without `--repo-only`, the
+  script also checks programs that exist only on the production machine.
 - A change to `tools/configure_strata_q3.py` needs a unit test in `tests/`.
 - A change to the deployed configuration needs measurements from this hardware. Put the raw output in `results/` and
   explain the change in [docs/deployment-record.md](docs/deployment-record.md).

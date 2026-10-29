@@ -46,6 +46,7 @@ jobs:
             HOME=/tmp STRATA_TEST_NO_SERVICE=1 setpriv --reuid=65534 --regid=65534 --clear-groups \
               scripts/test.sh --repo-only --harnesses --jobs 6
         run: |
+          echo "CPUs (nproc): $(nproc)"
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/base.tar.gz" "$BASE"
           echo "$BASE_SHA256  $RUNNER_TEMP/base.tar.gz" | sha256sum -c --quiet -
           docker import "$RUNNER_TEMP/base.tar.gz" ubuntu-base:22.04.5 > /dev/null

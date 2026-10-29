@@ -2615,6 +2615,32 @@ class TestSh(unittest.TestCase):
         self.assertEqual(p.wait(timeout=60), 0, out.read_text())
         self.assertEqual(got.read_text(), "x")
 
+    def test_a_ctrl_c_as_the_runner_reads_the_records(self):
+        # the runner is back in scripts/test.sh's process group before it reads the workers' records, so that a Ctrl-C
+        # then ends the run.  Here the record is a FIFO, which a helper opens once the runner reads it: it notes the
+        # runner's process group and sends SIGINT to scripts/test.sh's.  Before, the runner read the records out of
+        # the group, and the run went on to "all checks passed"
+        d = self.tree()
+        seen = d.parent / "seen"
+        (d.parent / "helper.py").write_text(
+            "import errno, os, signal, sys, time\nfifo, data, runner, group, seen = sys.argv[1:]\n"
+            "deadline = time.monotonic() + 30\nwhile True:\n    try:\n"
+            "        fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)\n        break\n    except OSError as e:\n"
+            "        if e.errno != errno.ENXIO or time.monotonic() > deadline:\n            raise\n"
+            "        time.sleep(0.01)\nopen(seen, 'w').write(str(os.getpgid(int(runner))))\n"
+            "os.killpg(int(group), signal.SIGINT)\ntime.sleep(0.5)\nos.write(fd, open(data, 'rb').read())\n")
+        (d / "tests" / "test_r.py").write_text(
+            "import atexit, os, subprocess, sys, unittest\ndef swap():\n    rec = sys.argv[1] + '.0'\n"
+            "    os.rename(rec, rec + '.saved')\n    os.mkfifo(rec)\n"
+            f"    subprocess.Popen([sys.executable, {str(d.parent / 'helper.py')!r}, rec, rec + '.saved', "
+            f"str(os.getppid()), str(os.getpgrp()), {str(seen)!r}], start_new_session=True, "
+            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+            "class R(unittest.TestCase):\n    def test_r(self):\n        atexit.register(swap)\n")
+        p, out = self.start_sh(d)
+        self.assertEqual(p.wait(timeout=60), -signal.SIGINT, out.read_text())
+        self.assertEqual(seen.read_text(), str(p.pid))
+        self.assertNotIn("\n== shell syntax", out.read_text())
+
     def test_a_stop_of_the_group_stops_the_tests(self):
         # SIGSTOP to scripts/test.sh's process group (as a Ctrl-Z stops the job at a terminal) stops the tests, and
         # SIGCONT lets them go on.  Before, the workers ran on in groups of their own

@@ -444,7 +444,8 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
 # not reach; one sent to it alone (SIGINT, SIGTERM, SIGHUP) goes on to each worker.  So no worker gets a signal twice.
 # Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
-# worker that does not hold it.  A worker ends as Python ends, but without the interpreter's teardown, which would also finalize what the loading
+# worker that does not hold it.  This process is back in the group before it reads the workers' records.
+# A worker ends as Python ends, but without the interpreter's teardown, which would also finalize what the loading
 # made.  It drops the tests it ran, as unittest's suites do, and collects them, so that what they hold is finalized; an
 # object that a global still holds (a NamedTemporaryFile in a module's list) is not, and the TMPDIR check fails on its
 # file (close it in a clean-up).  Then it runs the atexit handlers that its tests registered, and those that a library
@@ -696,7 +697,7 @@ for s, handler in saved.items():
         signal.signal(s, forward)
 signal.pthread_sigmask(signal.SIG_SETMASK, mask)
 profile.disable()
-records, lost, died = {}, [], []
+ended = []                      # (worker, its exit status), as they end
 while alive:
     try:
         pid, status = os.wait()
@@ -705,6 +706,19 @@ while alive:
     k = alive.pop(pid, None)
     if k is None:
         continue
+    ended.append((k, status))
+    if status != 0 or not os.path.exists(f"{sys.argv[1]}.{k}"):
+        no_more_units()
+taken = time.perf_counter() - start
+for s, handler in saved.items():                # a signal from now on acts as it did before the workers
+    if handler is not None:
+        signal.signal(s, handler)
+try:
+    os.setpgid(0, home)                         # back, before this process reads the records and writes again
+except OSError:                                 # (the group has ended: scripts/test.sh and the workers)
+    pass
+records, lost, died = {}, [], []
+for k, status in ended:
     try:
         records[k] = json.loads(pathlib.Path(f"{sys.argv[1]}.{k}").read_text())
     except (OSError, ValueError):
@@ -714,15 +728,6 @@ while alive:
                     ("" if k in records else ", without its record"))
         if os.WIFSIGNALED(status):
             died.append(os.WTERMSIG(status))
-        no_more_units()
-taken = time.perf_counter() - start
-for s, handler in saved.items():                # a signal from now on acts as it did before the workers
-    if handler is not None:
-        signal.signal(s, handler)
-try:
-    os.setpgid(0, home)                         # back, before this process writes again
-except OSError:                                 # (the group has ended: scripts/test.sh and the workers)
-    pass
 if lost:
     try:
         sys.stdout.flush()

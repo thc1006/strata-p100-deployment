@@ -822,7 +822,9 @@ class DeployTests(unittest.TestCase):
             r = self.deploy("--apply")
         self.assertRefused(r, f"scripts/test.sh of {new[:7]} failed: strata-preflight.sh would refuse a start of "
                               "strata-q3 while it ran: an engine (killed): python3 -c import time; time.sleep(60) ", base)
-        self.assertIn("engine-cuda12/strata --serve", r.stderr)
+        # the stand-in under the checks' TMPDIR, whose command line has the preflight's pattern after that path, and no
+        # other (deploy.sh shows the first 120 characters of a command line, which may end before the pattern)
+        self.assertIn(f"time.sleep(60) {self.tmpdir}/", r.stderr)
         self.assertEqual([q for q in os.listdir("/proc") if q.isdigit() and b"strata --serve" in self.cmdline(q)
                           and str(self.tmpdir).encode() in self.cmdline(q)], [])
 

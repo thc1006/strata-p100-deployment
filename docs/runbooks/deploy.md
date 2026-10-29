@@ -12,7 +12,7 @@
    ```bash
    scripts/deploy.sh
    ```
-   Expected: the new commits, one `ok` line per check, and `dry run: scripts/deploy.sh --apply deploys <commit>`. This already runs the new commit's `scripts/test.sh` and `scripts/check-drift.sh --candidate`, which take most of its time. When a check fails, the script prints `not deployed:` and the reason, and leaves the checkout as it was.
+   Expected: the new commits, one `ok` line per check, and `dry run: scripts/deploy.sh --apply deploys <commit>`. This already runs the new commit's `scripts/test.sh` and `scripts/check-drift.sh --candidate` on this machine, which takes most of its time. When a check fails, the script prints `not deployed:` and the reason, and leaves the checkout as it was.
 2. Deploy:
    ```bash
    scripts/deploy.sh --apply
@@ -31,13 +31,24 @@
 | `the newest run of test.yml for … is queued`, `in_progress`, or `missing` right after a push | Wait for the run. A commit whose message has `[skip ci]` gets no run, so `missing` stays: push another commit. |
 | `the newest run of test.yml for … is completed failure` | Fix the commit. For another conclusion, such as `cancelled`, run the workflow again on GitHub. |
 | `cannot read the runs of test.yml`, `… is unreadable` | No network, or GitHub's limit of 60 requests an hour without a token, or `remote.origin.url` no longer names the repository. |
-| `scripts/test.sh of … failed`, `scripts/check-drift.sh of … failed` | The output above the reason shows the failing check. If check-drift.sh reports drift in files that the commits do not change, the machine has drifted: find the cause with `scripts/check-drift.sh` first. `strata-preflight.sh would refuse a start of strata-q3 while it ran`: while the check ran, a process that was not the service's had the preflight's engine pattern in its command line, or listened on port 8080. With `(killed)`, the check started it: fix the commit. Without it, the reason names the process: find out what runs it, and run the script again when it is gone. `what the watch found (its record is missing)`: the watch found such a process, and the check removed the record of which one: fix the commit. `the watch did not finish (exit …)`: the watch ended before the check did, or the check kept it stopped (exit 137), so what ran meanwhile is not known. Run the script again; if it repeats, the commit's check ends or stops the watch: fix the commit. `the clean-up after the check did not finish (exit …)`: what the check started may still run (exit 4: its 20 passes still found something, such as a process that starts another each time one is killed). Look for it (`ps -u $USER -o pid,args`), end it, and run the script again. `it was killed (SIGKILL) after … s`: something ended the check before its time limit, for example the OOM killer at the account's memory limit; `oom_kill` in `/sys/fs/cgroup/user.slice/user-1003.slice/memory.events` tells. Look at what the commit's tests take, or at what else ran, and run the script again. `it did not finish in 1800 s`: the check hung, or the machine was busy; `scripts/test.sh` alone takes about 22 minutes here (1303 s on 2026-10-27: `results/test-sh-20261027.txt`). Look at what else runs, and run the script again. |
+| `scripts/test.sh of … failed`, `scripts/check-drift.sh of … failed` | See [When a check of the new commit fails](#when-a-check-of-the-new-commit-fails). |
 | `another scripts/deploy.sh is running` | Wait until it finishes. |
-| `interrupted` | Ctrl-C, SIGTERM or SIGHUP stopped the script before the fast-forward, and the check it was running: the script ends the check and the watch, with SIGTERM and SIGCONT and, 15 s later, SIGKILL. Then every process whose command line names the script's temporary directory as a path, and every process with the checks' TMPDIR in any cgroup, is killed, with its process group when it leads one, and a `note` line names it (one of another user's is named, not killed). Run it again. An interrupt during the fast-forward lets git finish it; then the script says whether the commit is deployed. Once the script has said how the run ended, an interrupt changes nothing. |
+| `interrupted` | Ctrl-C, SIGTERM or SIGHUP stopped the script before the fast-forward. It ended the check it was running and what it could find of what that check started; a `note` line names each process that this clean-up killed (another user's process is named, not killed). Run it again. An interrupt during the fast-forward lets git finish, and the script then says whether the commit is deployed. Once the script has said how the run ended, an interrupt changes nothing. |
 | `this checkout moved while the checks ran` | Someone committed or switched branches here during the checks. Run the script again. |
 | anything else, such as `git fetch origin main failed` or `origin is not a GitHub repository` | The reason names the command or the setting that failed. |
 
-`deployed …, but scripts/check-drift.sh after it failed: …` means that the commits are deployed and that the check after the fast-forward failed; the reason is one of those above. With `exit 1` and `DRIFT` lines above it, the machine changed while the script ran: find the cause with `scripts/check-drift.sh`. `deployed …, but the check after it was interrupted` means that the commits are deployed and that the check after the fast-forward did not finish: run `scripts/check-drift.sh`.
+`deployed …, but scripts/check-drift.sh after it failed: …` means that the commits are deployed and the check after the fast-forward failed, for one of the reasons below. With `exit 1` and `DRIFT` lines above it, the machine changed while the script ran: find the cause with `scripts/check-drift.sh`. `deployed …, but the check after it was interrupted` means that the commits are deployed and the check after the fast-forward did not finish: run `scripts/check-drift.sh`.
+
+### When a check of the new commit fails
+
+The output above the reason shows the failing check. If `check-drift.sh` reports drift in files that the commits do not change, the machine has drifted: find the cause with `scripts/check-drift.sh` first. The reason after `failed:` says more:
+
+- `strata-preflight.sh would refuse a start of strata-q3 while it ran`: while the check ran, a process that was not the service's had the preflight's engine pattern in its command line, or listened on port 8080. With `(killed)`, the check started it: fix the commit. Without it, the reason names the process: find out what runs it, and run the script again when it is gone.
+- `what the watch found (its record is missing)`: the watch found such a process, and the check removed the record of which one. Fix the commit.
+- `the watch did not finish (exit …)`: the watch ended before the check did, or the check kept it stopped (exit 137), so what ran meanwhile is not known. Run the script again. If it repeats, the commit's check ends or stops the watch: fix the commit.
+- `the clean-up after the check did not finish (exit …)`: what the check started may still run (exit 4: its 20 passes still found something, such as a process that starts another each time one is killed). Look for it (`ps -u $USER -o pid,args`), end it, and run the script again.
+- `it was killed (SIGKILL) after … s`: something ended the check before its time limit, for example the OOM killer at the account's memory limit (`oom_kill` in `/sys/fs/cgroup/user.slice/user-1003.slice/memory.events` tells). Look at what the commit's tests take, or at what else ran, and run the script again.
+- `it did not finish in 1800 s`: the check hung, or the machine was busy. `scripts/test.sh` alone takes about 22 minutes here (1303 s on 2026-10-27: `results/test-sh-20261027.txt`). Look at what else runs, and run the script again.
 
 ## Deploy by hand
 
@@ -57,7 +68,7 @@ The script stops before its other checks when the commits change one of these, a
    ```bash
    git diff HEAD <sha> -- scripts/test.sh scripts/check-drift.sh scripts/host-units.sh scripts/deploy.sh tests/harness_run.py .github/ ':(glob)**/.gitattributes'
    ```
-   A check that is removed or made weaker needs its reason in the commit message or in a decision record. Otherwise, stop here.
+   A check that is removed or made weaker needs its reason in the commit message or in a decision record. If it has none, stop here.
 3. If the commits change `systemd/`, `scripts/strata-health.sh`, `config/profile.conf`, the config snapshots `config/strata-iq3_xxs.*.json`, or the engine or the model in `config/deployed-artifacts.sha256`, stop the watchdog, so that it does not start the service between the steps below: `sudo systemctl stop strata-q3-health.timer`. Until step 6 starts it again, `scripts/check-deployment.sh` reports the stopped timer as a `PROBLEM`.
 4. Check that the service is not starting or stopping (`systemctl is-active strata-q3`: `active`, `inactive` or `failed`). Then fast-forward to exactly that commit, and run the tests:
    ```bash
@@ -73,8 +84,8 @@ The script stops before its other checks when the commits change one of these, a
 
    Until these steps are done, a start of the service uses the new files of this checkout with the old live config and system files, and the preflight can refuse to start.
 6. If you stopped the watchdog, start it again: `sudo systemctl start strata-q3-health.timer`.
-7. Run `scripts/check-drift.sh`. It must report `no drift`. A `restart pending` line means that the service runs other settings or files than the repository now gives (step 5 changed the unit, or a file the service read at its start): restart when the service can be down for about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`) with `sudo systemctl restart strata-q3`, and run it again.
+7. Run `scripts/check-drift.sh`. It must report `no drift`. A `restart pending` line means that the service runs other settings or files than the repository now gives (step 5 changed the unit, or a file the service read at its start). Restart when the service can be down for about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`) with `sudo systemctl restart strata-q3`, and run the check again.
 
 ## Rollback
 
-`scripts/deploy.sh` only moves forward. To undo a deployed commit, revert it on GitHub (`git revert <commit>` in a clone, then push), wait for its `test` workflow, and run `scripts/deploy.sh --apply` again. A revert of a commit that was deployed by hand changes the same paths, so it is deployed by hand too, with the steps above.
+`scripts/deploy.sh` only moves forward. To undo a deployed commit, revert it on GitHub (`git revert <commit>` in a clone, then push), wait for its `test` workflow, and run `scripts/deploy.sh --apply` again. A revert of a commit that was deployed by hand changes the same paths, so deploy it by hand too, with the steps above.

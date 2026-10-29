@@ -2410,6 +2410,19 @@ class TestSh(unittest.TestCase):
                     else:
                         seen.add((*what.split("."), pid))
 
+    def test_what_the_tests_leave_in_their_tmpdir(self):
+        # the tests get a TMPDIR of their own, which fails the run when something is left in it, also by a test that
+        # passed; what a test removes again passes
+        d = self.tree()
+        text = ("import os, shutil, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+                "        d = tempfile.mkdtemp(prefix='left-')\n        self.assertNotEqual(tempfile.gettempdir(), '/tmp')\n")
+        (d / "tests" / "test_tmp.py").write_text(text + "        shutil.rmtree(d)\n")
+        self.passes(d)
+        (d / "tests" / "test_tmp.py").write_text(text)
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: the tests left this in their TMPDIR: left-\w+ \n")
+
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
         # a helper: what a test holds is read after the tests have run, in the worker that ran it

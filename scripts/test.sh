@@ -40,8 +40,9 @@
 # None) fails; a test behind a decorator without functools.wraps runs when its function ran, or when its test was
 # skipped or never started and the decorator holds the function, in its closure or as an argument's default), when a
 # test returns something (a coroutine it returns never runs), when a test expects to fail, or when a test is skipped for
-# another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only).  Code review has to see
-# what runs but checks nothing, as a test that returns early from its own body.
+# another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
+# something in the TMPDIR they get (a directory of this run's).  Code review has to see what runs but checks nothing,
+# as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
 set -u -o pipefail
@@ -67,8 +68,11 @@ trap 'rm -rf -- "$tmp"' EXIT
 tmp=$(cd -- "$tmp" && pwd -P) || { echo "cannot enter the temporary directory"; exit 1; }
 
 step "unit tests (tests/)"
-# the runner writes its verdict last: a test that ends the process (os._exit) leaves none
-TEST_REPO_ONLY=$REPO_ONLY STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
+# the runner writes its verdict last: a test that ends the process (os._exit) leaves none.  The tests get a TMPDIR of
+# their own, which must be empty when they have ended, and the lock of tests/harness_run.py is next to it
+mkdir "$tmp/tests" || { echo "cannot create the tests' temporary directory"; exit 1; }
+TMPDIR=$tmp/tests STRATA_TEST_ENGINES_LOCK=$tmp/engines.lock TEST_REPO_ONLY=$REPO_ONLY \
+  STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
 import ast, atexit, cProfile, ctypes, functools, inspect, json, os, pathlib, signal, stat, symtable, sys, threading, \
     time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
@@ -814,6 +818,11 @@ pathlib.Path(sys.argv[1]).write_text("pass\n" if ok else "fail\n")
 sys.exit(0 if ok else 1)
 EOF
 [ "$(cat "$tmp/verdict" 2>/dev/null)" = pass ] || { [ $fail = 1 ] || echo "FAIL: the unit tests did not finish (no verdict)"; fail=1; }
+if ! left=$(ls -A -b -- "$tmp/tests"); then
+  echo "FAIL: cannot read the tests' TMPDIR"; fail=1
+elif [ -n "$left" ]; then
+  echo "FAIL: the tests left this in their TMPDIR: $(head -n 20 <<< "$left" | tr '\n' ' ')"; fail=1
+fi
 
 step "shell syntax (bash -n; it does not parse \$( ) and \$(( )) bodies, so the tests run the scripts)"
 sh_files=(); for f in scripts/*.sh bench/*.sh tests/*.sh; do   # not a glob that matches nothing; not a FIFO or a

@@ -15,9 +15,9 @@ What the gate does not catch: a harness whose file does not name the engine's di
 from parts (e=engine-cuda; "${e}12/strata") or reads it from another file, when neither its name nor the name of the
 file a link leads to is a *_stubs.sh outside NO_ENGINES.  Only a harness written to get around the gate does that,
 and code review is the gate for such a one.
-While a harness that starts fake engines runs, it holds a lock in the temporary directory shared (lock_path): with
-scripts/test.sh --jobs, tests run side by side, and a test whose check watches for any process with the engine's
-command line holds the lock alone (alone()), so that it sees no fake engine of a harness in another worker.
+While a harness that starts fake engines runs, it holds a lock (lock_path): with scripts/test.sh --jobs, tests run
+side by side, and a test whose check watches for any process with the engine's command line holds the lock alone
+(alone()), so that it sees no fake engine of a harness in another worker.
 A harness runs in a session and a temporary directory of its own (its sandbox is made under TMPDIR, and its command
 line names the directory).  A run past its time, and a run whose test is interrupted (SIGINT, SIGTERM, SIGHUP: a
 Ctrl-C, or a timeout), gets SIGTERM, so that its EXIT trap stops what it started, then SIGKILL STOP_WAIT s later.
@@ -54,7 +54,7 @@ MODULES = "/sys/module"                 # the kernel's modules: a container sees
 SANDBOX = re.compile(rb"/stubs\.[A-Za-z0-9_]+/")
 STOP_WAIT = 60                          # seconds a harness has for its EXIT trap after SIGTERM
 SIGNALS = {signal.SIGINT, signal.SIGTERM, signal.SIGHUP}
-LOCK = "strata-test-engines.lock"       # in the temporary directory (lock_path)
+LOCK = "STRATA_TEST_ENGINES_LOCK"      # the lock's path, which scripts/test.sh gives (lock_path)
 
 
 def starts_engines(script: Path) -> bool:
@@ -210,10 +210,9 @@ def gate(test: unittest.TestCase, tools: tuple[str, ...]) -> None:
 
 
 def lock_path() -> str:
-    """The lock that a harness that starts fake engines holds shared while it runs, and that alone() holds alone.  It
-    is in the temporary directory, which the workers of one scripts/test.sh --jobs share (and so do other runs with the
-    same one)."""
-    return os.path.join(tempfile.gettempdir(), LOCK)
+    """The lock that a harness that starts fake engines holds shared while it runs, and that alone() holds alone: the
+    one that scripts/test.sh gives its workers, or one of this user's in the shared temporary directory."""
+    return os.environ.get(LOCK) or os.path.join(tempfile.gettempdir(), f"strata-test-engines-{os.getuid()}.lock")
 
 
 @contextlib.contextmanager

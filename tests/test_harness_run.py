@@ -429,6 +429,17 @@ class Lock(unittest.TestCase):
         self.assertEqual((t.is_alive(), u.is_alive(), len(held)), (False, False, 1))
 
 
+class LockPath(unittest.TestCase):
+    def test_scripts_test_sh_s_or_one_of_this_users(self):
+        # the one that scripts/test.sh gives its workers; without it, one in the temporary directory that only this
+        # user's runs share, so that another user's file of that name does not stop them
+        with mock.patch.dict(os.environ, {H.LOCK: "/run/x/engines.lock"}):
+            self.assertEqual(H.lock_path(), "/run/x/engines.lock")
+        with mock.patch.dict(os.environ, {H.LOCK: ""}):
+            self.assertEqual(H.lock_path(),
+                             os.path.join(tempfile.gettempdir(), f"strata-test-engines-{os.getuid()}.lock"))
+
+
 class NotNow(unittest.TestCase):
     def setUp(self):
         # as on a machine that systemd runs, also in CI's container: the drivers are looked for first

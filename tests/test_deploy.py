@@ -803,7 +803,7 @@ class DeployTests(unittest.TestCase):
         hooks = {"DRIFT_SYSROOT": "/x", "DRIFT_OWNER": "1:1", "DRIFT_ENGINE_RE": "x", "DRIFT_URL": "http://x",
                  "DRIFT_TEST_SPEC": "/x", "HOST_UNITS_CONF": "/x", "HOST_UNITS_RUN_USER": "/x", "TEST_SHELLCHECK": "x",
                  "STRATA_DIR": "/x", "STRATA_TEST_HARNESSES": "1", "STRATA_TEST_NO_SERVICE": "1", "TEST_REPO_ONLY": "1",
-                 "TEST_JOBS_DEAL": "1", "STRATA_PY": "/x", "BASH_ENV": "/x",
+                 "TEST_JOBS_DEAL": "1", "STRATA_TEST_ENGINES_LOCK": "/x", "STRATA_PY": "/x", "BASH_ENV": "/x",
                  "PYTHONPATH": "/x"}
         r = self.deploy("--apply", **hooks)
         self.assertEqual((r.returncode, self.head()), (0, new), r.stderr)

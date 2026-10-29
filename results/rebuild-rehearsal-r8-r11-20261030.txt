@@ -1,0 +1,464 @@
+# Copied on 2026-10-30 from the rehearsal's own record (written as the steps ran), unchanged below this preface.
+# The tools it names under ~/rebuild-rehearsal/bin are in bench/ now, each header saying how it differs from the copy
+# that ran: rr is bench/rehearsal_rr.sh, rr-guard bench/rehearsal_guard.sh, rr-memwatch bench/rehearsal_memwatch.sh,
+# rlog bench/rehearsal_log.sh, elfcmp.py bench/rehearsal_elfcmp.py, r0-selftest.sh bench/rehearsal_selftest.sh,
+# r0-probe.py bench/rehearsal_probe.py, r0-settings.py bench/rehearsal_settings.py, shim/sudo and shim/nvidia-smi
+# bench/rehearsal_shim_sudo.sh and bench/rehearsal_shim_nvidia_smi.sh.  "PLAN.md" is the plan of the session that ran
+# the rehearsal; it is not in this repository, and docs/runbooks/rebuild.md gives the procedure.
+# R8-R11 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 02:09:57 +0800.
+# The account's limit is back at MemoryMax=6G (the maintainer, 2026-10-30 02:1x).  Each job ran alone through
+# ~/rebuild-rehearsal/bin/rr (capped user scope, choom -n 500, nice -n 19, chrt -i 0, ionice -c3, taskset, the bubblewrap
+# sandbox); rr-guard ran beside it (logs/guard.log); memory sampled every 5 s by bin/rr-memwatch (logs/<scope>.mem).
+# No sudo was run.  The host name is written <host>; everything else is the output, unchanged.
+
+== before R8 (2026-10-30 02:09:57)
+
+$ sh -c cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.max\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current\;\ grep\ -E\ \"\^\(anon\|file\)\ \"\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.stat\;\ grep\ -E\ \"\^\(oom\|oom_kill\)\ \"\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.events\;\ grep\ MemAvailable\ /proc/meminfo\;\ df\ --output=avail\,pcent\ /\ \|\ tail\ -1\;\ systemctl\ is-active\ strata-q3.service\ strata-q3-health.timer
+6442450944
+2960642048
+anon 711995392
+file 2125410304
+oom 19
+oom_kill 14
+MemAvailable:   23608488 kB
+301162624  50%
+active
+active
+[exit 0]
+
+== R8. IQ3_S shard 1 (PLAN.md F7), curl --limit-rate 30M (2026-10-30 02:09:57)
+# download started 02:09:57
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r8-dl -m 1G -- sh -c M=/home/thc1006/dev/Strata-data/models\;\ f=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf\;\ mkdir\ -p\ \$M/IQ3_S\ \&\&\ T0=\$\(date\ +%s\)\ \&\&\ curl\ -fsSL\ -C\ -\ --limit-rate\ 30M\ -o\ \$M/IQ3_S/\$f.part\ https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/IQ3_S/\$f\;\ rc=\$\?\;\ echo\ \"curl\ exit\ \$rc\ after\ \$\(\(\ \$\(date\ +%s\)\ -\ T0\ \)\)\ s\"\;\ ls\ -l\ \$M/IQ3_S\;\ exit\ \$rc
+curl exit 0 after 1728 s
+total 53404641
+-rw-rw-r-- 1 thc1006 thc1006 54817524224  十  30 02:38 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf.part
+[exit 0]
+# download ended 02:38:45
+# size 54,817,524,224 = results/iq3s-model-files-20261019.txt:2; sha256 next (pinned: 4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3, docs/runbooks/change-config.md:53, config/deployed-artifacts.sha256:37)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r8-sha -m 512M -- sh -c T0=\$\(date\ +%s\)\;\ cd\ /home/thc1006/dev/Strata-data/models/IQ3_S\ \&\&\ echo\ \"4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3\ \ Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf.part\"\ \|\ sha256sum\ -c\ -\;\ rc=\$\?\;\ echo\ \"sha256\ in\ \$\(\(\ \$\(date\ +%s\)\ -\ T0\ \)\)\ s\"\;\ exit\ \$rc
+Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf.part: OK
+sha256 in 392 s
+[exit 0]
+# the download: curl exit 0 after 1728 s (02:09:5x-02:38:45; about 31.5 MB/s, the 30 MiB/s limit); its scope's memory.peak 10240000 B
+
+$ mv /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf.part /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+[exit 0]
+
+$ ln -P /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+[exit 0]
+
+$ ls -l /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_S /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_XXS
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_S:
+total 53561794
+-rw-rw-r-- 1 thc1006 thc1006 54817524224  十  30 02:38 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+lrwxrwxrwx 2 thc1006 thc1006         122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_XXS:
+total 4
+lrwxrwxrwx 1 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf.done
+lrwxrwxrwx 2 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf.done
+[exit 0]
+# shard 2 is a hard link of the sandbox's IQ3_XXS shard 2, which is a symbolic link into production's read-only view (link count 2 on the link, not on production's file); its sha256 is checked in R11
+
+$ stat -c %n\ %i\ %h\ %Z /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+/home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf 461004 2 1792333867
+[exit 0]
+# production's shard 2 (read outside): link count 2, ctime 1792333867 (2026-10-18 22:31:07), as in R0
+
+== R9. the IQ3_S pack (PLAN.md F8; docs/runbooks/change-config.md:58-63), in a 4G scope under the 6 GiB account limit (2026-10-30 02:46:28)
+# the account before: memory.current 2983845888 B (anon 735141888 file 2127589376 ); expected peak of the pack's own memory about 2.6 GiB anonymous (the largest layer, 1.27 GiB, concatenated and copied once: PLAN.md R9), plus page cache of the mapped shard, which the scope's cap reclaims
+# pack started 02:46:28
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-pack -m 4G -- sh -c $'cd /home/thc1006/dev/strata && M=/home/thc1006/dev/Strata-data/models && f=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf && T0=$(date +%s) &&\n  PYTHONDONTWRITEBYTECODE=1 STRATA_GGUF_PY=third_party/llama.cpp/gguf-py .venv/bin/python tools/iq_pack.py --gguf "$M/IQ3_S/$f" --out /home/thc1006/dev/Strata-data/packs/iq3_s --experts-bin\n  rc=$?; cg=/sys/fs/cgroup$(sed -n "s/^0:://p" /proc/self/cgroup); echo "iq_pack exit $rc after $(( $(date +%s) - T0 )) s; scope memory.peak $(cat $cg/memory.peak) B; $(grep -E "^(oom|oom_kill) " $cg/memory.events | tr "\\n" " ")"; exit $rc'
+tokenizer/: vocab 248320, merges 247587, pre qwen35, specials {'tokenizer.ggml.eos_token_id': 248046, 'tokenizer.ggml.padding_token_id': 248044, 'tokenizer.ggml.bos_token_id': 248044}
+model shards: Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf, Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+index.txt: 1079 tensors, 302 served natively, 0 in extra.bin, arena 1.43 GiB
+  layer  0  IQ3_XXS /IQ4_NL  blob  2176000  at 0.00 GiB
+  layer  8  IQ2_S   /Q2_0    blob  1510400  at 7.50 GiB
+  layer 16  IQ3_XXS /IQ4_NL  blob  2176000  at 14.33 GiB
+  layer 24  IQ2_S   /IQ4_NL  blob  1971200  at 22.14 GiB
+  layer 32  IQ2_S   /IQ4_NL  blob  1971200  at 30.32 GiB
+  layer 40  IQ3_S   /IQ4_NL  blob  2329600  at 38.09 GiB
+experts.bin: 48 layers, 46.84 GiB
+iq_pack exit 0 after 1209 s; scope memory.peak 4294967296 B; oom 0 oom_kill 0 
+[exit 0]
+# pack ended 03:06:37
+# R9 time and memory: 1209 s (02:46:28-03:06:37; 18.7 min on 2026-10-18 by the pack's mtimes); the scope's memory.peak is its cap, 4,294,967,296 B, reached by page cache of the mapped shard, which the cap reclaimed; anonymous memory at most 2,867,412,992 B (2.67 GiB, logs/rr-r9-pack.scope.mem); no oom, no oom_kill. Memory every 2 minutes:
+
+$ sh -c awk\ \'NR%24==1\'\ /home/thc1006/rebuild-rehearsal/logs/rr-r9-pack.scope.mem\ \|\ cut\ -c1-140\;\ tail\ -2\ /home/thc1006/rebuild-rehearsal/logs/rr-r9-pack.scope.mem\ \|\ head\ -1\ \|\ cut\ -c1-140
+02:46:29 current 92520448 peak 93306880 oom 0 oom_kill 0 anon 91205632 file 2805760 
+02:48:30 current 4294897664 peak 4294967296 oom 0 oom_kill 0 anon 2159624192 file 2106396672 
+02:50:31 current 3845713920 peak 4294967296 oom 0 oom_kill 0 anon 1706983424 file 2091716608 
+02:52:32 current 4294443008 peak 4294967296 oom 0 oom_kill 0 anon 1496993792 file 2727251968 
+02:54:33 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2170732544 file 2033008640 
+02:56:33 current 3970854912 peak 4294967296 oom 0 oom_kill 0 anon 1845846016 file 2015338496 
+02:58:34 current 4037242880 peak 4294967296 oom 0 oom_kill 0 anon 2043654144 file 1860759552 
+03:00:35 current 4294852608 peak 4294967296 oom 0 oom_kill 0 anon 1974214656 file 2163576832 
+03:02:36 current 4225957888 peak 4294967296 oom 0 oom_kill 0 anon 2170724352 file 1762402304 
+03:04:37 current 4294918144 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1747652608 
+03:06:38 rr-r9-pack.scope ended
+03:06:33 current 4294619136 peak 4294967296 oom 0 oom_kill 0 anon 2867412992 file 1248317440 
+[exit 0]
+
+== R9 checks: every pack file (2026-10-30 03:06:56)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-ls -m 256M -- sh -c cd\ /home/thc1006/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ -type\ f\ \|\ LC_ALL=C\ sort\ \|\ xargs\ ls\ -l
+-rw-rw-r-- 1 thc1006 thc1006         306  十  30 02:46 ./conversions.json
+-rw-rw-r-- 1 thc1006 thc1006  1538035200  十  30 02:46 ./dense.bin
+-rw-rw-r-- 1 thc1006 thc1006 50292326400  十  30 03:06 ./experts.bin
+-rw-rw-r-- 1 thc1006 thc1006         373  十  30 03:06 ./experts.bin.src.json
+-rw-rw-r-- 1 thc1006 thc1006       93685  十  30 02:46 ./index.txt
+-rw-rw-r-- 1 thc1006 thc1006        3304  十  30 02:46 ./native_experts.txt
+-rw-rw-r-- 1 thc1006 thc1006        9993  十  30 02:46 ./tokenizer/chat_template.jinja
+-rw-rw-r-- 1 thc1006 thc1006     3353258  十  30 02:46 ./tokenizer/merges.txt
+-rw-rw-r-- 1 thc1006 thc1006         541  十  30 02:46 ./tokenizer/tokenizer.json
+-rw-rw-r-- 1 thc1006 thc1006      744960  十  30 02:46 ./tokenizer/token_type.json
+-rw-rw-r-- 1 thc1006 thc1006     5737005  十  30 02:46 ./tokenizer/vocab.json
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-sha -m 512M -- sh -c T0=\$\(date\ +%s\)\;\ cd\ /home/thc1006/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ -type\ f\ -print0\ \|\ LC_ALL=C\ sort\ -z\ \|\ xargs\ -0\ sha256sum\ \>\ /tmp/r9-sandbox.sha\;\ echo\ \"sandbox\ pack\ hashed\ in\ \$\(\(\ \$\(date\ +%s\)\ -\ T0\ \)\)\ s\"\;\ cat\ /tmp/r9-sandbox.sha
+sandbox pack hashed in 373 s
+51df3cd6ffd0d38c2da8e2d3a95a604b4a96c20b06fc639a9bf477282a42b86a  ./conversions.json
+d2af3d8331e5c7a1985d1d589747230f9d56719a6d33c7cddc9ee6b81cde6b13  ./dense.bin
+ed9d0a872b4d9fb992a05f3f5114107b0689767f0d95e2fb7e2ffe091000e67c  ./experts.bin
+5a18d0c1f89ac64c08998010c81536fcd6b67557778f8f2dfc36539ad0150cad  ./experts.bin.src.json
+b2a014878c3b61d6a6f915e194055a5e68ede34f9465dd1cb13249d902f008ac  ./index.txt
+d9ac2dfa3ee63c55c9c6a6db26f72da0cec0ee41733f007e5cbbbba71617aa5d  ./native_experts.txt
+12827f24b742ea4e80cdc12dbcf9622227056b9f797252a3149263d4f9aaadce  ./tokenizer/chat_template.jinja
+4ba698529766c7a2f5052083ea10cdf2485577f5237a332ee291054eb11e3332  ./tokenizer/merges.txt
+5088c8c298fc06af8382ddb3b76c888703ac2634e82263b97eedcc2ad202738b  ./tokenizer/token_type.json
+c0bd435efbc6c3b28964b47999afe16c4ad268c7c7c4e8cb3af410796a6f30bf  ./tokenizer/tokenizer.json
+4ba64f0332abcfb0b600b7df1537d1e836e68009d5fb7cdb77339738dc6365c4  ./tokenizer/vocab.json
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-man -m 256M -- sh -c cd\ /home/thc1006/dev\ \&\&\ grep\ \"\ Strata-data/packs/iq3_s/\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -
+Strata-data/packs/iq3_s/index.txt: OK
+Strata-data/packs/iq3_s/native_experts.txt: OK
+Strata-data/packs/iq3_s/dense.bin: OK
+Strata-data/packs/iq3_s/experts.bin: OK
+Strata-data/packs/iq3_s/tokenizer/chat_template.jinja: OK
+Strata-data/packs/iq3_s/tokenizer/merges.txt: OK
+Strata-data/packs/iq3_s/tokenizer/token_type.json: OK
+Strata-data/packs/iq3_s/tokenizer/vocab.json: OK
+Strata-data/packs/iq3_s/conversions.json: OK
+Strata-data/packs/iq3_s/experts.bin.src.json: OK
+Strata-data/packs/iq3_s/tokenizer/tokenizer.json: OK
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-list -m 256M -- sh -c echo\ \"files\ in\ the\ sandbox\ pack:\ \$\(wc\ -l\ \<\ /tmp/r9-sandbox.sha\)\"\;\ diff\ \<\(cd\ /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ \|\ LC_ALL=C\ sort\)\ \<\(cd\ /home/thc1006/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ \|\ LC_ALL=C\ sort\)\ \&\&\ echo\ \"the\ same\ names\ as\ production\'s\ pack\ \(find\,\ read\ only\)\"\;\ grep\ -h\ \"hashed\ in\"\ /dev/null
+sh: 1: Syntax error: "(" unexpected
+[exit 2]
+# R9 result: the sandbox's pack has 11 files, the same names as production's, and all 11 match config/deployed-artifacts.sha256:23-30,33-35 (every pack file the manifest lists, and the pack has no other); last line 'experts.bin: 48 layers, 46.84 GiB' as docs/runbooks/change-config.md:63. So 0.1.45's tools/iq_pack.py reproduces the deployed pack of 2026-10-18 byte for byte
+# the probe above did not run (sh has no process substitution); the note above was written before its result. Again with bash:
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r9-list2 -m 256M -- bash -c echo\ \"files\ in\ the\ sandbox\ pack:\ \$\(wc\ -l\ \<\ /tmp/r9-sandbox.sha\)\"\;\ diff\ \<\(cd\ /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ \|\ LC_ALL=C\ sort\)\ \<\(cd\ /home/thc1006/dev/Strata-data/packs/iq3_s\ \&\&\ find\ .\ \|\ LC_ALL=C\ sort\)\ \&\&\ echo\ \"the\ same\ names\ as\ production\'s\ pack\ \(find\,\ read\ only\)\"
+files in the sandbox pack: 11
+the same names as production's pack (find, read only)
+[exit 0]
+# sandbox pack hashed in 373 s (51.8 GB)
+
+== R10. the live config (PLAN.md F9), written by the tool on the sandbox's own path (2026-10-30 03:19:53)
+# the sandbox's ~/dev/strata/strata-iq3_xxs.json is setup's output, byte for byte config/strata-iq3_xxs.setup.json (R6). The tool runs on it through the path /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/strata-iq3_xxs.json (the same file inside and outside rr), never through /home/thc1006/dev/strata/...
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r10-tool -m 256M -- sh -c cd\ /home/thc1006/dev/p100-q3-deployment\ \&\&\ T=/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/strata-iq3_xxs.json\ \&\&\ sha256sum\ \$T\ \&\&\ python3\ -I\ tools/configure_strata_q3.py\ \$T\ \$\(sed\ -e\ \"s/#.\*//\"\ config/profile.conf\)\ \|\ python3\ -I\ -c\ \"import\ json\,sys\;\ d=json.load\(sys.stdin\)\;\ print\(\\\"changed:\\\"\,\ d.get\(\\\"changed\\\"\)\,\ \\\"\|\ critical:\\\"\,\ d.get\(\\\"critical_changes\\\"\)\)\;\ \[print\(\\\"\ \ \\\"\,\ c\)\ for\ c\ in\ d.get\(\\\"changes\\\"\,\ \[\]\)\]\"\;\ ls\ -l\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/\ \|\ grep\ strata-iq3_xxs
+6e7cc82ea2a0e2395eeb7cdc5cc18c31702d3846e5b0b097673be9423ad3ac88  /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/strata-iq3_xxs.json
+changed: True | critical: ['model: iq3_xxs -> iq3_s', '--batch-groups: None -> auto', '--conversation-cache-mib: None -> 8192', '--conversation-cache-min-free-mib: None -> 6144', '--conversation-cache-min-tokens: None -> 1024', '--conversation-cache-slots: None -> 8', '--no-kv-grow: False -> True', '--no-ple-prefetch: False -> True', '--ple-io: None -> ram', '--trim-stage-weights: False -> True', 'gpu_order: null -> "as_given"', 'layer_split: "12,24,36" -> [13, 25, 38]', 'split_skip_if_fits: null -> false', 'env STRATA_ADAPT_NOWAIT: null -> "0"', 'env STRATA_ADAPT_OVERLAP: null -> "0"', 'env STRATA_ADAPT_OVERLAP_RESIDENT: null -> "0"', 'env STRATA_BATCH_MTP: null -> "0"', 'env STRATA_BATCH_MTP_SERIAL: null -> "0"', 'env STRATA_KV_GROW: null -> "0"', 'env STRATA_MMQ_GROUP_SORT: null -> "1"', 'env STRATA_MMQ_RESIDENT_SORT_NE: null -> "0"', 'env STRATA_PIPED_CONCURRENT: null -> "1"', 'env STRATA_PIPELINE_ADAPT_ASYNC: null -> "0"', 'env STRATA_PREFILL_CPU_SHARE: null -> "0"', 'env STRATA_RESIDENT_HEADROOM_GIB: null -> "6"', 'env STRATA_ROUTE_TAIL_SKIP: null -> "0"']
+   model: iq3_xxs -> iq3_s
+   --batch-groups: None -> auto
+   --conversation-cache-mib: None -> 8192
+   --conversation-cache-min-free-mib: None -> 6144
+   --conversation-cache-min-tokens: None -> 1024
+   --conversation-cache-slots: None -> 8
+   --no-kv-grow: False -> True
+   --no-ple-prefetch: False -> True
+   --ple-io: None -> ram
+   --pool-workers: None -> 6
+   --prefill: auto -> 2048
+   --trim-stage-weights: False -> True
+   gpu_order: null -> "as_given"
+   layer_split: "12,24,36" -> [13, 25, 38]
+   split_skip_if_fits: null -> false
+   reasoning_effort: null -> "medium"
+   reasoning_budget_tokens: null -> 1024
+   fit_max_tokens: null -> false
+   reasoning_close_retry: null -> true
+   env STRATA_ADAPT_NOWAIT: null -> "0"
+   env STRATA_ADAPT_OVERLAP: null -> "0"
+   env STRATA_ADAPT_OVERLAP_RESIDENT: null -> "0"
+   env STRATA_BATCH_MTP: null -> "0"
+   env STRATA_BATCH_MTP_SERIAL: null -> "0"
+   env STRATA_KV_GROW: null -> "0"
+   env STRATA_MMQ_GROUP_SORT: null -> "1"
+   env STRATA_MMQ_RESIDENT_SORT_NE: null -> "0"
+   env STRATA_PIPED_CONCURRENT: null -> "1"
+   env STRATA_PIPELINE_ADAPT_ASYNC: null -> "0"
+   env STRATA_PREFILL_CPU_SHARE: null -> "0"
+   env STRATA_RESIDENT_HEADROOM_GIB: null -> "6"
+   env STRATA_ROUTE_TAIL_SKIP: null -> "0"
+-rw-rw-r--  1 thc1006 thc1006   2281  十  30 03:19 strata-iq3_xxs.json
+-rw-rw-r--  1 thc1006 thc1006   1178  十  30 03:19 strata-iq3_xxs.json.before-p100-q3
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r10-cmp -m 256M -- sh -c cd\ /home/thc1006/dev\ \&\&\ cmp\ strata/strata-iq3_xxs.json\ p100-q3-deployment/config/strata-iq3_xxs.deployed.json\ \&\&\ echo\ \"config\ matches:\ the\ live\ config\ =\ config/strata-iq3_xxs.deployed.json\ byte\ for\ byte\"\;\ grep\ \"\ \ strata/strata-iq3_xxs.json\$\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -
+config matches: the live config = config/strata-iq3_xxs.deployed.json byte for byte
+strata/strata-iq3_xxs.json: OK
+[exit 0]
+# no path mapping is needed for the cmp: the config names /home/thc1006/dev/... and /home/thc1006/cuda-12.9/..., the same strings as production's, and inside rr those paths are the sandbox's files. What they resolve to inside:
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r10-paths -m 256M -- python3 -I -c $'\nimport json, os\nc = json.load(open("/home/thc1006/dev/strata/strata-iq3_xxs.json"))\npaths = [c["exe"], c["cwd"], c["tokenizer"]] + [a for a in c["args"] if a.startswith("/")] + c.get("lib_dirs", [])\nfor p in paths:\n    r = os.path.realpath(p)\n    print(("ok   " if os.path.exists(p) else "MISSING ") + p + ("" if r == p else "  -> " + r))\nprint("api_key set:", c.get("api_key") not in (None, ""))'
+ok   /home/thc1006/dev/strata/engine-cuda12/strata
+ok   /home/thc1006/dev/strata
+ok   /home/thc1006/dev/Strata-data/packs/iq3_s/tokenizer
+ok   /home/thc1006/dev/Strata-data/packs/iq3_s
+ok   /home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+ok   /home/thc1006/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf  -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+ok   /home/thc1006/dev/strata/data/expert-profile.bin
+ok   /home/thc1006/dev/Strata-data/mtp/rt
+ok   /home/thc1006/cuda-12.9/bin
+ok   /home/thc1006/cuda-12.9/lib64  -> /home/thc1006/cuda-12.9/targets/x86_64-linux/lib
+api_key set: False
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r10-dry -m 256M -- sh -c cd\ /home/thc1006/dev/p100-q3-deployment\ \&\&\ python3\ -I\ tools/configure_strata_q3.py\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/strata-iq3_xxs.json\ \$\(sed\ -e\ \"s/#.\*//\"\ config/profile.conf\)\ --dry-run\ \|\ python3\ -I\ -c\ \"import\ json\,sys\;\ d=json.load\(sys.stdin\)\;\ print\(\\\"dry\ run:\ changed:\\\"\,\ d.get\(\\\"changed\\\"\)\,\ \\\"semantic_change:\\\"\,\ d.get\(\\\"semantic_change\\\"\)\,\ \\\"critical_changes:\\\"\,\ d.get\(\\\"critical_changes\\\"\)\)\"
+dry run: changed: False semantic_change: False critical_changes: []
+[exit 0]
+# R10 result: the tool made the live config from setup's output with --profile deployed --model iq3_s (its changes above, the backup strata-iq3_xxs.json.before-p100-q3 beside it in the sandbox tree); the result is config/strata-iq3_xxs.deployed.json byte for byte and config/deployed-artifacts.sha256:7 is OK; every path it names exists inside the namespace; the preflight's verdict (dry run) is no change and no critical change
+
+== R11. scripts/check-drift.sh --full of the sandbox's ops clone, inside rr, with --sysbus (read-only: systemctl show / is-active for its sections on the units and host units) and the hooks that keep it off the running server: DRIFT_URL=http://127.0.0.1:9 (nothing listens there), DRIFT_ENGINE_RE='[n]o-such-engine' (2026-10-30 03:20:05)
+# started 03:20:05
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr --sysbus -n rr-r11-drift -m 1G -c 7 -- sh -c T0=\$\(date\ +%s\)\;\ cd\ /home/thc1006/dev/p100-q3-deployment\ \&\&\ DRIFT_URL=http://127.0.0.1:9\ DRIFT_ENGINE_RE=\"\[n\]o-such-engine\"\ scripts/check-drift.sh\ --full\;\ rc=\$\?\;\ echo\ \"check-drift\ exit\ \$rc\ after\ \$\(\(\ \$\(date\ +%s\)\ -\ T0\ \)\)\ s\"\;\ exit\ \$rc
+note   test hooks set: DRIFT_ENGINE_RE DRIFT_URL
+== installed files, and what systemd loaded of each unit
+DRIFT  /etc/systemd/system/strata-q3.service is owner:group mode 65534:65534 644, not 0:0 644
+ok     strata-q3.service (loaded: as the repo's file, 26 settings; its cgroup holds its MemorySwapMax)
+DRIFT  /etc/systemd/system/strata-q3-health.service is owner:group mode 65534:65534 644, not 0:0 644
+ok     strata-q3-health.service (loaded: as the repo's file, 12 settings)
+DRIFT  /etc/systemd/system/strata-q3-health.timer is owner:group mode 65534:65534 644, not 0:0 644
+ok     strata-q3-health.timer (loaded: as the repo's file, 5 settings)
+DRIFT  /etc/systemd/system/zfs-arc-max.service is owner:group mode 65534:65534 644, not 0:0 644
+ok     zfs-arc-max.service (loaded: as the repo's file, 8 settings)
+DRIFT  /etc/systemd/system/user-1003.slice.d/50-memory.conf is owner:group mode 65534:65534 644, not 0:0 644
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemoryMax.conf (systemctl set-property --runtime) holds the repo's values
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemorySwapMax.conf (systemctl set-property --runtime) holds the repo's values
+ok     user-1003.slice (loaded: as the repo's drop-ins, 2 settings; its cgroup holds its MemoryMax, MemorySwapMax)
+DRIFT  /etc/logrotate.d/strata-q3 is owner:group mode 65534:65534 644, not 0:0 644
+DRIFT  /usr/local/sbin/strata-q3-health is owner:group mode 65534:65534 755, not 0:0 755
+ok     zfs_arc_max = 2147483648
+ok     zfs_arc_shrinker_limit = 0
+== host units (config/host-units.conf)
+ok     default target multi-user.target
+ok     system cups.service disabled, inactive
+ok     system cups.socket disabled, inactive
+ok     system cups.path disabled, inactive
+ok     system cups-browsed.service disabled, inactive
+ok     system avahi-daemon.socket disabled, inactive
+ok     system avahi-daemon.service masked, inactive
+ok     system ModemManager.service masked, inactive
+ok     system fwupd.service masked, inactive
+ok     system fwupd-refresh.timer disabled, inactive
+ok     system packagekit.service masked, inactive
+ok     system colord.service masked, inactive
+ok     system switcheroo-control.service masked, inactive
+ok     system power-profiles-daemon.service masked, inactive
+ok     system kerneloops.service disabled, inactive
+ok     system upower.service masked, inactive
+ok     system udisks2.service masked, inactive
+ok     system accounts-daemon.service masked, inactive
+ok     system rtkit-daemon.service masked, inactive
+ok     system docker.service disabled, inactive
+ok     system docker.socket disabled, inactive
+ok     system containerd.service disabled, inactive
+ok     system snapd.service disabled, inactive
+ok     system snapd.socket disabled, inactive
+ok     system snapd.seeded.service disabled, inactive
+ok     system motd-news.timer disabled, inactive
+ok     system update-notifier-download.timer disabled, inactive
+ok     system update-notifier-motd.timer disabled, inactive
+ok     system man-db.timer disabled, inactive
+ok     system e2scrub_all.timer disabled, inactive
+DRIFT  user pipewire.socket is unreadable / unreadable, want masked and not running
+DRIFT  user pipewire.service is unreadable / unreadable, want masked and not running
+DRIFT  user pipewire-media-session.service is unreadable / unreadable, want masked and not running
+DRIFT  user snap.snapd-desktop-integration.snapd-desktop-integration.service is unreadable / unreadable, want masked and not running
+== Strata config
+ok     /home/thc1006/dev/strata/strata-iq3_xxs.json
+ok     setup's config + configure_strata_q3.py --profile deployed --model iq3_s = the deployed snapshot
+== deployed files (sha256, config/deployed-artifacts.sha256)
+DRIFT  strata/engine-cuda12/strata (sha256 changed, or unreadable)
+DRIFT  strata/engine-cuda12/libstrata_kq.so (sha256 changed, or unreadable)
+ok     strata/engine-cuda12/BUILD.json
+ok     strata/strata-iq3_xxs.json
+ok     strata/data/expert-profile.bin
+ok     strata/.venv/pyvenv.cfg
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcudart.so.12.9.79
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublas.so.12.9.1.4
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublasLt.so.12.9.1.4
+ok     Strata-data/mtp/rt/dense.bin
+ok     Strata-data/mtp/rt/dense.txt
+ok     Strata-data/mtp/rt/draft_vocab.bin
+ok     Strata-data/mtp/rt/experts.bin
+ok     Strata-data/packs/iq3_s/index.txt
+ok     Strata-data/packs/iq3_s/native_experts.txt
+ok     Strata-data/packs/iq3_s/dense.bin
+ok     Strata-data/packs/iq3_s/experts.bin
+ok     Strata-data/packs/iq3_s/tokenizer/chat_template.jinja
+ok     Strata-data/packs/iq3_s/tokenizer/merges.txt
+ok     Strata-data/packs/iq3_s/tokenizer/token_type.json
+ok     Strata-data/packs/iq3_s/tokenizer/vocab.json
+ok     strata/.venv/.strata-pip.json
+ok     Strata-data/packs/iq3_s/conversions.json
+ok     Strata-data/packs/iq3_s/experts.bin.src.json
+ok     Strata-data/packs/iq3_s/tokenizer/tokenizer.json
+ok     Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
+ok     Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
+== the Strata tree, its venv and its shared settings; the service's checkout (/home/thc1006/dev/p100-q3-deployment)
+ok     /home/thc1006/dev/strata is at 477ac13cbe8e582c20484871ce459d20d82df09d
+ok     /home/thc1006/dev/strata: its 3286 files are the pinned commit's
+ok     /home/thc1006/dev/strata: where server.py imports from, the commit's modules and the list's only, and their cached bytecode is what they compile to
+ok     /home/thc1006/dev/strata/.venv: the packages config/strata-venv.txt lists, with the RECORDs it pins, file by file as their RECORDs give them, no other file, and their cached bytecode what their sources compile to
+ok     no .pth, usercustomize or sitecustomize in the service user's site-packages (/home/thc1006/.local/lib/python*)
+ok     no shared settings file (/home/thc1006/dev/strata/strata-iq3_xxs.shared-settings.json)
+ok     /home/thc1006/dev/p100-q3-deployment: its commit 7886a39, file by file, and no other file where the service runs code from
+DRIFT  /home/thc1006/dev/strata/.venv/bin/python is not the system's python: it resolves to /usr/bin/python3.10, which others than root can change
+== the running service
+DRIFT  the service manager's PATH has /usr/local/sbin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /usr/local/bin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /usr/sbin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /usr/bin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /sbin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /bin, which is not absolute or which others than root can change
+DRIFT  the service manager's PATH has /snap/bin, which is not absolute or which others than root can change
+DRIFT  strata-q3.service: its main process (1076343) cannot be read
+
+drift found: see DRIFT lines above
+check-drift exit 1 after 604 s
+[exit 1]
+# ended 03:30:09
+# R11 reading. Sections 'Strata config', 'deployed files' and the Strata tree / venv / checkout section check the sandbox exactly as they check production: all ok, except strata/engine-cuda12/strata and libstrata_kq.so (the expected difference: nvcc's tmpxft names, R7). Both IQ3_S shards are ok (shard 2 is production's file, read through the sandbox's link and the read-only view). The other DRIFT lines come from the namespace, not from the rehearsal's files: (a) owner 65534:65534 and 'others than root can change': inside the user namespace root's files show as the unmapped uid 65534, so every root-owned file and directory looks foreign (the installed units, logrotate, the watchdog, /usr/bin for the venv's python, the PATH directories); (b) the four user units 'unreadable': no user bus inside (/run/user/1003 is empty); (c) 'main process cannot be read': the sandbox's own PID namespace hides the service's processes. To show that, the same check outside the sandbox, on production's live checkout, without --full (read-only; it reads the running service as it always does):
+
+$ systemd-run --user --scope -q --unit=rrg-drift-prod -p MemoryMax=1G -p MemorySwapMax=0 -- choom -n 500 -- nice -n 19 ionice -c3 /home/thc1006/dev/p100-q3-deployment/scripts/check-drift.sh
+== installed files, and what systemd loaded of each unit
+ok     /etc/systemd/system/strata-q3.service
+ok     strata-q3.service (loaded: as the repo's file, 26 settings; its cgroup holds its MemorySwapMax)
+ok     /etc/systemd/system/strata-q3-health.service
+ok     strata-q3-health.service (loaded: as the repo's file, 12 settings)
+ok     /etc/systemd/system/strata-q3-health.timer
+ok     strata-q3-health.timer (loaded: as the repo's file, 5 settings)
+ok     /etc/systemd/system/zfs-arc-max.service
+ok     zfs-arc-max.service (loaded: as the repo's file, 8 settings)
+ok     /etc/systemd/system/user-1003.slice.d/50-memory.conf
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemoryMax.conf (systemctl set-property --runtime) holds the repo's values
+note   user-1003.slice: /run/systemd/system.control/user-1003.slice.d/50-MemorySwapMax.conf (systemctl set-property --runtime) holds the repo's values
+ok     user-1003.slice (loaded: as the repo's drop-ins, 2 settings; its cgroup holds its MemoryMax, MemorySwapMax)
+ok     /etc/logrotate.d/strata-q3
+ok     /usr/local/sbin/strata-q3-health
+ok     zfs_arc_max = 2147483648
+ok     zfs_arc_shrinker_limit = 0
+== host units (config/host-units.conf)
+ok     default target multi-user.target
+ok     system cups.service disabled, inactive
+ok     system cups.socket disabled, inactive
+ok     system cups.path disabled, inactive
+ok     system cups-browsed.service disabled, inactive
+ok     system avahi-daemon.socket disabled, inactive
+ok     system avahi-daemon.service masked, inactive
+ok     system ModemManager.service masked, inactive
+ok     system fwupd.service masked, inactive
+ok     system fwupd-refresh.timer disabled, inactive
+ok     system packagekit.service masked, inactive
+ok     system colord.service masked, inactive
+ok     system switcheroo-control.service masked, inactive
+ok     system power-profiles-daemon.service masked, inactive
+ok     system kerneloops.service disabled, inactive
+ok     system upower.service masked, inactive
+ok     system udisks2.service masked, inactive
+ok     system accounts-daemon.service masked, inactive
+ok     system rtkit-daemon.service masked, inactive
+ok     system docker.service disabled, inactive
+ok     system docker.socket disabled, inactive
+ok     system containerd.service disabled, inactive
+ok     system snapd.service disabled, inactive
+ok     system snapd.socket disabled, inactive
+ok     system snapd.seeded.service disabled, inactive
+ok     system motd-news.timer disabled, inactive
+ok     system update-notifier-download.timer disabled, inactive
+ok     system update-notifier-motd.timer disabled, inactive
+ok     system man-db.timer disabled, inactive
+ok     system e2scrub_all.timer disabled, inactive
+ok     user pipewire.socket masked, inactive
+ok     user pipewire.service masked, inactive
+ok     user pipewire-media-session.service masked, inactive
+ok     user snap.snapd-desktop-integration.snapd-desktop-integration.service masked, inactive
+== Strata config
+ok     /home/thc1006/dev/strata/strata-iq3_xxs.json
+ok     setup's config + configure_strata_q3.py --profile deployed --model iq3_s = the deployed snapshot
+== deployed files (sha256, config/deployed-artifacts.sha256)
+ok     strata/engine-cuda12/strata
+ok     strata/engine-cuda12/libstrata_kq.so
+ok     strata/engine-cuda12/BUILD.json
+ok     strata/strata-iq3_xxs.json
+ok     strata/data/expert-profile.bin
+ok     strata/.venv/pyvenv.cfg
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcudart.so.12.9.79
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublas.so.12.9.1.4
+ok     /home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublasLt.so.12.9.1.4
+ok     Strata-data/mtp/rt/dense.bin
+ok     Strata-data/mtp/rt/dense.txt
+ok     Strata-data/mtp/rt/draft_vocab.bin
+ok     Strata-data/mtp/rt/experts.bin
+ok     Strata-data/packs/iq3_s/index.txt
+ok     Strata-data/packs/iq3_s/native_experts.txt
+skip   Strata-data/packs/iq3_s/dense.bin (--full: 1 GiB)
+skip   Strata-data/packs/iq3_s/experts.bin (--full: 46 GiB)
+ok     Strata-data/packs/iq3_s/tokenizer/chat_template.jinja
+ok     Strata-data/packs/iq3_s/tokenizer/merges.txt
+ok     Strata-data/packs/iq3_s/tokenizer/token_type.json
+ok     Strata-data/packs/iq3_s/tokenizer/vocab.json
+ok     strata/.venv/.strata-pip.json
+ok     Strata-data/packs/iq3_s/conversions.json
+ok     Strata-data/packs/iq3_s/experts.bin.src.json
+ok     Strata-data/packs/iq3_s/tokenizer/tokenizer.json
+skip   Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf (--full: 51 GiB)
+skip   Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf (--full: 26 GiB)
+== the Strata tree, its venv and its shared settings; the service's checkout (/home/thc1006/dev/p100-q3-deployment)
+ok     /home/thc1006/dev/strata is at 477ac13cbe8e582c20484871ce459d20d82df09d
+ok     /home/thc1006/dev/strata: its 3286 files are the pinned commit's
+ok     /home/thc1006/dev/strata: where server.py imports from, the commit's modules and the list's only, and their cached bytecode is what they compile to
+ok     /home/thc1006/dev/strata/.venv: the packages config/strata-venv.txt lists, with the RECORDs it pins, file by file as their RECORDs give them, no other file, and their cached bytecode what their sources compile to
+ok     no .pth, usercustomize or sitecustomize in the service user's site-packages (/home/thc1006/.local/lib/python*)
+ok     no shared settings file (/home/thc1006/dev/strata/strata-iq3_xxs.shared-settings.json)
+ok     /home/thc1006/dev/p100-q3-deployment: its commit 7886a39, file by file, and no other file where the service runs code from
+== the running service
+ok     strata-q3.service runs what the files above say
+
+no drift
+[exit 0]
+# production's own check (outside, the live checkout): no drift. Every section the sandbox run showed as DRIFT for (a)-(c) is ok here, so those lines were the namespace's; the sandbox's only real difference from the manifest is the two engine binaries
+
+== after R8-R11 (2026-10-30 03:31:02)
+
+$ diff /home/thc1006/rebuild-rehearsal/verify/r0-prod-before.txt /home/thc1006/rebuild-rehearsal/verify/r11-prod-after.txt
+[exit 0]
+
+$ sh -c grep\ -c\ \':\ freeze\'\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ tail\ -1\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ systemctl\ is-active\ strata-q3.service\ strata-q3-health.timer\;\ cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.max\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current\;\ grep\ -E\ \'\^\(anon\|file\)\ \'\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.stat\;\ grep\ -E\ \'\^\(oom\|oom_kill\)\ \'\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.events\;\ grep\ MemAvailable\ /proc/meminfo\;\ df\ --output=avail\,pcent\ /\ \|\ tail\ -1\;\ du\ -s\ -B1\ --apparent-size\ /home/thc1006/rebuild-rehearsal\;\ systemctl\ --user\ list-units\ --type=scope\ --plain\ --no-legend\ \'rr-\*\'\ \|\ grep\ -c\ \'\^rr-\'\ \|\|\ true
+0
+rr-guard 2026-10-30 03:30:49: service active, MemAvailable 22 GiB, / 67 %: thaw; scopes: none
+active
+active
+6442450944
+3367960576
+anon 828850176
+file 2346098688
+oom 19
+oom_kill 14
+MemAvailable:   23479160 kB
+196934016  67%
+124940480439	/home/thc1006/rebuild-rehearsal
+0
+[exit 0]
+# the 33 production paths of R0 unchanged; rr-guard: no freeze in R8-R11; the account's oom and oom_kill as before R6 (no new kill); no rr job left; the guard still runs (rrg-guard.scope); R12 (cleanup) not started

@@ -1,0 +1,275 @@
+# Copied on 2026-10-30 from the rehearsal's own record (written as the steps ran), unchanged below this preface.
+# The tools it names under ~/rebuild-rehearsal/bin are in bench/ now, each header saying how it differs from the copy
+# that ran: rr is bench/rehearsal_rr.sh, rr-guard bench/rehearsal_guard.sh, rr-memwatch bench/rehearsal_memwatch.sh,
+# rlog bench/rehearsal_log.sh, elfcmp.py bench/rehearsal_elfcmp.py, r0-selftest.sh bench/rehearsal_selftest.sh,
+# r0-probe.py bench/rehearsal_probe.py, r0-settings.py bench/rehearsal_settings.py, shim/sudo and shim/nvidia-smi
+# bench/rehearsal_shim_sudo.sh and bench/rehearsal_shim_nvidia_smi.sh.  "PLAN.md" is the plan of the session that ran
+# the rehearsal; it is not in this repository, and docs/runbooks/rebuild.md gives the procedure.
+# R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, 2026-10-30 00:48:13 +0800.
+# Every job ran through ~/rebuild-rehearsal/bin/rr: its own user scope (MemoryMax, MemorySwapMax=0), choom -n 500,
+# nice -n 19, chrt -i 0, ionice -c3, taskset -c 7, then bwrap.  No sudo was run.  Production was read only.
+# Probe token (in every probe file name): 8f9f0719ae14.  The host name is written <host>; everything else is the output, unchanged.
+
+== 0. the state before
+
+$ systemctl is-active strata-q3.service strata-q3-health.timer
+active
+active
+[exit 0]
+
+$ cat /sys/fs/cgroup/user.slice/user-1003.slice/memory.current
+1439703040
+[exit 0]
+
+$ df --output=avail\,pcent /
+    Avail Use%
+315668096  47%
+[exit 0]
+
+$ sha256sum /home/thc1006/rebuild-rehearsal/bin/rr /home/thc1006/rebuild-rehearsal/bin/rr-guard /home/thc1006/rebuild-rehearsal/bin/r0-probe.py /home/thc1006/rebuild-rehearsal/bin/r0-settings.py /home/thc1006/rebuild-rehearsal/shim/sudo /home/thc1006/rebuild-rehearsal/shim/nvidia-smi
+2009c269d1ed02e4c423f9ce202e44a23129645e4b96ef408bdafc2bc49ff20a  /home/thc1006/rebuild-rehearsal/bin/rr
+ff8bc7fb5289180848f7f30c5755f3f053956361f0e86a94ecc63a861012fcd3  /home/thc1006/rebuild-rehearsal/bin/rr-guard
+ca9543a7aafe52c82fe5aa40cea1c0c1dce20da50e9e54d36d8628004ce93482  /home/thc1006/rebuild-rehearsal/bin/r0-probe.py
+9dd4f79f5c65b4f5623ee47430160048436ad33214b0b3232d6f9520e11bad7a  /home/thc1006/rebuild-rehearsal/bin/r0-settings.py
+03da5182ceadbc2f1219b9dd09650a50f3f4a00eda71da8ab8d051b5866bc23c  /home/thc1006/rebuild-rehearsal/shim/sudo
+5cd16e8ec34416611d3b937aee5cf8336f29578c7bb3724a275d4d1862d21a68  /home/thc1006/rebuild-rehearsal/shim/nvidia-smi
+[exit 0]
+
+== 1. the namespace and the job's limits, seen from inside
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-props -m 256M -- sh -c $'id; echo "pid $$"; chrt -p $$; echo "nice $(nice)"; ionice -p $$; echo "oom_score_adj $(cat /proc/self/oom_score_adj)"; taskset -pc $$\n  cg=$(sed -n "s/^0:://p" /proc/self/cgroup); echo "cgroup $cg"; echo "memory.max $(cat /sys/fs/cgroup$cg/memory.max) memory.swap.max $(cat /sys/fs/cgroup$cg/memory.swap.max)"\n  for p in / /etc /usr/local/sbin /home/thc1006 /home/thc1006/.config /home/thc1006/rebuild-rehearsal /home/thc1006/rebuild-rehearsal/prod/dev \\\n           /home/thc1006/rebuild-rehearsal/prod/cuda-12.9 /home/thc1006/dev /home/thc1006/cuda-12.9 /home/thc1006/downloads /tmp /run/user/1003 /run/dbus /proc; do\n    printf "%-45s %s\\n" "$p" "$(findmnt -no SOURCE,OPTIONS -T $p | cut -c1-90)"; done'
+uid=1003(thc1006) gid=1003(thc1006) groups=1003(thc1006),65534(nogroup)
+pid 2
+pid 2's current scheduling policy: SCHED_IDLE
+pid 2's current scheduling priority: 0
+nice 19
+idle
+oom_score_adj 500
+pid 2's current affinity list: 7
+cgroup /user.slice/user-1003.slice/user@1003.service/app.slice/rr-r0-props.scope
+memory.max 268435456 memory.swap.max 0
+/                                             rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/etc                                          rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/usr/local/sbin                               rpool/ROOT/ubuntu_b3m9mu/usr/local ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/home/thc1006                                 rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/home/thc1006/.config                         rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/home/thc1006/rebuild-rehearsal               rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal] rw,nosuid,nodev,relatime,xattr,p
+/home/thc1006/rebuild-rehearsal/prod/dev      rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/dev] ro,nosuid,nodev,relatime,xattr,posixacl,casese
+/home/thc1006/rebuild-rehearsal/prod/cuda-12.9 rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/cuda-12.9] ro,nosuid,nodev,relatime,xattr,posixacl,
+/home/thc1006/dev                             rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev] rw,nosuid,
+/home/thc1006/cuda-12.9                       rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9] rw,n
+/home/thc1006/downloads                       rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads] rw,n
+/tmp                                          rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/tmp] rw,nosuid,nodev,relatim
+/run/user/1003                                tmpfs                                                                         ro,nosuid,no
+rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/empty-run-user] rw,nosuid,no
+/run/dbus                                     rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/empty-dbus] rw,nosuid,nodev,
+/proc                                         proc   ro,nosuid,nodev,noexec,relatime
+proc   rw,nosuid,nodev,noexec,relatime
+[exit 0]
+
+== 2. writes into production paths, from inside (each must be refused)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-probe -m 256M -- python3 -I /home/thc1006/rebuild-rehearsal/bin/r0-probe.py 8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/prod/dev/strata: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/strata/engine-cuda12: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (ETXTBSY); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/strata/.venv: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_S: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_s: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_xxs: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp/rt: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/cuda-12.9: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/.config/strata: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/etc: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+/etc/systemd/system: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+/usr/local/sbin: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+probes allowed: 0
+[exit 0]
+
+== 3. the production paths at their own names, inside: they are the sandbox's
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-names -m 256M -- sh -c ls\ -A\ /home/thc1006/dev\ /home/thc1006/cuda-12.9\ /home/thc1006/downloads\ /tmp\;\ for\ p\ in\ /home/thc1006/dev/strata\ /home/thc1006/dev/Strata-data\ /home/thc1006/dev/p100-q3-deployment\ /home/thc1006/cuda-12.9/bin/nvcc\;\ do\ \[\ -e\ \$p\ \]\ \&\&\ echo\ \"\$p\ exists\"\ \|\|\ echo\ \"\$p\ does\ not\ exist\ inside\"\;\ done
+/home/thc1006/cuda-12.9:
+
+/home/thc1006/dev:
+.rehearsal-sandbox
+
+/home/thc1006/downloads:
+cuda
+
+/tmp:
+/home/thc1006/dev/strata does not exist inside
+/home/thc1006/dev/Strata-data does not exist inside
+/home/thc1006/dev/p100-q3-deployment does not exist inside
+/home/thc1006/cuda-12.9/bin/nvcc does not exist inside
+[exit 0]
+
+== 4. markers written through the mapped paths inside, found under ~/rebuild-rehearsal outside
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-mark -m 256M -- sh -c $'set -e; T=8f9f0719ae14; mkdir -p /home/thc1006/dev/strata /home/thc1006/dev/Strata-data/models /home/thc1006/dev/Strata-data/packs /home/thc1006/dev/Strata-data/mtp\n  for p in /home/thc1006/dev /home/thc1006/dev/strata /home/thc1006/dev/Strata-data/models /home/thc1006/dev/Strata-data/packs /home/thc1006/dev/Strata-data/mtp /home/thc1006/cuda-12.9 /home/thc1006/downloads /tmp "$XDG_CONFIG_HOME"; do\n    echo "written inside through $p" > $p/.rr-marker-$T && echo "wrote $p/.rr-marker-$T"; done'
+wrote /home/thc1006/dev/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/dev/strata/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/dev/Strata-data/models/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/dev/Strata-data/packs/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/dev/Strata-data/mtp/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/cuda-12.9/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/downloads/.rr-marker-8f9f0719ae14
+wrote /tmp/.rr-marker-8f9f0719ae14
+wrote /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/.rr-marker-8f9f0719ae14
+[exit 0]
+
+$ find /home/thc1006/rebuild-rehearsal -name .rr-marker-8f9f0719ae14 -printf %p\\n
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/mtp/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/packs/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/tmp/.rr-marker-8f9f0719ae14
+[exit 0]
+
+$ ls -d <the same names outside, in production>
+absent /home/thc1006/dev/.rr-marker-8f9f0719ae14
+absent /home/thc1006/dev/strata/.rr-marker-8f9f0719ae14
+absent /home/thc1006/dev/Strata-data/models/.rr-marker-8f9f0719ae14
+absent /home/thc1006/dev/Strata-data/packs/.rr-marker-8f9f0719ae14
+absent /home/thc1006/dev/Strata-data/mtp/.rr-marker-8f9f0719ae14
+absent /home/thc1006/cuda-12.9/.rr-marker-8f9f0719ae14
+absent /home/thc1006/downloads/.rr-marker-8f9f0719ae14
+absent /tmp/.rr-marker-8f9f0719ae14
+absent /home/thc1006/.config/.rr-marker-8f9f0719ae14
+# cleanup of the markers and of the two directories made for them, by their sandbox paths, outside:
+
+$ rm -rf /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data
+[exit 0]
+
+$ find /home/thc1006/rebuild-rehearsal -name .rr-marker-8f9f0719ae14 -delete -print
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/.rr-marker-8f9f0719ae14
+/home/thc1006/rebuild-rehearsal/root/tmp/.rr-marker-8f9f0719ae14
+[exit 0]
+
+== 5. no GPU inside; the stand-ins
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-gpu -m 256M -- sh -c ls\ -l\ /dev/nvidia\*\ 2\>\&1\;\ ls\ /dev\ \|\ grep\ -c\ nvidia\;\ command\ -v\ nvidia-smi\ sudo\;\ nvidia-smi\ --query-gpu=index\,name\,memory.total\,compute_cap\,driver_version\ --format=csv\,noheader\,nounits\;\ nvidia-smi\ -L\;\ echo\ \"nvidia-smi\ -L\ exit\ \$\?\"\;\ sudo\ -n\ true\;\ echo\ \"sudo\ exit\ \$\?\"
+ls: cannot access '/dev/nvidia*': No such file or directory
+0
+/home/thc1006/rebuild-rehearsal/shim/nvidia-smi
+0, Tesla P100-PCIE-16GB, 16384, 6.0, 535.230.02
+1, Tesla P100-PCIE-16GB, 16384, 6.0, 535.230.02
+2, Tesla P100-PCIE-16GB, 16384, 6.0, 535.230.02
+3, Tesla P100-PCIE-16GB, 16384, 6.0, 535.230.02
+nvidia-smi -L exit 6
+rehearsal: sudo refused: -n true
+sudo exit 1
+[exit 0]
+
+== 6. setup.py's settings inside: its own settings_path() and load_settings()
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-settings -m 256M -- python3 -I /home/thc1006/rebuild-rehearsal/bin/r0-settings.py
+setup.py settings_path() inside: /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/strata/settings.json | exists: False
+setup.py load_settings() inside: {}
+the real ~/.config/strata/settings.json, read-only inside, names: {'data_dir': '/home/thc1006/dev/Strata-data', 'installs': ['/home/thc1006/dev/strata']}
+  /home/thc1006/dev/Strata-data inside: exists False; it is under the bind of /home/thc1006/dev: True
+  /home/thc1006/dev/strata inside: exists False; it is under the bind of /home/thc1006/dev: True
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-dirs -m 256M -- sh -c echo\ \"strata\*\ in\ /home/thc1006\ \(setup.py\ other_installs\,\ grandparent\ of\ the\ tree\):\"\;\ ls\ -d\ /home/thc1006/\[Ss\]trata\*\ 2\>\&1\;\ echo\ \"in\ /home/thc1006/dev\ \(its\ parent\):\"\;\ ls\ -A\ /home/thc1006/dev
+strata* in /home/thc1006 (setup.py other_installs, grandparent of the tree):
+ls: cannot access '/home/thc1006/[Ss]trata*': No such file or directory
+in /home/thc1006/dev (its parent):
+.rehearsal-sandbox
+[exit 0]
+
+== 7. routes out of the namespace, closed
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r0-routes -m 256M -- sh -c echo\ \"processes\ visible:\ \$\(ls\ /proc\ \|\ grep\ -c\ \"\^\[0-9\]\"\)\"\;\ pgrep\ -fa\ \"\[e\]ngine-cuda12/strata\|\[s\]erver.py\"\ \|\|\ echo\ \"no\ Strata\ engine\ or\ server\ process\ visible\"\;\ ls\ -A\ /run/user/1003\ /run/dbus\;\ systemctl\ --user\ is-system-running\ 2\>\&1\ \|\ head\ -2\;\ systemctl\ is-active\ strata-q3.service\ 2\>\&1\ \|\ head\ -2
+processes visible: 5
+no Strata engine or server process visible
+/run/dbus:
+
+/run/user/1003:
+Failed to connect to bus: No such file or directory
+Failed to connect to bus: No such file or directory
+[exit 0]
+
+== 8. the guard: one freeze and thaw of a dummy job (sleep), then one unforced round
+
+$ systemctl --user show -p ActiveState -p FreezerState rr-r0-dummy.scope
+ActiveState=active
+FreezerState=running
+[exit 0]
+
+$ env RR_GUARD_FORCE=freeze /home/thc1006/rebuild-rehearsal/bin/rr-guard --once
+rr-guard 2026-10-30 00:48:17: service active, MemAvailable 22 GiB, / 47 %: freeze (forced by RR_GUARD_FORCE); scopes: rr-r0-dummy.scope 
+[exit 0]
+
+$ systemctl --user show -p FreezerState rr-r0-dummy.scope
+FreezerState=frozen
+[exit 0]
+
+$ cat /sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/rr-r0-dummy.scope/cgroup.events
+populated 1
+frozen 1
+[exit 0]
+
+$ sh -c ps\ -o\ pid\,stat\,cmd\ -p\ \$\(tr\ \'\\n\'\ \,\ \<\ /sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/rr-r0-dummy.scope/cgroup.procs\ \|\ sed\ \'s/\,\$//\'\)
+    PID STAT CMD
+1658230 SN   bwrap --die-with-parent --new-session --unshare-pid --ro-bind / / --dev /dev --proc /proc --bind /home/thc1006/rebuild-rehearsal /home/thc1006/rebuild-rehearsal --ro-bind /home/thc1006/dev /home/thc1006/rebuild-rehearsal/prod/dev --ro-bind /home/thc1006/cuda-12.9 /home/thc1006/rebuild-rehearsal/prod/cuda-12.9 --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev /home/thc1006/dev --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9 /home/thc1006/cuda-12.9 --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads /home/thc1006/downloads --bind /home/thc1006/rebuild-rehearsal/root/tmp /tmp --bind /home/thc1006/rebuild-rehearsal/root/empty-run-user /run/user/1003 --bind /home/thc1006/rebuild-rehearsal/root/empty-dbus /run/dbus --unsetenv DBUS_SESSION_BUS_ADDRESS --setenv XDG_RUNTIME_DIR /run/user/1003 --setenv XDG_CONFIG_HOME /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config --setenv XDG_CACHE_HOME /home/thc1006/rebuild-rehearsal/root/home/thc1006/.cache --setenv TMPDIR /tmp --setenv PATH /home/thc1006/rebuild-rehearsal/shim:/usr/local/bin:/usr/bin:/bin --setenv PYTHONNOUSERSITE 1 /bin/sh -c if [ -e /home/thc1006/dev/.rehearsal-sandbox ] && [ ! -w /etc ] && [ ! -w "$0" ] && [ ! -w "$0/../cuda-12.9" ] \                    && ! ls /dev/nvidia* >/dev/null 2>&1; then shift; exec "$@"; fi                 echo "rr: namespace check failed: nothing run" >&2; exit 98 /home/thc1006/rebuild-rehearsal/prod/dev sh sleep 600
+1658235 SNs  bwrap --die-with-parent --new-session --unshare-pid --ro-bind / / --dev /dev --proc /proc --bind /home/thc1006/rebuild-rehearsal /home/thc1006/rebuild-rehearsal --ro-bind /home/thc1006/dev /home/thc1006/rebuild-rehearsal/prod/dev --ro-bind /home/thc1006/cuda-12.9 /home/thc1006/rebuild-rehearsal/prod/cuda-12.9 --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev /home/thc1006/dev --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9 /home/thc1006/cuda-12.9 --bind /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads /home/thc1006/downloads --bind /home/thc1006/rebuild-rehearsal/root/tmp /tmp --bind /home/thc1006/rebuild-rehearsal/root/empty-run-user /run/user/1003 --bind /home/thc1006/rebuild-rehearsal/root/empty-dbus /run/dbus --unsetenv DBUS_SESSION_BUS_ADDRESS --setenv XDG_RUNTIME_DIR /run/user/1003 --setenv XDG_CONFIG_HOME /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config --setenv XDG_CACHE_HOME /home/thc1006/rebuild-rehearsal/root/home/thc1006/.cache --setenv TMPDIR /tmp --setenv PATH /home/thc1006/rebuild-rehearsal/shim:/usr/local/bin:/usr/bin:/bin --setenv PYTHONNOUSERSITE 1 /bin/sh -c if [ -e /home/thc1006/dev/.rehearsal-sandbox ] && [ ! -w /etc ] && [ ! -w "$0" ] && [ ! -w "$0/../cuda-12.9" ] \                    && ! ls /dev/nvidia* >/dev/null 2>&1; then shift; exec "$@"; fi                 echo "rr: namespace check failed: nothing run" >&2; exit 98 /home/thc1006/rebuild-rehearsal/prod/dev sh sleep 600
+1658236 SN   sleep 600
+[exit 0]
+
+$ env RR_GUARD_FORCE=thaw /home/thc1006/rebuild-rehearsal/bin/rr-guard --once
+rr-guard 2026-10-30 00:48:18: service active, MemAvailable 22 GiB, / 47 %: thaw (forced by RR_GUARD_FORCE); scopes: rr-r0-dummy.scope 
+[exit 0]
+
+$ systemctl --user show -p FreezerState rr-r0-dummy.scope
+FreezerState=running
+[exit 0]
+
+$ cat /sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/rr-r0-dummy.scope/cgroup.events
+populated 1
+frozen 0
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr-guard --once
+rr-guard 2026-10-30 00:48:20: service active, MemAvailable 22 GiB, / 47 %: thaw; scopes: rr-r0-dummy.scope 
+[exit 0]
+
+$ systemctl --user stop rr-r0-dummy.scope
+[exit 0]
+
+$ sh -c systemctl\ --user\ list-units\ --type=scope\ --plain\ --no-legend\ \'rr-\*\'\ \|\ grep\ -c\ \'\^rr-\'\ \|\|\ true
+0
+[exit 0]
+
+== 9. the state after
+
+$ diff /home/thc1006/rebuild-rehearsal/verify/r0-prod-before.txt /home/thc1006/rebuild-rehearsal/verify/r0-prod-after.txt
+[exit 0]
+
+$ <the 33 production paths of section 2, before = after>
+inode, link count, size, mtime and ctime unchanged for every path
+
+$ sh -c find\ ~/dev/strata\ ~/dev/Strata-data\ ~/dev/p100-q3-deployment\ ~/cuda-12.9\ ~/.config/strata\ /etc\ /etc/systemd/system\ /usr/local/sbin\ ~/dev\ ~/downloads\ /tmp\ -maxdepth\ 1\ -name\ \'.rr-\*\'\ 2\>/dev/null\ \|\ wc\ -l
+0
+[exit 0]
+
+$ systemctl is-active strata-q3.service strata-q3-health.timer
+active
+active
+[exit 0]
+
+$ cat /sys/fs/cgroup/user.slice/user-1003.slice/memory.current
+1443123200
+[exit 0]

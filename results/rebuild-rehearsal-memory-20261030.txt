@@ -1,0 +1,937 @@
+# Memory of the rehearsal's heavy jobs, sampled every 5 s from outside by rr-memwatch (bench/rehearsal_memwatch.sh) while each
+# job's user scope existed: time, memory.current, memory.peak, oom and oom_kill of the scope's memory.events, and from R9 on
+# anon and file of its memory.stat (bytes).  On <host>, 2026-10-30 (UTC+8).  The five logs, unchanged, one after another.
+
+== rr-r6-setup.scope (~/rebuild-rehearsal/logs/rr-r6-setup.scope.mem)
+01:47:08 current 37986304 peak 39219200 oom 0 oom_kill 0 
+01:47:13 current 82317312 peak 82857984 oom 0 oom_kill 0 
+01:47:18 current 110051328 peak 197902336 oom 0 oom_kill 0 
+01:47:23 current 144113664 peak 197902336 oom 0 oom_kill 0 
+01:47:28 current 53534720 peak 197902336 oom 0 oom_kill 0 
+01:47:33 current 88166400 peak 274366464 oom 0 oom_kill 0 
+01:47:38 current 440987648 peak 522113024 oom 0 oom_kill 0 
+01:47:43 current 759128064 peak 812740608 oom 0 oom_kill 0 
+01:47:48 current 572448768 peak 965423104 oom 0 oom_kill 0 
+01:47:53 current 828211200 peak 965423104 oom 0 oom_kill 0 
+01:47:58 current 508653568 peak 965423104 oom 0 oom_kill 0 
+01:48:03 current 730079232 peak 965423104 oom 0 oom_kill 0 
+01:48:08 current 431525888 peak 965423104 oom 0 oom_kill 0 
+01:48:13 current 574627840 peak 1118486528 oom 0 oom_kill 0 
+01:48:18 current 483467264 peak 1118486528 oom 0 oom_kill 0 
+01:48:23 current 600190976 peak 1118486528 oom 0 oom_kill 0 
+01:48:28 current 631025664 peak 1118486528 oom 0 oom_kill 0 
+01:48:33 current 680144896 peak 1118486528 oom 0 oom_kill 0 
+01:48:38 current 665751552 peak 1118486528 oom 0 oom_kill 0 
+01:48:43 current 667529216 peak 1118486528 oom 0 oom_kill 0 
+01:48:48 current 784457728 peak 1118486528 oom 0 oom_kill 0 
+01:48:53 current 740106240 peak 1118486528 oom 0 oom_kill 0 
+01:48:58 current 706383872 peak 1118486528 oom 0 oom_kill 0 
+01:49:03 current 859975680 peak 1126813696 oom 0 oom_kill 0 
+01:49:09 current 807501824 peak 1126813696 oom 0 oom_kill 0 
+01:49:14 current 847785984 peak 1126813696 oom 0 oom_kill 0 
+01:49:19 current 1703895040 peak 1790464000 oom 0 oom_kill 0 
+01:49:24 current 1897000960 peak 1897263104 oom 0 oom_kill 0 
+01:49:29 current 1989763072 peak 1989763072 oom 0 oom_kill 0 
+01:49:34 current 1999974400 peak 2166349824 oom 0 oom_kill 0 
+01:49:39 current 2195120128 peak 2195644416 oom 0 oom_kill 0 
+01:49:44 current 2116083712 peak 2473312256 oom 0 oom_kill 0 
+01:49:49 current 1002512384 peak 2473312256 oom 0 oom_kill 0 
+01:49:54 current 862904320 peak 2473312256 oom 0 oom_kill 0 
+01:49:59 current 1481887744 peak 2473312256 oom 0 oom_kill 0 
+01:50:04 current 1128648704 peak 2473312256 oom 0 oom_kill 0 
+01:50:09 current 1737965568 peak 2473312256 oom 0 oom_kill 0 
+01:50:14 current 1564512256 peak 2473312256 oom 0 oom_kill 0 
+01:50:19 current 1518710784 peak 2473312256 oom 0 oom_kill 0 
+01:50:24 current 1775001600 peak 2473312256 oom 0 oom_kill 0 
+01:50:29 current 1855926272 peak 2473312256 oom 0 oom_kill 0 
+01:50:34 current 1244082176 peak 2473312256 oom 0 oom_kill 0 
+01:50:39 current 1076649984 peak 2473312256 oom 0 oom_kill 0 
+01:50:44 current 1037783040 peak 2473312256 oom 0 oom_kill 0 
+01:50:49 current 940974080 peak 2473312256 oom 0 oom_kill 0 
+01:50:54 current 1383538688 peak 2473312256 oom 0 oom_kill 0 
+01:50:59 current 975437824 peak 2473312256 oom 0 oom_kill 0 
+01:51:04 current 1043910656 peak 2473312256 oom 0 oom_kill 0 
+01:51:09 current 1379917824 peak 2473312256 oom 0 oom_kill 0 
+01:51:14 current 1123581952 peak 2473312256 oom 0 oom_kill 0 
+01:51:19 current 898883584 peak 2473312256 oom 0 oom_kill 0 
+01:51:24 current 1091125248 peak 2473312256 oom 0 oom_kill 0 
+01:51:29 current 931000320 peak 2473312256 oom 0 oom_kill 0 
+01:51:34 current 884502528 peak 2473312256 oom 0 oom_kill 0 
+01:51:39 current 1478959104 peak 2473312256 oom 0 oom_kill 0 
+01:51:44 current 1027883008 peak 2473312256 oom 0 oom_kill 0 
+01:51:49 current 1275412480 peak 2473312256 oom 0 oom_kill 0 
+01:51:54 current 1053118464 peak 2473312256 oom 0 oom_kill 0 
+01:51:59 current 633749504 peak 2473312256 oom 0 oom_kill 0 
+01:52:05 current 1438347264 peak 2473312256 oom 0 oom_kill 0 
+01:52:10 current 773726208 peak 2473312256 oom 0 oom_kill 0 
+01:52:15 current 844640256 peak 2473312256 oom 0 oom_kill 0 
+01:52:20 current 1154211840 peak 2473312256 oom 0 oom_kill 0 
+01:52:25 current 943489024 peak 2473312256 oom 0 oom_kill 0 
+01:52:30 current 1323143168 peak 2473312256 oom 0 oom_kill 0 
+01:52:35 current 771063808 peak 2473312256 oom 0 oom_kill 0 
+01:52:40 current 1110847488 peak 2473312256 oom 0 oom_kill 0 
+01:52:45 current 1177051136 peak 2473312256 oom 0 oom_kill 0 
+01:52:50 current 828428288 peak 2473312256 oom 0 oom_kill 0 
+01:52:55 current 916246528 peak 2473312256 oom 0 oom_kill 0 
+01:53:00 current 944025600 peak 2473312256 oom 0 oom_kill 0 
+01:53:05 current 1000648704 peak 2473312256 oom 0 oom_kill 0 
+01:53:10 current 1006034944 peak 2473312256 oom 0 oom_kill 0 
+01:53:15 current 1023860736 peak 2473312256 oom 0 oom_kill 0 
+01:53:20 current 1033035776 peak 2473312256 oom 0 oom_kill 0 
+01:53:25 current 1208094720 peak 2473312256 oom 0 oom_kill 0 
+01:53:30 current 1241911296 peak 2473312256 oom 0 oom_kill 0 
+01:53:35 current 1123467264 peak 2473312256 oom 0 oom_kill 0 
+01:53:40 current 1145749504 peak 2473312256 oom 0 oom_kill 0 
+01:53:45 current 1135996928 peak 2473312256 oom 0 oom_kill 0 
+01:53:50 current 1156026368 peak 2473312256 oom 0 oom_kill 0 
+01:53:55 current 1146310656 peak 2473312256 oom 0 oom_kill 0 
+01:54:00 current 1153921024 peak 2473312256 oom 0 oom_kill 0 
+01:54:05 current 177545216 peak 2473312256 oom 0 oom_kill 0 
+01:54:10 current 165253120 peak 2473312256 oom 0 oom_kill 0 
+01:54:15 current 165310464 peak 2473312256 oom 0 oom_kill 0 
+01:54:20 current 165249024 peak 2473312256 oom 0 oom_kill 0 
+01:54:25 current 165249024 peak 2473312256 oom 0 oom_kill 0 
+01:54:30 current 229494784 peak 2473312256 oom 0 oom_kill 0 
+01:54:35 current 316440576 peak 2473312256 oom 0 oom_kill 0 
+01:54:40 current 382582784 peak 2473312256 oom 0 oom_kill 0 
+01:54:45 current 442728448 peak 2473312256 oom 0 oom_kill 0 
+01:54:51 current 519049216 peak 2473312256 oom 0 oom_kill 0 
+01:54:56 current 589438976 peak 2473312256 oom 0 oom_kill 0 
+01:55:01 current 693809152 peak 2473312256 oom 0 oom_kill 0 
+01:55:06 current 784932864 peak 2473312256 oom 0 oom_kill 0 
+01:55:11 current 878657536 peak 2473312256 oom 0 oom_kill 0 
+01:55:16 current 968380416 peak 2473312256 oom 0 oom_kill 0 
+01:55:21 current 1088720896 peak 2473312256 oom 0 oom_kill 0 
+01:55:26 current 1188323328 peak 2473312256 oom 0 oom_kill 0 
+01:55:31 current 1274814464 peak 2473312256 oom 0 oom_kill 0 
+01:55:36 current 1376505856 peak 2473312256 oom 0 oom_kill 0 
+01:55:41 current 1482956800 peak 2473312256 oom 0 oom_kill 0 
+01:55:46 current 1592930304 peak 2473312256 oom 0 oom_kill 0 
+01:55:51 current 1690099712 peak 2473312256 oom 0 oom_kill 0 
+01:55:56 current 1791594496 peak 2473312256 oom 0 oom_kill 0 
+01:56:01 current 1886195712 peak 2473312256 oom 0 oom_kill 0 
+01:56:06 current 1992679424 peak 2473312256 oom 0 oom_kill 0 
+01:56:11 current 2090565632 peak 2473312256 oom 0 oom_kill 0 
+01:56:16 current 2191503360 peak 2473312256 oom 0 oom_kill 0 
+01:56:21 current 2560122880 peak 2560122880 oom 0 oom_kill 0 
+01:56:26 current 2665312256 peak 2665312256 oom 0 oom_kill 0 
+01:56:31 current 2764754944 peak 2764918784 oom 0 oom_kill 0 
+01:56:36 current 2844123136 peak 2864496640 oom 0 oom_kill 0 
+01:56:41 current 2969567232 peak 2969583616 oom 0 oom_kill 0 
+01:56:46 current 3052273664 peak 3071291392 oom 0 oom_kill 0 
+01:56:51 current 3166568448 peak 3178385408 oom 0 oom_kill 0 
+01:56:56 current 3270258688 peak 3283415040 oom 0 oom_kill 0 
+01:57:01 current 3390578688 peak 3390578688 oom 0 oom_kill 0 
+01:57:06 current 3474456576 peak 3497656320 oom 0 oom_kill 0 
+01:57:11 current 3604750336 peak 3604992000 oom 0 oom_kill 0 
+01:57:16 current 3698548736 peak 3711909888 oom 0 oom_kill 0 
+01:57:21 current 3803611136 peak 3817062400 oom 0 oom_kill 0 
+01:57:26 current 3923988480 peak 3924279296 oom 0 oom_kill 0 
+01:57:31 current 4008595456 peak 4031160320 oom 0 oom_kill 0 
+01:57:37 current 4115587072 peak 4138295296 oom 0 oom_kill 0 
+01:57:42 current 4252860416 peak 4252860416 oom 0 oom_kill 0 
+01:57:47 current 4346744832 peak 4360007680 oom 0 oom_kill 0 
+01:57:52 current 4456996864 peak 4467097600 oom 0 oom_kill 0 
+01:57:57 current 4574236672 peak 4574236672 oom 0 oom_kill 0 
+01:58:02 current 4671717376 peak 4671897600 oom 0 oom_kill 0 
+01:58:07 current 4767760384 peak 4781047808 oom 0 oom_kill 0 
+01:58:12 current 4888092672 peak 4888133632 oom 0 oom_kill 0 
+01:58:17 current 4993024000 peak 4993179648 oom 0 oom_kill 0 
+01:58:22 current 5087023104 peak 5100285952 oom 0 oom_kill 0 
+01:58:27 current 5194219520 peak 5207203840 oom 0 oom_kill 0 
+01:58:32 current 5286838272 peak 5307064320 oom 0 oom_kill 0 
+01:58:37 current 5394313216 peak 5414170624 oom 0 oom_kill 0 
+01:58:42 current 5518389248 peak 5519249408 oom 0 oom_kill 0 
+01:58:47 current 5626241024 peak 5626425344 oom 0 oom_kill 0 
+01:58:52 current 5723566080 peak 5733384192 oom 0 oom_kill 0 
+01:58:57 current 5817065472 peak 5825503232 oom 0 oom_kill 0 
+01:59:02 current 5902381056 peak 5902778368 oom 0 oom_kill 0 
+01:59:07 current 5984120832 peak 6002282496 oom 0 oom_kill 0 
+01:59:12 current 6068080640 peak 6087028736 oom 0 oom_kill 0 
+01:59:17 current 6170787840 peak 6191955968 oom 0 oom_kill 0 
+01:59:22 current 6285701120 peak 6299176960 oom 0 oom_kill 0 
+01:59:27 current 6393004032 peak 6406275072 oom 0 oom_kill 0 
+01:59:32 current 6786998272 peak 6786998272 oom 0 oom_kill 0 
+01:59:37 current 5200662528 peak 6853582848 oom 0 oom_kill 0 
+01:59:42 current 5494898688 peak 6853582848 oom 0 oom_kill 0 
+01:59:47 current 5835812864 peak 6853582848 oom 0 oom_kill 0 
+01:59:52 current 6425272320 peak 6853582848 oom 0 oom_kill 0 
+01:59:57 current 6824321024 peak 6853582848 oom 0 oom_kill 0 
+02:00:02 rr-r6-setup.scope ended
+
+== rr-r7-build.scope (~/rebuild-rehearsal/logs/rr-r7-build.scope.mem)
+02:01:54 current 14106624 peak 14245888 oom 0 oom_kill 0 
+02:01:59 current 19501056 peak 195887104 oom 0 oom_kill 0 
+02:02:05 current 1010438144 peak 1011486720 oom 0 oom_kill 0 
+02:02:10 current 598605824 peak 1162035200 oom 0 oom_kill 0 
+02:02:15 current 929763328 peak 1162919936 oom 0 oom_kill 0 
+02:02:20 current 898220032 peak 1336430592 oom 0 oom_kill 0 
+02:02:25 current 413007872 peak 1336430592 oom 0 oom_kill 0 
+02:02:30 current 702722048 peak 1336430592 oom 0 oom_kill 0 
+02:02:35 current 692129792 peak 1336430592 oom 0 oom_kill 0 
+02:02:40 current 993767424 peak 1336430592 oom 0 oom_kill 0 
+02:02:45 current 686821376 peak 1336430592 oom 0 oom_kill 0 
+02:02:50 current 735330304 peak 1336430592 oom 0 oom_kill 0 
+02:02:55 current 736829440 peak 1336430592 oom 0 oom_kill 0 
+02:03:00 current 849604608 peak 1336430592 oom 0 oom_kill 0 
+02:03:05 current 933232640 peak 1336430592 oom 0 oom_kill 0 
+02:03:10 current 871501824 peak 1336430592 oom 0 oom_kill 0 
+02:03:15 current 1201504256 peak 1450954752 oom 0 oom_kill 0 
+02:03:20 current 1623818240 peak 1846718464 oom 0 oom_kill 0 
+02:03:25 current 1380610048 peak 1846718464 oom 0 oom_kill 0 
+02:03:30 current 2234183680 peak 2325127168 oom 0 oom_kill 0 
+02:03:35 current 2275373056 peak 2328879104 oom 0 oom_kill 0 
+02:03:40 current 1876754432 peak 2328879104 oom 0 oom_kill 0 
+02:03:45 current 1975160832 peak 2328879104 oom 0 oom_kill 0 
+02:03:50 current 2436513792 peak 3005509632 oom 0 oom_kill 0 
+02:03:55 current 1974267904 peak 3005509632 oom 0 oom_kill 0 
+02:04:00 current 3139293184 peak 3140079616 oom 0 oom_kill 0 
+02:04:05 current 3045728256 peak 3260432384 oom 0 oom_kill 0 
+02:04:10 current 2483027968 peak 3260432384 oom 0 oom_kill 0 
+02:04:15 current 2562658304 peak 3260432384 oom 0 oom_kill 0 
+02:04:20 current 2530324480 peak 3260432384 oom 0 oom_kill 0 
+02:04:25 current 2248290304 peak 3260432384 oom 0 oom_kill 0 
+02:04:30 current 1551609856 peak 3260432384 oom 0 oom_kill 0 
+02:04:35 current 924856320 peak 3260432384 oom 0 oom_kill 0 
+02:04:40 current 1439129600 peak 3260432384 oom 0 oom_kill 0 
+02:04:45 current 1227227136 peak 3260432384 oom 0 oom_kill 0 
+02:04:50 current 949477376 peak 3260432384 oom 0 oom_kill 0 
+02:04:55 current 1475887104 peak 3260432384 oom 0 oom_kill 0 
+02:05:00 current 1704124416 peak 3260432384 oom 0 oom_kill 0 
+02:05:05 current 1780674560 peak 3260432384 oom 0 oom_kill 0 
+02:05:10 current 1233588224 peak 3260432384 oom 0 oom_kill 0 
+02:05:15 current 1321930752 peak 3260432384 oom 0 oom_kill 0 
+02:05:20 current 1284931584 peak 3260432384 oom 0 oom_kill 0 
+02:05:26 current 1763270656 peak 3260432384 oom 0 oom_kill 0 
+02:05:31 current 691765248 peak 3260432384 oom 0 oom_kill 0 
+02:05:36 current 1018880000 peak 3260432384 oom 0 oom_kill 0 
+02:05:41 current 1079296000 peak 3260432384 oom 0 oom_kill 0 
+02:05:46 current 1189543936 peak 3260432384 oom 0 oom_kill 0 
+02:05:51 current 842354688 peak 3260432384 oom 0 oom_kill 0 
+02:05:56 current 872923136 peak 3260432384 oom 0 oom_kill 0 
+02:06:01 current 866811904 peak 3260432384 oom 0 oom_kill 0 
+02:06:06 current 914190336 peak 3260432384 oom 0 oom_kill 0 
+02:06:11 current 923095040 peak 3260432384 oom 0 oom_kill 0 
+02:06:16 current 944775168 peak 3260432384 oom 0 oom_kill 0 
+02:06:21 current 1103736832 peak 3260432384 oom 0 oom_kill 0 
+02:06:26 current 1137725440 peak 3260432384 oom 0 oom_kill 0 
+02:06:31 current 1020932096 peak 3260432384 oom 0 oom_kill 0 
+02:06:36 current 1045659648 peak 3260432384 oom 0 oom_kill 0 
+02:06:41 current 1048854528 peak 3260432384 oom 0 oom_kill 0 
+02:06:46 current 1027997696 peak 3260432384 oom 0 oom_kill 0 
+02:06:51 current 1050497024 peak 3260432384 oom 0 oom_kill 0 
+02:06:56 current 1080643584 peak 3260432384 oom 0 oom_kill 0 
+02:07:01 rr-r7-build.scope ended
+
+== rr-r8-dl.scope (~/rebuild-rehearsal/logs/rr-r8-dl.scope.mem)
+02:09:58 current 5398528 peak 5632000 oom 0 oom_kill 0 
+02:10:03 current 8105984 peak 9670656 oom 0 oom_kill 0 
+02:10:08 current 8753152 peak 9670656 oom 0 oom_kill 0 
+02:10:13 current 7397376 peak 9670656 oom 0 oom_kill 0 
+02:10:18 current 8691712 peak 9670656 oom 0 oom_kill 0 
+02:10:23 current 8351744 peak 9670656 oom 0 oom_kill 0 
+02:10:28 current 5402624 peak 9670656 oom 0 oom_kill 0 
+02:10:33 current 8392704 peak 9687040 oom 0 oom_kill 0 
+02:10:38 current 7876608 peak 9687040 oom 0 oom_kill 0 
+02:10:43 current 8228864 peak 9723904 oom 0 oom_kill 0 
+02:10:48 current 7712768 peak 9723904 oom 0 oom_kill 0 
+02:10:53 current 8294400 peak 9723904 oom 0 oom_kill 0 
+02:10:58 current 8933376 peak 9785344 oom 0 oom_kill 0 
+02:11:03 current 8708096 peak 9785344 oom 0 oom_kill 0 
+02:11:08 current 8089600 peak 9785344 oom 0 oom_kill 0 
+02:11:13 current 7458816 peak 9785344 oom 0 oom_kill 0 
+02:11:18 current 9068544 peak 9785344 oom 0 oom_kill 0 
+02:11:23 current 7974912 peak 9785344 oom 0 oom_kill 0 
+02:11:28 current 7290880 peak 9785344 oom 0 oom_kill 0 
+02:11:33 current 8224768 peak 9785344 oom 0 oom_kill 0 
+02:11:38 current 7323648 peak 9785344 oom 0 oom_kill 0 
+02:11:43 current 7475200 peak 9785344 oom 0 oom_kill 0 
+02:11:48 current 7589888 peak 9785344 oom 0 oom_kill 0 
+02:11:53 current 7725056 peak 9785344 oom 0 oom_kill 0 
+02:11:58 current 8859648 peak 9785344 oom 0 oom_kill 0 
+02:12:03 current 7360512 peak 9785344 oom 0 oom_kill 0 
+02:12:08 current 9154560 peak 9785344 oom 0 oom_kill 0 
+02:12:13 current 7737344 peak 9785344 oom 0 oom_kill 0 
+02:12:19 current 8630272 peak 9785344 oom 0 oom_kill 0 
+02:12:24 current 9424896 peak 9785344 oom 0 oom_kill 0 
+02:12:29 current 7380992 peak 9785344 oom 0 oom_kill 0 
+02:12:34 current 9322496 peak 9785344 oom 0 oom_kill 0 
+02:12:39 current 8282112 peak 9785344 oom 0 oom_kill 0 
+02:12:44 current 5431296 peak 9785344 oom 0 oom_kill 0 
+02:12:49 current 7704576 peak 9785344 oom 0 oom_kill 0 
+02:12:54 current 7692288 peak 9785344 oom 0 oom_kill 0 
+02:12:59 current 8953856 peak 9785344 oom 0 oom_kill 0 
+02:13:04 current 8183808 peak 9785344 oom 0 oom_kill 0 
+02:13:09 current 5861376 peak 9785344 oom 0 oom_kill 0 
+02:13:14 current 8454144 peak 9785344 oom 0 oom_kill 0 
+02:13:19 current 7327744 peak 9785344 oom 0 oom_kill 0 
+02:13:24 current 7868416 peak 9785344 oom 0 oom_kill 0 
+02:13:29 current 8978432 peak 9785344 oom 0 oom_kill 0 
+02:13:34 current 8077312 peak 9785344 oom 0 oom_kill 0 
+02:13:39 current 8937472 peak 9785344 oom 0 oom_kill 0 
+02:13:44 current 8294400 peak 9785344 oom 0 oom_kill 0 
+02:13:49 current 9248768 peak 9785344 oom 0 oom_kill 0 
+02:13:54 current 7368704 peak 9785344 oom 0 oom_kill 0 
+02:13:59 current 7368704 peak 9785344 oom 0 oom_kill 0 
+02:14:04 current 8998912 peak 9785344 oom 0 oom_kill 0 
+02:14:09 current 8790016 peak 9785344 oom 0 oom_kill 0 
+02:14:14 current 7864320 peak 9785344 oom 0 oom_kill 0 
+02:14:19 current 8216576 peak 9785344 oom 0 oom_kill 0 
+02:14:24 current 7286784 peak 9785344 oom 0 oom_kill 0 
+02:14:29 current 8904704 peak 9785344 oom 0 oom_kill 0 
+02:14:34 current 8228864 peak 9785344 oom 0 oom_kill 0 
+02:14:39 current 7655424 peak 9785344 oom 0 oom_kill 0 
+02:14:44 current 7282688 peak 9785344 oom 0 oom_kill 0 
+02:14:49 current 8429568 peak 9785344 oom 0 oom_kill 0 
+02:14:54 current 7294976 peak 9785344 oom 0 oom_kill 0 
+02:14:59 current 9048064 peak 9785344 oom 0 oom_kill 0 
+02:15:04 current 7639040 peak 9785344 oom 0 oom_kill 0 
+02:15:09 current 7872512 peak 9785344 oom 0 oom_kill 0 
+02:15:14 current 8781824 peak 9785344 oom 0 oom_kill 0 
+02:15:19 current 9023488 peak 9785344 oom 0 oom_kill 0 
+02:15:24 current 7680000 peak 9785344 oom 0 oom_kill 0 
+02:15:29 current 8933376 peak 9785344 oom 0 oom_kill 0 
+02:15:35 current 7127040 peak 9785344 oom 0 oom_kill 0 
+02:15:40 current 8806400 peak 9785344 oom 0 oom_kill 0 
+02:15:45 current 7692288 peak 9785344 oom 0 oom_kill 0 
+02:15:50 current 8470528 peak 9785344 oom 0 oom_kill 0 
+02:15:55 current 7155712 peak 9785344 oom 0 oom_kill 0 
+02:16:00 current 7901184 peak 9785344 oom 0 oom_kill 0 
+02:16:05 current 8413184 peak 9785344 oom 0 oom_kill 0 
+02:16:10 current 7634944 peak 9785344 oom 0 oom_kill 0 
+02:16:15 current 8585216 peak 9785344 oom 0 oom_kill 0 
+02:16:20 current 9240576 peak 9785344 oom 0 oom_kill 0 
+02:16:25 current 8003584 peak 9785344 oom 0 oom_kill 0 
+02:16:30 current 7159808 peak 9785344 oom 0 oom_kill 0 
+02:16:35 current 7593984 peak 9785344 oom 0 oom_kill 0 
+02:16:40 current 8990720 peak 9785344 oom 0 oom_kill 0 
+02:16:45 current 8986624 peak 9785344 oom 0 oom_kill 0 
+02:16:50 current 8540160 peak 9785344 oom 0 oom_kill 0 
+02:16:55 current 7933952 peak 9785344 oom 0 oom_kill 0 
+02:17:00 current 8867840 peak 9785344 oom 0 oom_kill 0 
+02:17:05 current 7983104 peak 9785344 oom 0 oom_kill 0 
+02:17:10 current 7352320 peak 9785344 oom 0 oom_kill 0 
+02:17:15 current 8523776 peak 9785344 oom 0 oom_kill 0 
+02:17:20 current 9011200 peak 9785344 oom 0 oom_kill 0 
+02:17:25 current 7155712 peak 9785344 oom 0 oom_kill 0 
+02:17:30 current 7933952 peak 9785344 oom 0 oom_kill 0 
+02:17:35 current 9318400 peak 9785344 oom 0 oom_kill 0 
+02:17:40 current 7692288 peak 9785344 oom 0 oom_kill 0 
+02:17:45 current 8704000 peak 9785344 oom 0 oom_kill 0 
+02:17:50 current 9392128 peak 9785344 oom 0 oom_kill 0 
+02:17:55 current 7335936 peak 9785344 oom 0 oom_kill 0 
+02:18:00 current 9400320 peak 9785344 oom 0 oom_kill 0 
+02:18:05 current 7675904 peak 9785344 oom 0 oom_kill 0 
+02:18:10 current 8949760 peak 9785344 oom 0 oom_kill 0 
+02:18:15 current 5443584 peak 9785344 oom 0 oom_kill 0 
+02:18:20 current 7925760 peak 9785344 oom 0 oom_kill 0 
+02:18:25 current 7790592 peak 9785344 oom 0 oom_kill 0 
+02:18:30 current 8597504 peak 9785344 oom 0 oom_kill 0 
+02:18:35 current 8876032 peak 9785344 oom 0 oom_kill 0 
+02:18:40 current 8531968 peak 9785344 oom 0 oom_kill 0 
+02:18:46 current 7831552 peak 9785344 oom 0 oom_kill 0 
+02:18:51 current 8896512 peak 9785344 oom 0 oom_kill 0 
+02:18:56 current 7684096 peak 9785344 oom 0 oom_kill 0 
+02:19:01 current 7577600 peak 9785344 oom 0 oom_kill 0 
+02:19:06 current 8097792 peak 9785344 oom 0 oom_kill 0 
+02:19:11 current 8912896 peak 9785344 oom 0 oom_kill 0 
+02:19:16 current 7876608 peak 9785344 oom 0 oom_kill 0 
+02:19:21 current 9244672 peak 9785344 oom 0 oom_kill 0 
+02:19:26 current 7876608 peak 9785344 oom 0 oom_kill 0 
+02:19:31 current 9191424 peak 9785344 oom 0 oom_kill 0 
+02:19:36 current 8691712 peak 9785344 oom 0 oom_kill 0 
+02:19:41 current 7196672 peak 9785344 oom 0 oom_kill 0 
+02:19:46 current 8880128 peak 9785344 oom 0 oom_kill 0 
+02:19:51 current 7737344 peak 9785344 oom 0 oom_kill 0 
+02:19:56 current 9412608 peak 9785344 oom 0 oom_kill 0 
+02:20:01 current 5500928 peak 9785344 oom 0 oom_kill 0 
+02:20:06 current 7766016 peak 9785344 oom 0 oom_kill 0 
+02:20:11 current 8994816 peak 9785344 oom 0 oom_kill 0 
+02:20:16 current 9039872 peak 9785344 oom 0 oom_kill 0 
+02:20:21 current 8032256 peak 9785344 oom 0 oom_kill 0 
+02:20:26 current 9027584 peak 9785344 oom 0 oom_kill 0 
+02:20:31 current 7524352 peak 9785344 oom 0 oom_kill 0 
+02:20:36 current 7606272 peak 9785344 oom 0 oom_kill 0 
+02:20:41 current 5513216 peak 9785344 oom 0 oom_kill 0 
+02:20:46 current 8630272 peak 9785344 oom 0 oom_kill 0 
+02:20:51 current 9515008 peak 9785344 oom 0 oom_kill 0 
+02:20:56 current 7335936 peak 9785344 oom 0 oom_kill 0 
+02:21:01 current 8765440 peak 9785344 oom 0 oom_kill 0 
+02:21:06 current 8818688 peak 9785344 oom 0 oom_kill 0 
+02:21:11 current 7745536 peak 9785344 oom 0 oom_kill 0 
+02:21:16 current 8953856 peak 9785344 oom 0 oom_kill 0 
+02:21:21 current 5595136 peak 9785344 oom 0 oom_kill 0 
+02:21:26 current 7663616 peak 9785344 oom 0 oom_kill 0 
+02:21:31 current 8769536 peak 9785344 oom 0 oom_kill 0 
+02:21:36 current 7450624 peak 9785344 oom 0 oom_kill 0 
+02:21:41 current 8032256 peak 9785344 oom 0 oom_kill 0 
+02:21:46 current 7274496 peak 9785344 oom 0 oom_kill 0 
+02:21:51 current 8945664 peak 9785344 oom 0 oom_kill 0 
+02:21:56 current 8826880 peak 9785344 oom 0 oom_kill 0 
+02:22:02 current 9170944 peak 9785344 oom 0 oom_kill 0 
+02:22:07 current 7200768 peak 9785344 oom 0 oom_kill 0 
+02:22:12 current 9207808 peak 9785344 oom 0 oom_kill 0 
+02:22:17 current 7565312 peak 9785344 oom 0 oom_kill 0 
+02:22:22 current 8974336 peak 9785344 oom 0 oom_kill 0 
+02:22:27 current 8044544 peak 9785344 oom 0 oom_kill 0 
+02:22:32 current 7532544 peak 9785344 oom 0 oom_kill 0 
+02:22:37 current 8171520 peak 9785344 oom 0 oom_kill 0 
+02:22:42 current 8929280 peak 9785344 oom 0 oom_kill 0 
+02:22:47 current 7835648 peak 9785344 oom 0 oom_kill 0 
+02:22:52 current 8441856 peak 9785344 oom 0 oom_kill 0 
+02:22:57 current 7495680 peak 9785344 oom 0 oom_kill 0 
+02:23:02 current 9162752 peak 9785344 oom 0 oom_kill 0 
+02:23:07 current 8376320 peak 9785344 oom 0 oom_kill 0 
+02:23:12 current 8196096 peak 9785344 oom 0 oom_kill 0 
+02:23:17 current 7499776 peak 9785344 oom 0 oom_kill 0 
+02:23:22 current 8847360 peak 9785344 oom 0 oom_kill 0 
+02:23:27 current 7991296 peak 9785344 oom 0 oom_kill 0 
+02:23:32 current 7593984 peak 9785344 oom 0 oom_kill 0 
+02:23:37 current 8634368 peak 9785344 oom 0 oom_kill 0 
+02:23:42 current 8429568 peak 9785344 oom 0 oom_kill 0 
+02:23:47 current 8597504 peak 9785344 oom 0 oom_kill 0 
+02:23:52 current 8101888 peak 9785344 oom 0 oom_kill 0 
+02:23:57 current 8208384 peak 9785344 oom 0 oom_kill 0 
+02:24:02 current 9175040 peak 9785344 oom 0 oom_kill 0 
+02:24:07 current 8155136 peak 9785344 oom 0 oom_kill 0 
+02:24:12 current 8261632 peak 9785344 oom 0 oom_kill 0 
+02:24:17 current 9072640 peak 9785344 oom 0 oom_kill 0 
+02:24:22 current 7995392 peak 9785344 oom 0 oom_kill 0 
+02:24:27 current 8196096 peak 9785344 oom 0 oom_kill 0 
+02:24:32 current 5500928 peak 9785344 oom 0 oom_kill 0 
+02:24:37 current 9363456 peak 9785344 oom 0 oom_kill 0 
+02:24:42 current 7286784 peak 9785344 oom 0 oom_kill 0 
+02:24:47 current 7663616 peak 9785344 oom 0 oom_kill 0 
+02:24:52 current 8101888 peak 9785344 oom 0 oom_kill 0 
+02:24:57 current 7647232 peak 9785344 oom 0 oom_kill 0 
+02:25:02 current 8372224 peak 9785344 oom 0 oom_kill 0 
+02:25:07 current 8007680 peak 9785344 oom 0 oom_kill 0 
+02:25:12 current 9080832 peak 9785344 oom 0 oom_kill 0 
+02:25:18 current 7696384 peak 9785344 oom 0 oom_kill 0 
+02:25:23 current 8941568 peak 9785344 oom 0 oom_kill 0 
+02:25:28 current 5603328 peak 9785344 oom 0 oom_kill 0 
+02:25:33 current 7352320 peak 9785344 oom 0 oom_kill 0 
+02:25:38 current 5849088 peak 9785344 oom 0 oom_kill 0 
+02:25:43 current 8093696 peak 9785344 oom 0 oom_kill 0 
+02:25:48 current 9248768 peak 10240000 oom 0 oom_kill 0 
+02:25:53 current 8908800 peak 10240000 oom 0 oom_kill 0 
+02:25:58 current 7389184 peak 10240000 oom 0 oom_kill 0 
+02:26:03 current 8413184 peak 10240000 oom 0 oom_kill 0 
+02:26:08 current 8089600 peak 10240000 oom 0 oom_kill 0 
+02:26:13 current 7626752 peak 10240000 oom 0 oom_kill 0 
+02:26:18 current 7188480 peak 10240000 oom 0 oom_kill 0 
+02:26:23 current 8671232 peak 10240000 oom 0 oom_kill 0 
+02:26:28 current 5468160 peak 10240000 oom 0 oom_kill 0 
+02:26:33 current 7172096 peak 10240000 oom 0 oom_kill 0 
+02:26:38 current 7446528 peak 10240000 oom 0 oom_kill 0 
+02:26:43 current 8323072 peak 10240000 oom 0 oom_kill 0 
+02:26:48 current 9519104 peak 10240000 oom 0 oom_kill 0 
+02:26:53 current 8450048 peak 10240000 oom 0 oom_kill 0 
+02:26:58 current 8560640 peak 10240000 oom 0 oom_kill 0 
+02:27:03 current 9023488 peak 10240000 oom 0 oom_kill 0 
+02:27:08 current 8069120 peak 10240000 oom 0 oom_kill 0 
+02:27:13 current 7319552 peak 10240000 oom 0 oom_kill 0 
+02:27:18 current 8945664 peak 10240000 oom 0 oom_kill 0 
+02:27:23 current 8835072 peak 10240000 oom 0 oom_kill 0 
+02:27:28 current 7168000 peak 10240000 oom 0 oom_kill 0 
+02:27:33 current 8359936 peak 10240000 oom 0 oom_kill 0 
+02:27:38 current 9089024 peak 10240000 oom 0 oom_kill 0 
+02:27:43 current 7888896 peak 10240000 oom 0 oom_kill 0 
+02:27:48 current 8884224 peak 10240000 oom 0 oom_kill 0 
+02:27:53 current 5591040 peak 10240000 oom 0 oom_kill 0 
+02:27:58 current 8499200 peak 10240000 oom 0 oom_kill 0 
+02:28:03 current 5562368 peak 10240000 oom 0 oom_kill 0 
+02:28:08 current 8925184 peak 10240000 oom 0 oom_kill 0 
+02:28:13 current 8642560 peak 10240000 oom 0 oom_kill 0 
+02:28:18 current 8437760 peak 10240000 oom 0 oom_kill 0 
+02:28:23 current 7684096 peak 10240000 oom 0 oom_kill 0 
+02:28:29 current 6029312 peak 10240000 oom 0 oom_kill 0 
+02:28:34 current 7643136 peak 10240000 oom 0 oom_kill 0 
+02:28:39 current 5373952 peak 10240000 oom 0 oom_kill 0 
+02:28:44 current 9179136 peak 10240000 oom 0 oom_kill 0 
+02:28:49 current 8658944 peak 10240000 oom 0 oom_kill 0 
+02:28:54 current 7462912 peak 10240000 oom 0 oom_kill 0 
+02:28:59 current 7565312 peak 10240000 oom 0 oom_kill 0 
+02:29:04 current 7757824 peak 10240000 oom 0 oom_kill 0 
+02:29:09 current 8994816 peak 10240000 oom 0 oom_kill 0 
+02:29:14 current 7442432 peak 10240000 oom 0 oom_kill 0 
+02:29:19 current 8749056 peak 10240000 oom 0 oom_kill 0 
+02:29:24 current 8605696 peak 10240000 oom 0 oom_kill 0 
+02:29:29 current 8351744 peak 10240000 oom 0 oom_kill 0 
+02:29:34 current 8658944 peak 10240000 oom 0 oom_kill 0 
+02:29:39 current 7163904 peak 10240000 oom 0 oom_kill 0 
+02:29:44 current 9166848 peak 10240000 oom 0 oom_kill 0 
+02:29:49 current 8155136 peak 10240000 oom 0 oom_kill 0 
+02:29:54 current 7442432 peak 10240000 oom 0 oom_kill 0 
+02:29:59 current 7897088 peak 10240000 oom 0 oom_kill 0 
+02:30:04 current 8773632 peak 10240000 oom 0 oom_kill 0 
+02:30:09 current 8294400 peak 10240000 oom 0 oom_kill 0 
+02:30:14 current 7368704 peak 10240000 oom 0 oom_kill 0 
+02:30:19 current 8245248 peak 10240000 oom 0 oom_kill 0 
+02:30:24 current 8552448 peak 10240000 oom 0 oom_kill 0 
+02:30:29 current 9031680 peak 10240000 oom 0 oom_kill 0 
+02:30:34 current 7282688 peak 10240000 oom 0 oom_kill 0 
+02:30:39 current 8400896 peak 10240000 oom 0 oom_kill 0 
+02:30:44 current 7745536 peak 10240000 oom 0 oom_kill 0 
+02:30:49 current 8982528 peak 10240000 oom 0 oom_kill 0 
+02:30:54 current 8355840 peak 10240000 oom 0 oom_kill 0 
+02:30:59 current 7143424 peak 10240000 oom 0 oom_kill 0 
+02:31:04 current 8785920 peak 10240000 oom 0 oom_kill 0 
+02:31:09 current 6348800 peak 10240000 oom 0 oom_kill 0 
+02:31:14 current 8499200 peak 10240000 oom 0 oom_kill 0 
+02:31:19 current 7692288 peak 10240000 oom 0 oom_kill 0 
+02:31:24 current 8843264 peak 10240000 oom 0 oom_kill 0 
+02:31:29 current 7823360 peak 10240000 oom 0 oom_kill 0 
+02:31:34 current 7479296 peak 10240000 oom 0 oom_kill 0 
+02:31:39 current 8929280 peak 10240000 oom 0 oom_kill 0 
+02:31:44 current 7729152 peak 10240000 oom 0 oom_kill 0 
+02:31:50 current 9478144 peak 10240000 oom 0 oom_kill 0 
+02:31:55 current 7155712 peak 10240000 oom 0 oom_kill 0 
+02:32:00 current 8495104 peak 10240000 oom 0 oom_kill 0 
+02:32:05 current 8650752 peak 10240000 oom 0 oom_kill 0 
+02:32:10 current 8142848 peak 10240000 oom 0 oom_kill 0 
+02:32:15 current 7122944 peak 10240000 oom 0 oom_kill 0 
+02:32:20 current 9142272 peak 10240000 oom 0 oom_kill 0 
+02:32:25 current 7942144 peak 10240000 oom 0 oom_kill 0 
+02:32:30 current 9314304 peak 10240000 oom 0 oom_kill 0 
+02:32:35 current 5345280 peak 10240000 oom 0 oom_kill 0 
+02:32:40 current 6090752 peak 10240000 oom 0 oom_kill 0 
+02:32:45 current 7053312 peak 10240000 oom 0 oom_kill 0 
+02:32:50 current 8638464 peak 10240000 oom 0 oom_kill 0 
+02:32:55 current 7147520 peak 10240000 oom 0 oom_kill 0 
+02:33:00 current 7417856 peak 10240000 oom 0 oom_kill 0 
+02:33:05 current 9248768 peak 10240000 oom 0 oom_kill 0 
+02:33:10 current 5365760 peak 10240000 oom 0 oom_kill 0 
+02:33:15 current 7491584 peak 10240000 oom 0 oom_kill 0 
+02:33:20 current 8368128 peak 10240000 oom 0 oom_kill 0 
+02:33:25 current 7430144 peak 10240000 oom 0 oom_kill 0 
+02:33:30 current 9289728 peak 10240000 oom 0 oom_kill 0 
+02:33:35 current 8073216 peak 10240000 oom 0 oom_kill 0 
+02:33:40 current 8695808 peak 10240000 oom 0 oom_kill 0 
+02:33:45 current 7991296 peak 10240000 oom 0 oom_kill 0 
+02:33:50 current 9080832 peak 10240000 oom 0 oom_kill 0 
+02:33:55 current 8626176 peak 10240000 oom 0 oom_kill 0 
+02:34:00 current 9363456 peak 10240000 oom 0 oom_kill 0 
+02:34:05 current 8507392 peak 10240000 oom 0 oom_kill 0 
+02:34:10 current 8335360 peak 10240000 oom 0 oom_kill 0 
+02:34:15 current 8773632 peak 10240000 oom 0 oom_kill 0 
+02:34:20 current 5644288 peak 10240000 oom 0 oom_kill 0 
+02:34:25 current 9199616 peak 10240000 oom 0 oom_kill 0 
+02:34:30 current 8785920 peak 10240000 oom 0 oom_kill 0 
+02:34:35 current 7413760 peak 10240000 oom 0 oom_kill 0 
+02:34:40 current 7532544 peak 10240000 oom 0 oom_kill 0 
+02:34:45 current 8544256 peak 10240000 oom 0 oom_kill 0 
+02:34:50 current 7610368 peak 10240000 oom 0 oom_kill 0 
+02:34:56 current 9166848 peak 10240000 oom 0 oom_kill 0 
+02:35:01 current 8110080 peak 10240000 oom 0 oom_kill 0 
+02:35:06 current 9379840 peak 10240000 oom 0 oom_kill 0 
+02:35:11 current 8716288 peak 10240000 oom 0 oom_kill 0 
+02:35:16 current 8273920 peak 10240000 oom 0 oom_kill 0 
+02:35:21 current 8724480 peak 10240000 oom 0 oom_kill 0 
+02:35:26 current 8970240 peak 10240000 oom 0 oom_kill 0 
+02:35:31 current 5619712 peak 10240000 oom 0 oom_kill 0 
+02:35:36 current 7303168 peak 10240000 oom 0 oom_kill 0 
+02:35:41 current 8982528 peak 10240000 oom 0 oom_kill 0 
+02:35:46 current 8151040 peak 10240000 oom 0 oom_kill 0 
+02:35:51 current 7798784 peak 10240000 oom 0 oom_kill 0 
+02:35:56 current 7929856 peak 10240000 oom 0 oom_kill 0 
+02:36:01 current 8957952 peak 10240000 oom 0 oom_kill 0 
+02:36:06 current 9080832 peak 10240000 oom 0 oom_kill 0 
+02:36:11 current 9101312 peak 10240000 oom 0 oom_kill 0 
+02:36:16 current 7221248 peak 10240000 oom 0 oom_kill 0 
+02:36:21 current 8994816 peak 10240000 oom 0 oom_kill 0 
+02:36:26 current 7839744 peak 10240000 oom 0 oom_kill 0 
+02:36:31 current 8212480 peak 10240000 oom 0 oom_kill 0 
+02:36:36 current 7307264 peak 10240000 oom 0 oom_kill 0 
+02:36:41 current 9134080 peak 10240000 oom 0 oom_kill 0 
+02:36:46 current 7688192 peak 10240000 oom 0 oom_kill 0 
+02:36:51 current 9252864 peak 10240000 oom 0 oom_kill 0 
+02:36:56 current 7397376 peak 10240000 oom 0 oom_kill 0 
+02:37:01 current 8900608 peak 10240000 oom 0 oom_kill 0 
+02:37:06 current 5574656 peak 10240000 oom 0 oom_kill 0 
+02:37:11 current 9039872 peak 10240000 oom 0 oom_kill 0 
+02:37:16 current 5718016 peak 10240000 oom 0 oom_kill 0 
+02:37:21 current 8855552 peak 10240000 oom 0 oom_kill 0 
+02:37:26 current 5570560 peak 10240000 oom 0 oom_kill 0 
+02:37:31 current 8339456 peak 10240000 oom 0 oom_kill 0 
+02:37:36 current 7860224 peak 10240000 oom 0 oom_kill 0 
+02:37:41 current 7925760 peak 10240000 oom 0 oom_kill 0 
+02:37:46 current 9027584 peak 10240000 oom 0 oom_kill 0 
+02:37:51 current 7225344 peak 10240000 oom 0 oom_kill 0 
+02:37:56 current 8605696 peak 10240000 oom 0 oom_kill 0 
+02:38:01 current 7692288 peak 10240000 oom 0 oom_kill 0 
+02:38:06 current 8638464 peak 10240000 oom 0 oom_kill 0 
+02:38:11 current 8179712 peak 10240000 oom 0 oom_kill 0 
+02:38:17 current 9142272 peak 10240000 oom 0 oom_kill 0 
+02:38:22 current 7794688 peak 10240000 oom 0 oom_kill 0 
+02:38:27 current 9003008 peak 10240000 oom 0 oom_kill 0 
+02:38:32 current 7245824 peak 10240000 oom 0 oom_kill 0 
+02:38:37 current 8376320 peak 10240000 oom 0 oom_kill 0 
+02:38:42 current 7065600 peak 10240000 oom 0 oom_kill 0 
+02:38:47 rr-r8-dl.scope ended
+
+== rr-r9-pack.scope (~/rebuild-rehearsal/logs/rr-r9-pack.scope.mem)
+02:46:29 current 92520448 peak 93306880 oom 0 oom_kill 0 anon 91205632 file 2805760 
+02:46:34 current 415666176 peak 415797248 oom 0 oom_kill 0 anon 140541952 file 272932864 
+02:46:39 current 900628480 peak 900890624 oom 0 oom_kill 0 anon 140713984 file 757149696 
+02:46:44 current 1237360640 peak 1238147072 oom 0 oom_kill 0 anon 140836864 file 1092980736 
+02:46:49 current 1724915712 peak 1725440000 oom 0 oom_kill 0 anon 179785728 file 1541562368 
+02:46:54 current 2199879680 peak 2199879680 oom 0 oom_kill 0 anon 523931648 file 1666088960 
+02:46:59 current 2336620544 peak 2336620544 oom 0 oom_kill 0 anon 592850944 file 1733148672 
+02:47:04 current 2470838272 peak 2470838272 oom 0 oom_kill 0 anon 659746816 file 1799663616 
+02:47:09 current 2577530880 peak 2577530880 oom 0 oom_kill 0 anon 713060352 file 1852678144 
+02:47:14 current 3634868224 peak 3636178944 oom 0 oom_kill 0 anon 1112940544 file 2512785408 
+02:47:19 current 4294844416 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1908068352 
+02:47:25 current 3287633920 peak 4294967296 oom 0 oom_kill 0 anon 1338613760 file 1938984960 
+02:47:30 current 3540078592 peak 4294967296 oom 0 oom_kill 0 anon 1521025024 file 2002706432 
+02:47:35 current 3916255232 peak 4294967296 oom 0 oom_kill 0 anon 1739788288 file 2158571520 
+02:47:40 current 4294447104 peak 4294967296 oom 0 oom_kill 0 anon 1907499008 file 2368045056 
+02:47:45 current 3678281728 peak 4294967296 oom 0 oom_kill 0 anon 1300557824 file 2358300672 
+02:47:50 current 3753779200 peak 4294967296 oom 0 oom_kill 0 anon 1339027456 file 2394951680 
+02:47:55 current 3853131776 peak 4294967296 oom 0 oom_kill 0 anon 1388666880 file 2444255232 
+02:48:00 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 1629601792 file 2642333696 
+02:48:05 current 4294619136 peak 4294967296 oom 0 oom_kill 0 anon 2159624192 file 2110402560 
+02:48:10 current 3824115712 peak 4294967296 oom 0 oom_kill 0 anon 1571500032 file 2228551680 
+02:48:15 current 3945226240 peak 4294967296 oom 0 oom_kill 0 anon 1633787904 file 2290417664 
+02:48:20 current 4088881152 peak 4294967296 oom 0 oom_kill 0 anon 1703510016 file 2359685120 
+02:48:25 current 4294447104 peak 4294967296 oom 0 oom_kill 0 anon 1882533888 file 2385051648 
+02:48:30 current 4294897664 peak 4294967296 oom 0 oom_kill 0 anon 2159624192 file 2106396672 
+02:48:35 current 3283812352 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 2106523648 
+02:48:40 current 3732930560 peak 4294967296 oom 0 oom_kill 0 anon 1479647232 file 2224828416 
+02:48:45 current 3931635712 peak 4294967296 oom 0 oom_kill 0 anon 1578754048 file 2323263488 
+02:48:50 current 4119330816 peak 4294967296 oom 0 oom_kill 0 anon 1637068800 file 2457559040 
+02:48:55 current 4294926336 peak 4294967296 oom 0 oom_kill 0 anon 2070335488 file 2191097856 
+02:49:00 current 3283832832 peak 4294967296 oom 0 oom_kill 0 anon 1150427136 file 2102198272 
+02:49:05 current 3908370432 peak 4294967296 oom 0 oom_kill 0 anon 1636458496 file 2239111168 
+02:49:10 current 4008734720 peak 4294967296 oom 0 oom_kill 0 anon 1686482944 file 2288795648 
+02:49:15 current 4107563008 peak 4294967296 oom 0 oom_kill 0 anon 1735794688 file 2337771520 
+02:49:20 current 4294955008 peak 4294967296 oom 0 oom_kill 0 anon 1928409088 file 2329931776 
+02:49:25 current 3283447808 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 2097467392 
+02:49:30 current 3763200000 peak 4294967296 oom 0 oom_kill 0 anon 1518850048 file 2207461376 
+02:49:35 current 3911835648 peak 4294967296 oom 0 oom_kill 0 anon 1593040896 file 2281148416 
+02:49:40 current 4043169792 peak 4294967296 oom 0 oom_kill 0 anon 1661202432 file 2348847104 
+02:49:46 current 4294660096 peak 4294967296 oom 0 oom_kill 0 anon 1854091264 file 2399997952 
+02:49:51 current 4294860800 peak 4294967296 oom 0 oom_kill 0 anon 2159624192 file 2093367296 
+02:49:56 current 3935903744 peak 4294967296 oom 0 oom_kill 0 anon 1647218688 file 2247032832 
+02:50:01 current 4018216960 peak 4294967296 oom 0 oom_kill 0 anon 1690558464 file 2290126848 
+02:50:06 current 4150861824 peak 4294967296 oom 0 oom_kill 0 anon 1754415104 file 2353623040 
+02:50:11 current 4257554432 peak 4294967296 oom 0 oom_kill 0 anon 1807622144 file 2406522880 
+02:50:16 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 1998401536 file 2250731520 
+02:50:21 current 4294885376 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1878642688 
+02:50:26 current 3692097536 peak 4294967296 oom 0 oom_kill 0 anon 1630384128 file 2015633408 
+02:50:31 current 3845713920 peak 4294967296 oom 0 oom_kill 0 anon 1706983424 file 2091716608 
+02:50:36 current 4294844416 peak 4294967296 oom 0 oom_kill 0 anon 1877954560 file 2366103552 
+02:50:41 current 3800412160 peak 4294967296 oom 0 oom_kill 0 anon 1401626624 file 2349780992 
+02:50:46 current 3853869056 peak 4294967296 oom 0 oom_kill 0 anon 1428353024 file 2376327168 
+02:50:51 current 4019544064 peak 4294967296 oom 0 oom_kill 0 anon 1513345024 file 2460745728 
+02:50:56 current 4294881280 peak 4294967296 oom 0 oom_kill 0 anon 1703198720 file 2538565632 
+02:51:01 current 3283378176 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 2080919552 
+02:51:06 current 3844661248 peak 4294967296 oom 0 oom_kill 0 anon 1549287424 file 2241511424 
+02:51:11 current 4221624320 peak 4294967296 oom 0 oom_kill 0 anon 1677418496 file 2495889408 
+02:51:16 current 3283607552 peak 4294967296 oom 0 oom_kill 0 anon 914440192 file 2314248192 
+02:51:21 current 3928219648 peak 4294967296 oom 0 oom_kill 0 anon 1412485120 file 2464124928 
+02:51:26 current 4163624960 peak 4294967296 oom 0 oom_kill 0 anon 1527357440 file 2578223104 
+02:51:31 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 1715200000 file 2519199744 
+02:51:36 current 3283578880 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 2073538560 
+02:51:41 current 3838132224 peak 4294967296 oom 0 oom_kill 0 anon 1542602752 file 2234101760 
+02:51:46 current 3974184960 peak 4294967296 oom 0 oom_kill 0 anon 1610543104 file 2301657088 
+02:51:51 current 4294942720 peak 4294967296 oom 0 oom_kill 0 anon 1868775424 file 2361769984 
+02:51:56 current 3283374080 peak 4294967296 oom 0 oom_kill 0 anon 1019297792 file 2200829952 
+02:52:02 current 4032319488 peak 4294967296 oom 0 oom_kill 0 anon 1548500992 file 2420293632 
+02:52:07 current 4136652800 peak 4294967296 oom 0 oom_kill 0 anon 1598070784 file 2476670976 
+02:52:12 current 4189569024 peak 4294967296 oom 0 oom_kill 0 anon 1687764992 file 2434027520 
+02:52:17 current 3974930432 peak 4294967296 oom 0 oom_kill 0 anon 1323872256 file 2583117824 
+02:52:22 current 4072636416 peak 4294967296 oom 0 oom_kill 0 anon 1372631040 file 2631598080 
+02:52:27 current 4206854144 peak 4294967296 oom 0 oom_kill 0 anon 1439494144 file 2698084352 
+02:52:32 current 4294443008 peak 4294967296 oom 0 oom_kill 0 anon 1496993792 file 2727251968 
+02:52:37 current 4294754304 peak 4294967296 oom 0 oom_kill 0 anon 1866981376 file 2355388416 
+02:52:42 current 3178504192 peak 4294967296 oom 0 oom_kill 0 anon 1255227392 file 1851412480 
+02:52:47 current 3781959680 peak 4294967296 oom 0 oom_kill 0 anon 1718620160 file 1989959680 
+02:52:52 current 3858505728 peak 4294967296 oom 0 oom_kill 0 anon 1758961664 file 2030026752 
+02:52:57 current 4004782080 peak 4294967296 oom 0 oom_kill 0 anon 1829724160 file 2100310016 
+02:53:02 current 4294967296 peak 4294967296 oom 0 oom_kill 0 anon 2001154048 file 2217500672 
+02:53:07 current 3857596416 peak 4294967296 oom 0 oom_kill 0 anon 1846444032 file 1949814784 
+02:53:12 current 3678461952 peak 4294967296 oom 0 oom_kill 0 anon 1532198912 file 2072010752 
+02:53:17 current 3791646720 peak 4294967296 oom 0 oom_kill 0 anon 1587224576 file 2126721024 
+02:53:22 current 3945525248 peak 4294967296 oom 0 oom_kill 0 anon 1666633728 file 2205679616 
+02:53:27 current 4055216128 peak 4294967296 oom 0 oom_kill 0 anon 1720623104 file 2259357696 
+02:53:32 current 4294946816 peak 4294967296 oom 0 oom_kill 0 anon 1948856320 file 2264477696 
+02:53:37 current 4294553600 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1842409472 
+02:53:42 current 3543420928 peak 4294967296 oom 0 oom_kill 0 anon 1543237632 file 1929056256 
+02:53:47 current 3896758272 peak 4294967296 oom 0 oom_kill 0 anon 1769996288 file 2048028672 
+02:53:52 current 3957825536 peak 4294967296 oom 0 oom_kill 0 anon 1798299648 file 2076188672 
+02:53:57 current 4210270208 peak 4294967296 oom 0 oom_kill 0 anon 1924247552 file 2201501696 
+02:54:02 current 4289589248 peak 4294967296 oom 0 oom_kill 0 anon 2182942720 file 2025037824 
+02:54:07 current 4294860800 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1680039936 
+02:54:12 current 4294860800 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1680039936 
+02:54:17 current 3719012352 peak 4294967296 oom 0 oom_kill 0 anon 1805451264 file 1828737024 
+02:54:23 current 3881525248 peak 4294967296 oom 0 oom_kill 0 anon 1885847552 file 1907138560 
+02:54:28 current 3996868608 peak 4294967296 oom 0 oom_kill 0 anon 1946402816 file 1967349760 
+02:54:33 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2170732544 file 2033008640 
+02:54:38 current 3858710528 peak 4294967296 oom 0 oom_kill 0 anon 2027954176 file 1754148864 
+02:54:43 current 3100004352 peak 4294967296 oom 0 oom_kill 0 anon 1255313408 file 1754247168 
+02:54:48 current 3709792256 peak 4294967296 oom 0 oom_kill 0 anon 1721634816 file 1895985152 
+02:54:53 current 3809144832 peak 4294967296 oom 0 oom_kill 0 anon 1771167744 file 1945186304 
+02:54:58 current 3908759552 peak 4294967296 oom 0 oom_kill 0 anon 1821224960 file 1994903552 
+02:55:03 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 2001154048 file 2197729280 
+02:55:08 current 3911499776 peak 4294967296 oom 0 oom_kill 0 anon 1762299904 file 1933430784 
+02:55:13 current 3812233216 peak 4294967296 oom 0 oom_kill 0 anon 1607983104 file 2107797504 
+02:55:18 current 3886944256 peak 4294967296 oom 0 oom_kill 0 anon 1647775744 file 2147360768 
+02:55:23 current 4049735680 peak 4294967296 oom 0 oom_kill 0 anon 1726570496 file 2225709056 
+02:55:28 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 1913458688 file 2282016768 
+02:55:33 current 3283156992 peak 4294967296 oom 0 oom_kill 0 anon 1019297792 file 2165862400 
+02:55:38 current 3940184064 peak 4294967296 oom 0 oom_kill 0 anon 1485045760 file 2355236864 
+02:55:43 current 4161433600 peak 4294967296 oom 0 oom_kill 0 anon 1601519616 file 2463522816 
+02:55:48 current 4294447104 peak 4294967296 oom 0 oom_kill 0 anon 1864232960 file 2327416832 
+02:55:53 current 3336454144 peak 4294967296 oom 0 oom_kill 0 anon 1097940992 file 2136035328 
+02:55:58 current 3851911168 peak 4294967296 oom 0 oom_kill 0 anon 1488748544 file 2259447808 
+02:56:03 current 3990061056 peak 4294967296 oom 0 oom_kill 0 anon 1576771584 file 2309058560 
+02:56:08 current 4111323136 peak 4294967296 oom 0 oom_kill 0 anon 1649188864 file 2357436416 
+02:56:13 current 4294905856 peak 4294967296 oom 0 oom_kill 0 anon 1767170048 file 2422345728 
+02:56:18 current 4294447104 peak 4294967296 oom 0 oom_kill 0 anon 1834266624 file 2354348032 
+02:56:23 current 4292325376 peak 4294967296 oom 0 oom_kill 0 anon 2144419840 file 2041708544 
+02:56:28 current 3178393600 peak 4294967296 oom 0 oom_kill 0 anon 1255227392 file 1815912448 
+02:56:33 current 3970854912 peak 4294967296 oom 0 oom_kill 0 anon 1845846016 file 2015338496 
+02:56:39 current 4078333952 peak 4294967296 oom 0 oom_kill 0 anon 1911017472 file 2057138176 
+02:56:44 current 4294807552 peak 4294967296 oom 0 oom_kill 0 anon 2066980864 file 2116112384 
+02:56:49 current 4189597696 peak 4294967296 oom 0 oom_kill 0 anon 2159624192 file 1916461056 
+02:56:54 current 3920560128 peak 4294967296 oom 0 oom_kill 0 anon 1727528960 file 2079678464 
+02:56:59 current 4076142592 peak 4294967296 oom 0 oom_kill 0 anon 1831518208 file 2135711744 
+02:57:04 current 4294934528 peak 4294967296 oom 0 oom_kill 0 anon 1962254336 file 2217230336 
+02:57:09 current 3681017856 peak 4294967296 oom 0 oom_kill 0 anon 1562198016 file 2017705984 
+02:57:14 current 3835580416 peak 4294967296 oom 0 oom_kill 0 anon 1583083520 file 2148229120 
+02:57:19 current 4208873472 peak 4294967296 oom 0 oom_kill 0 anon 1833422848 file 2257068032 
+02:57:24 current 4294918144 peak 4294967296 oom 0 oom_kill 0 anon 1954201600 file 2221748224 
+02:57:29 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2012721152 file 2162036736 
+02:57:34 current 4294967296 peak 4294967296 oom 0 oom_kill 0 anon 2215034880 file 1957502976 
+02:57:39 current 4294803456 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1644789760 
+02:57:44 current 3877748736 peak 4294967296 oom 0 oom_kill 0 anon 1946763264 file 1808027648 
+02:57:49 current 4028530688 peak 4294967296 oom 0 oom_kill 0 anon 2047115264 file 1857867776 
+02:57:54 current 4294967296 peak 4294967296 oom 0 oom_kill 0 anon 2106535936 file 2059116544 
+02:57:59 current 3544346624 peak 4294967296 oom 0 oom_kill 0 anon 1487458304 file 1824243712 
+02:58:04 current 3099598848 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 1824247808 
+02:58:09 current 4087357440 peak 4294967296 oom 0 oom_kill 0 anon 1888288768 file 2071351296 
+02:58:14 current 4200865792 peak 4294967296 oom 0 oom_kill 0 anon 1945587712 file 2126966784 
+02:58:19 current 4294950912 peak 4294967296 oom 0 oom_kill 0 anon 1998147584 file 2167652352 
+02:58:24 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2151788544 file 2011631616 
+02:58:29 current 4294840320 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1635475456 
+02:58:34 current 4037242880 peak 4294967296 oom 0 oom_kill 0 anon 2043654144 file 1860759552 
+02:58:39 current 4125454336 peak 4294967296 oom 0 oom_kill 0 anon 2091700224 file 1906946048 
+02:58:44 current 4227690496 peak 4294967296 oom 0 oom_kill 0 anon 2139381760 file 1954390016 
+02:58:49 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 2181132288 file 1978220544 
+02:58:55 current 4294823936 peak 4294967296 oom 0 oom_kill 0 anon 2472755200 file 1684492288 
+02:59:00 current 4294459392 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1630023680 
+02:59:05 current 4044476416 peak 4294967296 oom 0 oom_kill 0 anon 2052861952 file 1857437696 
+02:59:10 current 4231385088 peak 4294967296 oom 0 oom_kill 0 anon 2161266688 file 1931358208 
+02:59:15 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 2220720128 file 1934249984 
+02:59:20 current 4294889472 peak 4294967296 oom 0 oom_kill 0 anon 2417659904 file 1734488064 
+02:59:25 current 3686481920 peak 4294967296 oom 0 oom_kill 0 anon 1768673280 file 1784487936 
+02:59:30 current 4188000256 peak 4294967296 oom 0 oom_kill 0 anon 2104799232 file 1939644416 
+02:59:35 current 3293913088 peak 4294967296 oom 0 oom_kill 0 anon 1225113600 file 1936891904 
+02:59:40 current 3932155904 peak 4294967296 oom 0 oom_kill 0 anon 1672138752 file 2125651968 
+02:59:45 current 4126404608 peak 4294967296 oom 0 oom_kill 0 anon 1782599680 file 2198437888 
+02:59:50 current 4233883648 peak 4294967296 oom 0 oom_kill 0 anon 1835585536 file 2251120640 
+02:59:55 current 4294447104 peak 4294967296 oom 0 oom_kill 0 anon 1960914944 file 2184294400 
+03:00:00 current 4294467584 peak 4294967296 oom 0 oom_kill 0 anon 2369224704 file 1774112768 
+03:00:05 current 4131708928 peak 4294967296 oom 0 oom_kill 0 anon 1988415488 file 1991909376 
+03:00:10 current 4231323648 peak 4294967296 oom 0 oom_kill 0 anon 2038083584 file 2041237504 
+03:00:15 current 4294791168 peak 4294967296 oom 0 oom_kill 0 anon 2132172800 file 2008256512 
+03:00:20 current 3178459136 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 1875152896 
+03:00:25 current 4112740352 peak 4294967296 oom 0 oom_kill 0 anon 1866993664 file 2090283008 
+03:00:30 current 4218908672 peak 4294967296 oom 0 oom_kill 0 anon 1919979520 file 2142969856 
+03:00:35 current 4294852608 peak 4294967296 oom 0 oom_kill 0 anon 1974214656 file 2163576832 
+03:00:40 current 4293808128 peak 4294967296 oom 0 oom_kill 0 anon 2133671936 file 2001354752 
+03:00:45 current 4294668288 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1777750016 
+03:00:50 current 4086263808 peak 4294967296 oom 0 oom_kill 0 anon 1963401216 file 1975156736 
+03:00:55 current 4185042944 peak 4294967296 oom 0 oom_kill 0 anon 2012573696 file 2023997440 
+03:01:00 current 4294787072 peak 4294967296 oom 0 oom_kill 0 anon 2120429568 file 2024280064 
+03:01:05 current 3276365824 peak 4294967296 oom 0 oom_kill 0 anon 1150369792 file 1878732800 
+03:01:10 current 3614769152 peak 4294967296 oom 0 oom_kill 0 anon 1484517376 file 1979633664 
+03:01:15 current 4235280384 peak 4294967296 oom 0 oom_kill 0 anon 1926127616 file 2162139136 
+03:01:21 current 4294885376 peak 4294967296 oom 0 oom_kill 0 anon 1983754240 file 2157932544 
+03:01:26 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2111332352 file 2028765184 
+03:01:31 current 3759366144 peak 4294967296 oom 0 oom_kill 0 anon 1826181120 file 1794793472 
+03:01:36 current 4290228224 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1606348800 
+03:01:41 current 4159807488 peak 4294967296 oom 0 oom_kill 0 anon 2062487552 file 1941581824 
+03:01:46 current 3320311808 peak 4294967296 oom 0 oom_kill 0 anon 1093324800 file 2079969280 
+03:01:51 current 4095385600 peak 4294967296 oom 0 oom_kill 0 anon 1662537728 file 2272591872 
+03:01:56 current 4208025600 peak 4294967296 oom 0 oom_kill 0 anon 1719640064 file 2329366528 
+03:02:01 current 4294959104 peak 4294967296 oom 0 oom_kill 0 anon 1856974848 file 2274738176 
+03:02:06 current 4294545408 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1766719488 
+03:02:11 current 4106240000 peak 4294967296 oom 0 oom_kill 0 anon 1971646464 file 1975865344 
+03:02:16 current 4213456896 peak 4294967296 oom 0 oom_kill 0 anon 2025095168 file 2029010944 
+03:02:21 current 4294459392 peak 4294967296 oom 0 oom_kill 0 anon 2065465344 file 2069151744 
+03:02:26 current 4294742016 peak 4294967296 oom 0 oom_kill 0 anon 2200514560 file 1932288000 
+03:02:31 current 4294959104 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1762402304 
+03:02:36 current 4225957888 peak 4294967296 oom 0 oom_kill 0 anon 2170724352 file 1762402304 
+03:02:41 current 4035092480 peak 4294967296 oom 0 oom_kill 0 anon 1910808576 file 1960755200 
+03:02:46 current 4133658624 peak 4294967296 oom 0 oom_kill 0 anon 1959976960 file 2009587712 
+03:02:51 current 4294963200 peak 4294967296 oom 0 oom_kill 0 anon 2084798464 file 2042855424 
+03:02:56 current 3629260800 peak 4294967296 oom 0 oom_kill 0 anon 1444601856 file 1862766592 
+03:03:01 current 4221083648 peak 4294967296 oom 0 oom_kill 0 anon 1938440192 file 2114801664 
+03:03:06 current 4294754304 peak 4294967296 oom 0 oom_kill 0 anon 1992216576 file 2134138880 
+03:03:11 current 4294823936 peak 4294967296 oom 0 oom_kill 0 anon 2047434752 file 2078081024 
+03:03:16 current 4294619136 peak 4294967296 oom 0 oom_kill 0 anon 2212179968 file 1910554624 
+03:03:21 current 4294766592 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1604182016 
+03:03:26 current 3957673984 peak 4294967296 oom 0 oom_kill 0 anon 1994297344 file 1804890112 
+03:03:31 current 4070658048 peak 4294967296 oom 0 oom_kill 0 anon 2047913984 file 1858199552 
+03:03:37 current 4153233408 peak 4294967296 oom 0 oom_kill 0 anon 2091642880 file 1900224512 
+03:03:42 current 4294705152 peak 4294967296 oom 0 oom_kill 0 anon 2251550720 file 1875681280 
+03:03:47 current 3103793152 peak 4294967296 oom 0 oom_kill 0 anon 1257951232 file 1679441920 
+03:03:52 current 4119437312 peak 4294967296 oom 0 oom_kill 0 anon 2036658176 file 1913716736 
+03:03:57 current 4226916352 peak 4294967296 oom 0 oom_kill 0 anon 2090274816 file 1967030272 
+03:04:02 current 4294938624 peak 4294967296 oom 0 oom_kill 0 anon 2187702272 file 1936252928 
+03:04:07 current 3811074048 peak 4294967296 oom 0 oom_kill 0 anon 1903718400 file 1752354816 
+03:04:12 current 4294811648 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1752354816 
+03:04:17 current 4027940864 peak 4294967296 oom 0 oom_kill 0 anon 1908645888 file 1946099712 
+03:04:22 current 4134633472 peak 4294967296 oom 0 oom_kill 0 anon 1961852928 file 1999003648 
+03:04:27 current 4268851200 peak 4294967296 oom 0 oom_kill 0 anon 2028748800 file 2065514496 
+03:04:32 current 4294930432 peak 4294967296 oom 0 oom_kill 0 anon 2172243968 file 1945628672 
+03:04:37 current 4294918144 peak 4294967296 oom 0 oom_kill 0 anon 2369339392 file 1747652608 
+03:04:42 current 3776520192 peak 4294967296 oom 0 oom_kill 0 anon 1713106944 file 1886105600 
+03:04:47 current 4294524928 peak 4294967296 oom 0 oom_kill 0 anon 2099965952 file 2015899648 
+03:04:52 current 4294885376 peak 4294967296 oom 0 oom_kill 0 anon 2152771584 file 1962061824 
+03:04:57 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2364211200 file 1749200896 
+03:05:02 current 4294918144 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1593614336 
+03:05:07 current 3559911424 peak 4294967296 oom 0 oom_kill 0 anon 1696874496 file 1703358464 
+03:05:12 current 4082102272 peak 4294967296 oom 0 oom_kill 0 anon 2054791168 file 1851985920 
+03:05:17 current 4165726208 peak 4294967296 oom 0 oom_kill 0 anon 2096537600 file 1893523456 
+03:05:22 current 4294938624 peak 4294967296 oom 0 oom_kill 0 anon 2158780416 file 1959694336 
+03:05:27 current 4294709248 peak 4294967296 oom 0 oom_kill 0 anon 2346545152 file 1768923136 
+03:05:32 current 4294647808 peak 4294967296 oom 0 oom_kill 0 anon 2526625792 file 1588281344 
+03:05:37 current 3099676672 peak 4294967296 oom 0 oom_kill 0 anon 1333870592 file 1588383744 
+03:05:42 current 4165029888 peak 4294967296 oom 0 oom_kill 0 anon 2138480640 file 1846161408 
+03:05:47 current 4245917696 peak 4294967296 oom 0 oom_kill 0 anon 2178850816 file 1886302208 
+03:05:53 current 4294823936 peak 4294967296 oom 0 oom_kill 0 anon 2302095360 file 1810325504 
+03:05:58 current 4071477248 peak 4294967296 oom 0 oom_kill 0 anon 2242367488 file 1662222336 
+03:06:03 current 3993645056 peak 4294967296 oom 0 oom_kill 0 anon 1925115904 file 1884184576 
+03:06:08 current 4114685952 peak 4294967296 oom 0 oom_kill 0 anon 1985359872 file 1944289280 
+03:06:13 current 4257816576 peak 4294967296 oom 0 oom_kill 0 anon 2059329536 file 2018082816 
+03:06:18 current 4294729728 peak 4294967296 oom 0 oom_kill 0 anon 2106585088 file 2002018304 
+03:06:23 current 4294963200 peak 4294967296 oom 0 oom_kill 0 anon 2149335040 file 1958068224 
+03:06:28 current 4294725632 peak 4294967296 oom 0 oom_kill 0 anon 2477498368 file 1629077504 
+03:06:33 current 4294619136 peak 4294967296 oom 0 oom_kill 0 anon 2867412992 file 1248317440 
+03:06:38 rr-r9-pack.scope ended
+
+== rr-r11-drift.scope (~/rebuild-rehearsal/logs/rr-r11-drift.scope.mem)
+03:20:06 current 2338816 peak 8396800 oom 0 oom_kill 0 anon 1716224 file 65536 
+03:20:11 current 6795264 peak 9543680 oom 0 oom_kill 0 anon 5976064 file 65536 
+03:20:16 current 6983680 peak 9543680 oom 0 oom_kill 0 anon 6000640 file 65536 
+03:20:21 current 6914048 peak 9543680 oom 0 oom_kill 0 anon 6025216 file 65536 
+03:20:26 current 6885376 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:31 current 6885376 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:36 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:41 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:46 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:51 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:20:56 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:01 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:06 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:11 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:16 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:21 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:26 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:31 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:36 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:41 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:46 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:51 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:21:57 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:02 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:07 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:12 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:17 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:22 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:27 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:32 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:37 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:42 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:47 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:52 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:22:57 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:02 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:07 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:12 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:17 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:22 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:27 current 6856704 peak 9543680 oom 0 oom_kill 0 anon 6033408 file 65536 
+03:23:32 current 6918144 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:23:37 current 6918144 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:23:42 current 6918144 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:23:47 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:23:52 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:23:57 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:02 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:07 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:12 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:17 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:22 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:27 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:32 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:37 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:42 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:48 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:53 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:24:58 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:03 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:08 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:13 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:18 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:23 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:28 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:33 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:38 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:43 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:48 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:53 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:25:58 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:03 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:08 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:13 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:18 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:23 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:28 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:33 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:38 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:43 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:48 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:53 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:26:58 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:03 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:08 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:13 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:18 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:23 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:28 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:34 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:39 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:44 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:49 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:54 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:27:59 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:04 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:09 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:14 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:19 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:24 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:29 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:34 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:39 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:44 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:49 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:54 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:28:59 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:04 current 6967296 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:09 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:14 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:19 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:24 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:29 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:34 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:39 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:44 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:49 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:29:54 current 6893568 peak 9543680 oom 0 oom_kill 0 anon 6070272 file 65536 
+03:30:00 current 35540992 peak 35540992 oom 0 oom_kill 0 anon 14413824 file 1163264 
+03:30:05 current 31244288 peak 35540992 oom 0 oom_kill 0 anon 29171712 file 1163264 
+03:30:10 rr-r11-drift.scope ended

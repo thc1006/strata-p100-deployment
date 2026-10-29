@@ -1,0 +1,62 @@
+# Package versions, held packages and the CUDA installer's desktop files on <host>, read on 2026-10-30 03:34:36 (UTC+8) without
+# sudo, for docs/runbooks/rebuild.md (step 0) and docs/reference/system-changes.md.  The commands and their output, unchanged.
+$ dpkg-query -W -f='${Package} ${Version}\n' nvidia-driver-535 nvidia-dkms-535 nvidia-utils-535 libnvidia-compute-535 gcc-11 g++-11 libstdc++-11-dev python3.10 python3.10-venv python3-venv python3-pip-whl python3-setuptools-whl git curl jq bubblewrap zfsutils-linux
+bubblewrap 0.6.1-1ubuntu0.3
+curl 7.81.0-1ubuntu1.30
+g++-11 11.4.0-1ubuntu1~22.04.3
+gcc-11 11.4.0-1ubuntu1~22.04.3
+git 1:2.34.1-1ubuntu1.18
+jq 1.6-2.1ubuntu3.2
+libnvidia-compute-535 535.230.02-0ubuntu0.22.04.1
+libnvidia-compute-535 535.230.02-0ubuntu0.22.04.1
+libstdc++-11-dev 11.4.0-1ubuntu1~22.04.3
+nvidia-dkms-535 535.230.02-0ubuntu0.22.04.1
+nvidia-driver-535 535.230.02-0ubuntu0.22.04.1
+nvidia-utils-535 535.230.02-0ubuntu0.22.04.1
+python3-pip-whl 22.0.2+dfsg-1ubuntu0.7
+python3-setuptools-whl 59.6.0-1.2ubuntu0.22.04.3
+python3-venv 3.10.6-1~22.04.1
+python3.10 3.10.12-1~22.04.18
+python3.10-venv 3.10.12-1~22.04.18
+zfsutils-linux 2.1.5-1ubuntu6~22.04.7
+$ apt-mark showhold
+libnvidia-cfg1-535
+libnvidia-common-535
+libnvidia-compute-535
+libnvidia-compute-535:i386
+libnvidia-container-tools
+libnvidia-container1
+libnvidia-decode-535
+libnvidia-decode-535:i386
+libnvidia-egl-wayland1
+libnvidia-egl-wayland1:i386
+libnvidia-encode-535
+libnvidia-encode-535:i386
+libnvidia-extra-535
+libnvidia-fbc1-535
+libnvidia-fbc1-535:i386
+libnvidia-gl-535
+libnvidia-gl-535:i386
+nvidia-compute-utils-535
+nvidia-container-toolkit
+nvidia-container-toolkit-base
+nvidia-dkms-535
+nvidia-driver-535
+nvidia-firmware-535-535.230.02
+nvidia-kernel-common-535
+nvidia-kernel-source-535
+nvidia-prime
+nvidia-settings
+nvidia-utils-535
+screen-resolution-extra
+xserver-xorg-video-nvidia-535
+$ ls -l --time-style=full-iso /home/thc1006/.local/share/applications/nsight-compute.desktop /home/thc1006/.local/share/applications/nsight.desktop /home/thc1006/.local/share/applications/nsight-systems.desktop /home/thc1006/.local/share/applications/nvvp.desktop
+-rw-rw-r-- 1 thc1006 thc1006 558 2026-10-16 05:29:43.652810955 +0800 /home/thc1006/.local/share/applications/nsight-compute.desktop
+-rw-rw-r-- 1 thc1006 thc1006 419 2026-10-16 05:29:20.334865312 +0800 /home/thc1006/.local/share/applications/nsight.desktop
+-rw-rw-r-- 1 thc1006 thc1006 507 2026-10-16 05:30:04.445547812 +0800 /home/thc1006/.local/share/applications/nsight-systems.desktop
+-rw-rw-r-- 1 thc1006 thc1006 398 2026-10-16 05:30:07.801828333 +0800 /home/thc1006/.local/share/applications/nvvp.desktop
+$ grep -H '^Exec=' /home/thc1006/.local/share/applications/nsight-compute.desktop /home/thc1006/.local/share/applications/nsight.desktop /home/thc1006/.local/share/applications/nsight-systems.desktop /home/thc1006/.local/share/applications/nvvp.desktop
+/home/thc1006/.local/share/applications/nvvp.desktop:Exec=/home/thc1006/cuda-12.9/bin/nvvp
+/home/thc1006/.local/share/applications/nsight.desktop:Exec=/home/thc1006/cuda-12.9/bin/nsight
+/home/thc1006/.local/share/applications/nsight-compute.desktop:Exec=/home/thc1006/cuda-12.9/nsight-compute-2025.2.1/host/linux-desktop-glibc_2_11_3-x64/ncu-ui
+/home/thc1006/.local/share/applications/nsight-systems.desktop:Exec=/home/thc1006/cuda-12.9/nsight-systems-2025.1.3/host-linux-x64/nsight-sys

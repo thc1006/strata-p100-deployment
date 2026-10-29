@@ -68,6 +68,11 @@ The long-document requests are taken from Strata's documentation (`docs/*.md` an
 | `gguf-metadata-iq3s-20261022.txt` | 10-22 | The first metadata keys of IQ3_S's shard 1, up to its context length (262144), with the script that read them | `tools/configure_strata_q3.py` |
 | `host-os-20261025.txt` | 10-25 | The operating system's release and the kind of virtual machine (`/etc/os-release`, `systemd-detect-virt`) | `docs/upstream/pr-2918.md`, `docs/upstream/issue-2281-comment.md` |
 | `host-versions-20261024.txt` | 10-24 | The kernel, ZFS module, NVIDIA driver, CPU and memory, and the boot (10-13) that every run since 10-16 ran after | `docs/upstream/pr-2918.md`, `docs/upstream/issue-2281-comment.md` |
+| `rebuild-rehearsal-r0-20261030.txt`, `rebuild-rehearsal-r1-r5-20261030.txt`, `rebuild-rehearsal-r6-r7-20261030.txt`, `rebuild-rehearsal-r8-r11-20261030.txt` | 10-30 | The rehearsal of the rebuild on this machine, in a bubblewrap sandbox (`bench/rehearsal_*`), with every command and its output: R0 the sandbox's self-test; R1-R5 the ops repository, the CUDA toolkit, the Strata tree, the llama.cpp zip and the data folder; R6-R7 `setup.sh` and `bench/build-engine.sh`, with their peak memory; R8-R11 IQ3_S's shard 1, its pack, the live config and `scripts/check-drift.sh --full` in the sandbox, then production's own `check-drift.sh` | `docs/runbooks/rebuild.md` |
+| `rebuild-rehearsal-setup-20261030.log` | 10-30 | Full output of `setup.sh` in the rehearsal's R6 | `docs/runbooks/rebuild.md` step 5 |
+| `rebuild-rehearsal-memory-20261030.txt`, `rebuild-rehearsal-guard-20261030.log` | 10-30 | The memory of the rehearsal's heavy jobs, every 5 s; the guard's decisions, every 30 s | `docs/runbooks/rebuild.md` |
+| `cuda-installer-20261030.log` | 10-30 | The CUDA 12.9.1 installer's log of the rehearsal's toolkit install, with its 140 warnings | `docs/runbooks/rebuild.md` step 2 |
+| `host-state-20261030.txt` | 10-30 | Versions of the packages the rebuild needs, the held packages, and the four desktop files the CUDA installer wrote on 10-16 (read without sudo) | `docs/runbooks/rebuild.md` step 0; `docs/reference/system-changes.md` |
 
 Not in git: `*.perf.data` (raw kprobe recordings, several hundred MB each; see `.gitignore`). The parsed results are in `z-hint-2-m-mem.txt` and `e-hint-1-m-mem.txt`.
 

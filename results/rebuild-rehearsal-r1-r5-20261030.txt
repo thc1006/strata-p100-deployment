@@ -1,0 +1,418 @@
+# Copied on 2026-10-30 from the rehearsal's own record (written as the steps ran), unchanged below this preface.
+# The tools it names under ~/rebuild-rehearsal/bin are in bench/ now, each header saying how it differs from the copy
+# that ran: rr is bench/rehearsal_rr.sh, rr-guard bench/rehearsal_guard.sh, rr-memwatch bench/rehearsal_memwatch.sh,
+# rlog bench/rehearsal_log.sh, elfcmp.py bench/rehearsal_elfcmp.py, r0-selftest.sh bench/rehearsal_selftest.sh,
+# r0-probe.py bench/rehearsal_probe.py, r0-settings.py bench/rehearsal_settings.py, shim/sudo and shim/nvidia-smi
+# bench/rehearsal_shim_sudo.sh and bench/rehearsal_shim_nvidia_smi.sh.  "PLAN.md" is the plan of the session that ran
+# the rehearsal; it is not in this repository, and docs/runbooks/rebuild.md gives the procedure.
+# R1-R5 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 00:49:55 +0800.
+# Every job ran through ~/rebuild-rehearsal/bin/rr (capped user scope, choom -n 500, nice -n 19, chrt -i 0, ionice -c3,
+# taskset, then the bubblewrap sandbox of R0-selftest.txt); rr-guard ran beside it (logs/guard.log).  No sudo was run.
+# Inside rr, /home/thc1006/dev, /home/thc1006/cuda-12.9, /home/thc1006/downloads and /tmp are the sandbox's
+# (~/rebuild-rehearsal/root/...); production is visible read-only at ~/rebuild-rehearsal/prod/{dev,cuda-12.9}.
+# The host name is written <host>; everything else is the output, unchanged (long outputs are cut where a note says so).
+
+== R1. the ops repo (PLAN.md F1) (2026-10-30 00:50:06)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r1-clone -m 1G -- git clone https://github.com/thc1006/strata-p100-deployment.git /home/thc1006/dev/p100-q3-deployment
+Cloning into '/home/thc1006/dev/p100-q3-deployment'...
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r1-co -m 512M -- git -C /home/thc1006/dev/p100-q3-deployment checkout --detach 7886a3996bbfa7824e60ff744e7739893ff0387a
+HEAD is now at 7886a39 Make three tests pass in CI's container, where they run as nobody on a fresh runner
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r1-head -m 256M -- git -C /home/thc1006/dev/p100-q3-deployment log -1 --format=%H\ %s
+7886a3996bbfa7824e60ff744e7739893ff0387a Make three tests pass in CI's container, where they run as nobody on a fresh runner
+[exit 0]
+
+$ git -C /home/thc1006/dev/p100-q3-deployment log -1 --format=%H\ %s
+7886a3996bbfa7824e60ff744e7739893ff0387a Make three tests pass in CI's container, where they run as nobody on a fresh runner
+[exit 0]
+# the line above is production's live checkout, read outside rr
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r1-diff -m 512M -- diff -r -x .git -x __pycache__ /home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment /home/thc1006/dev/p100-q3-deployment
+Only in /home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment/results: e-hint-1-m-mem.perf.data
+Only in /home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment/results: z-hint-2-m-mem.perf.data
+[exit 1]
+
+$ git -C /home/thc1006/dev/p100-q3-deployment check-ignore -v results/e-hint-1-m-mem.perf.data results/z-hint-2-m-mem.perf.data
+.gitignore:6:*.perf.data	results/e-hint-1-m-mem.perf.data
+.gitignore:6:*.perf.data	results/z-hint-2-m-mem.perf.data
+[exit 0]
+# R1 result: the sandbox clone at 7886a39 equals the live checkout file for file; the live checkout has two more files, ignored by its .gitignore (perf recordings), which a clone does not have
+
+== R2. CUDA 12.9.1 toolkit, at /home/thc1006/cuda-12.9 inside the sandbox (PLAN.md F2) (2026-10-30 00:50:21)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-dl -m 512M -- sh -c cd\ /home/thc1006/downloads/cuda\ \&\&\ curl\ -fsSL\ --limit-rate\ 30M\ -o\ cuda_12.9.1_575.57.08_linux.run\ https://developer.download.nvidia.com/compute/cuda/12.9.1/local_installers/cuda_12.9.1_575.57.08_linux.run\ \&\&\ ls\ -l\ cuda_12.9.1_575.57.08_linux.run\ \&\&\ echo\ \"a52d6c204bd4268627dfdab8bfeeb0d1\ \ cuda_12.9.1_575.57.08_linux.run\"\ \|\ md5sum\ -c\ -
+-rw-rw-r-- 1 thc1006 thc1006 5860276058  十  30 00:53 cuda_12.9.1_575.57.08_linux.run
+cuda_12.9.1_575.57.08_linux.run: OK
+[exit 0]
+
+$ ls -l /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/cuda/ /home/thc1006/downloads/cuda/
+/home/thc1006/downloads/cuda/:
+total 5725525
+-rw-rw-r-- 1 thc1006 thc1006 5860276058  十  16 05:22 cuda_12.9.1_575.57.08_linux.run
+
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/cuda/:
+total 5725526
+-rw-rw-r-- 1 thc1006 thc1006 5860276058  十  30 00:53 cuda_12.9.1_575.57.08_linux.run
+drwxrwxr-x 2 thc1006 thc1006          2  十  30 00:44 tmp
+[exit 0]
+# the runfile is in the sandbox (first listing); production's ~/downloads/cuda (second) is unchanged
+# install started 00:53:52
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-install -m 3G -- bash /home/thc1006/downloads/cuda/cuda_12.9.1_575.57.08_linux.run --silent --toolkit --toolkitpath=/home/thc1006/cuda-12.9 --defaultroot=/home/thc1006/cuda-12.9 --tmpdir=/home/thc1006/downloads/cuda/tmp --no-man-page --no-opengl-libs --no-drm
+ Installation failed. See log at /tmp/cuda-installer.log for details.
+[exit 1]
+# install ended 00:57:18
+# the runfile stopped: /home/thc1006 is read-only inside rr, and the installer needs to write there. The installer's log (in the sandbox's /tmp):
+
+$ tail -4 /home/thc1006/rebuild-rehearsal/root/tmp/cuda-installer.log
+[INFO]: Installing: CUDA Toolkit 12.9
+[WARNING]: Unable to write to directory: /home/thc1006
+[ERROR]: Permission denied. Unable to write to /home/thc1006/cuda-12.9/
+[ERROR]: Install of CUDA Toolkit 12.9 failed, quitting
+[exit 0]
+
+$ ls -A /home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9 /home/thc1006/cuda-12.9/version.json
+/home/thc1006/cuda-12.9/version.json
+
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9:
+[exit 0]
+# nothing was installed in the sandbox's toolkit directory; production's ~/cuda-12.9 is untouched (read outside). Fix: rr --home, in which the sandbox's ~/rebuild-rehearsal/root/home/thc1006 is all of /home/thc1006 inside. Its probes, before the install is run again:
+
+== R2a. the self-test of rr --home (probe token 2f0ada64866b) (2026-10-30 00:58:20)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr --home -n rr-r2a-mounts -m 256M -- sh -c for\ p\ in\ /\ /etc\ /usr/local/sbin\ /home/thc1006\ /home/thc1006/dev\ /home/thc1006/cuda-12.9\ /home/thc1006/downloads\ /home/thc1006/rebuild-rehearsal\ /home/thc1006/rebuild-rehearsal/prod/dev\ /home/thc1006/rebuild-rehearsal/prod/cuda-12.9\ /tmp\;\ do\ printf\ \"%-46s\ %s\\n\"\ \"\$p\"\ \"\$\(findmnt\ -no\ SOURCE\,OPTIONS\ -T\ \$p\ \|\ head\ -1\ \|\ cut\ -c1-100\)\"\;\ done\;\ ls\ -A\ /home/thc1006
+/                                              rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/etc                                           rpool/ROOT/ubuntu_b3m9mu ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/usr/local/sbin                                rpool/ROOT/ubuntu_b3m9mu/usr/local ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/home/thc1006                                  rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006] rw,nosuid,nodev,relatime
+/home/thc1006/dev                              rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006] rw,nosuid,nodev,relatime
+/home/thc1006/cuda-12.9                        rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006] rw,nosuid,nodev,relatime
+/home/thc1006/downloads                        rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/home/thc1006] rw,nosuid,nodev,relatime
+/home/thc1006/rebuild-rehearsal                rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal] rw,nosuid,nodev,relatime,xattr,posixacl,ca
+/home/thc1006/rebuild-rehearsal/prod/dev       rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/dev] ro,nosuid,nodev,relatime,xattr,posixacl,casesensitive
+/home/thc1006/rebuild-rehearsal/prod/cuda-12.9 rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/cuda-12.9] ro,nosuid,nodev,relatime,xattr,posixacl,casesensit
+/tmp                                           rpool/ROOT/ubuntu_b3m9mu[/home/thc1006/rebuild-rehearsal/root/tmp] rw,nosuid,nodev,relatime,xattr,po
+.cache
+.config
+cuda-12.9
+dev
+downloads
+rebuild-rehearsal
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr --home -n rr-r2a-probe -m 256M -- python3 -I /home/thc1006/rebuild-rehearsal/bin/r0-probe.py 2f0ada64866b
+/home/thc1006/rebuild-rehearsal/prod/dev/strata: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/strata/engine-cuda12: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (ETXTBSY); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/strata/.venv: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_S: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); rename dir to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_s: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_xxs: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp/rt: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/rebuild-rehearsal/prod/cuda-12.9: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EROFS); rename to itself refused (EROFS)
+/home/thc1006/.config/strata: create refused (ENOENT); mkdir refused (ENOENT); delete refused (ENOENT); open for writing refused (ENOENT); rename to itself refused (ENOENT)
+/etc: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+/etc/systemd/system: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+/usr/local/sbin: create refused (EROFS); mkdir refused (EROFS); delete refused (EROFS); open for writing refused (EACCES); rename to itself refused (EROFS)
+probes allowed: 0
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr --home -n rr-r2a-mark -m 256M -- sh -c for\ p\ in\ /home/thc1006\ /home/thc1006/.config\ /home/thc1006/dev\ /home/thc1006/cuda-12.9\;\ do\ mkdir\ -p\ \$p\ \&\&\ echo\ inside\ \>\ \$p/.rr-marker-2f0ada64866b\ \&\&\ echo\ \"wrote\ \$p/.rr-marker-2f0ada64866b\"\;\ done
+wrote /home/thc1006/.rr-marker-2f0ada64866b
+wrote /home/thc1006/.config/.rr-marker-2f0ada64866b
+wrote /home/thc1006/dev/.rr-marker-2f0ada64866b
+wrote /home/thc1006/cuda-12.9/.rr-marker-2f0ada64866b
+[exit 0]
+
+$ find /home/thc1006/rebuild-rehearsal -name .rr-marker-2f0ada64866b -print
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/.rr-marker-2f0ada64866b
+[exit 0]
+
+$ <the same names outside, in production>
+absent /home/thc1006/.rr-marker-2f0ada64866b
+absent /home/thc1006/.config/.rr-marker-2f0ada64866b
+absent /home/thc1006/dev/.rr-marker-2f0ada64866b
+absent /home/thc1006/cuda-12.9/.rr-marker-2f0ada64866b
+
+$ find /home/thc1006/rebuild-rehearsal -name .rr-marker-2f0ada64866b -delete -print
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/.rr-marker-2f0ada64866b
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/.rr-marker-2f0ada64866b
+[exit 0]
+
+$ ls -A /home/thc1006/rebuild-rehearsal/root/home/thc1006
+.cache
+.config
+cuda-12.9
+dev
+downloads
+rebuild-rehearsal
+[exit 0]
+
+== R2b. the toolkit install again, with rr --home (2026-10-30 00:58:27)
+# install started 00:58:27
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr --home -n rr-r2-install2 -m 3G -- bash /home/thc1006/downloads/cuda/cuda_12.9.1_575.57.08_linux.run --silent --toolkit --toolkitpath=/home/thc1006/cuda-12.9 --defaultroot=/home/thc1006/cuda-12.9 --tmpdir=/home/thc1006/downloads/cuda/tmp --no-man-page --no-opengl-libs --no-drm
+[exit 0]
+# install ended 01:04:52
+# the installer's WARNING lines, by kind (the toolkit path written <toolkit>); 132 on 2026-10-16 (results/cuda-installer-20261016.log)
+
+$ sh -c grep\ -c\ WARNING\ /home/thc1006/rebuild-rehearsal/logs/cuda-installer-try2.log\;\ grep\ WARNING\ /home/thc1006/rebuild-rehearsal/logs/cuda-installer-try2.log\ \|\ sed\ -E\ \'s\|/home/thc1006/cuda-12.9/.\*\|\<toolkit\>/...\|\'\ \|\ sort\ \|\ uniq\ -c\ \|\ sort\ -rn\;\ grep\ -c\ ERROR\ /home/thc1006/rebuild-rehearsal/logs/cuda-installer-try2.log
+140
+     60 [WARNING]: Unable to write to directory: /var/log
+     18 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Libraries_12.9-components/CUDA_Development_12.9-components/!
+     13 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Libraries_12.9-components/CUDA_Runtime_12.9-components/!
+      6 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/CUDA_Command_Line_Tools_12.9-components/!
+      6 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Compiler_12.9-components/!
+      6 [WARNING]: Skipping copy. File already exists at: <toolkit>/...
+      4 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/CUDA_Visual_Tools_12.9-components/!
+      4 [WARNING]: Unable to write to directory: /home/thc1006/.local/share/applications/
+      4 [WARNING]: Cannot install desktop file to: /home/thc1006/.local/share/applications/
+      3 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/!
+      3 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/!
+      2 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/!
+      2 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Libraries_12.9-components/!
+      2 [WARNING]: Unable to create .pc files, permission denied at /usr/local/cuda-12.9//pkgconfig/!
+      1 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/CUDA_Visual_Tools_12.9-components/nsight-systems-components/!
+      1 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/CUDA_Visual_Tools_12.9-components/nsight-compute-components/!
+      1 [WARNING]: Unable to write uninstall manifest to /var/log/nvidia/.uninstallManifests/CUDA_Toolkit_12.9-components/CUDA_Tools_12.9-components/CUDA_Command_Line_Tools_12.9-components/compute-sanitizer-components/!
+      1 [WARNING]: Unable to write to directory: /usr/share/applications/
+      1 [WARNING]: Unable to write to directory: /usr/local
+      1 [WARNING]: Unable to write to directory: /etc/ld.so.conf.d
+      1 [WARNING]: Permission denied creating symlink /usr/local/cuda!
+0
+[exit 1]
+# the 8 more than on 10-16 are the 4+4 lines about /home/thc1006/.local/share/applications/, absent in the sandbox's home. On 10-16 that directory existed in the real home, and the installer wrote four desktop files there (nsight-compute.desktop, nsight.desktop 05:29, nsight-systems.desktop, nvvp.desktop 05:30; ls ~/.local/share/applications, read outside): a change of the 10-16 install that docs/reference/system-changes.md does not list
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-nvcc -m 512M -- sh -c /home/thc1006/cuda-12.9/bin/nvcc\ --version\ \|\ tail\ -2
+Cuda compilation tools, release 12.9, V12.9.86
+Build cuda_12.9.r12.9/compiler.36037853_0
+[exit 0]
+# toolkit lists: sha256 of every file, and every symbolic link with its target, in the sandbox's toolkit and in production's (through its read-only view)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-sha-sb -m 512M -- sh -c cd\ /home/thc1006/cuda-12.9\ \&\&\ \{\ find\ .\ -type\ f\ -print0\ \|\ LC_ALL=C\ sort\ -z\ \|\ xargs\ -0\ sha256sum\;\ find\ .\ -type\ l\ -printf\ \"%p\ -\>\ %l\\n\"\ \|\ LC_ALL=C\ sort\;\ \}\ \>\ /tmp/cuda-sandbox.txt\;\ wc\ -l\ \<\ /tmp/cuda-sandbox.txt
+5796
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-sha-prod -m 512M -- sh -c cd\ /home/thc1006/rebuild-rehearsal/prod/cuda-12.9\ \&\&\ \{\ find\ .\ -type\ f\ -print0\ \|\ LC_ALL=C\ sort\ -z\ \|\ xargs\ -0\ sha256sum\;\ find\ .\ -type\ l\ -printf\ \"%p\ -\>\ %l\\n\"\ \|\ LC_ALL=C\ sort\;\ \}\ \>\ /tmp/cuda-prod.txt\;\ wc\ -l\ \<\ /tmp/cuda-prod.txt
+5796
+[exit 0]
+
+$ diff /home/thc1006/rebuild-rehearsal/root/tmp/cuda-prod.txt /home/thc1006/rebuild-rehearsal/root/tmp/cuda-sandbox.txt
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r2-sha-libs -m 512M -- sh -c cd\ /home/thc1006/dev\ \&\&\ grep\ \"\ /home/thc1006/cuda-12.9/\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -
+/home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcudart.so.12.9.79: OK
+/home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublas.so.12.9.1.4: OK
+/home/thc1006/cuda-12.9/targets/x86_64-linux/lib/libcublasLt.so.12.9.1.4: OK
+[exit 0]
+# R2 result: the sandbox's toolkit equals production's file for file (5684 files and 112 links, every sha256 and link target the same, the pkgconfig files with their path too) and gives V12.9.86; the three libraries of config/deployed-artifacts.sha256:12-14 are OK. Install: 00:58:27-01:04:52 (6 min 25 s) under rr; download 00:50:21-00:53 at 30 MB/s
+
+$ du -s -B1 --apparent-size /home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9
+10043220389	/home/thc1006/rebuild-rehearsal/root/home/thc1006/cuda-12.9
+[exit 0]
+
+$ rm -rf /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/cuda/cuda_12.9.1_575.57.08_linux.run /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/cuda/tmp
+[exit 0]
+
+$ ls -lA /home/thc1006/rebuild-rehearsal/root/home/thc1006/downloads/cuda
+total 0
+[exit 0]
+
+== R3. the Strata tree, a partial clone and a worktree at 477ac13cb (PLAN.md F3); run while R2's install ran (light: about 90 MB) (2026-10-30 00:54:27)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-clone -m 1G -- git clone --filter=blob:none https://github.com/Niko1221/Strata.git /home/thc1006/dev/strata-git
+Cloning into '/home/thc1006/dev/strata-git'...
+Updating files:   0% (2/5205)Updating files:   1% (53/5205)Updating files:   2% (105/5205)Updating files:   3% (157/5205)Updating files:   4% (209/5205)Updating files:   5% (261/5205)Updating files:   6% (313/5205)Updating files:   7% (365/5205)Updating files:   8% (417/5205)Updating files:   8% (461/5205)Updating files:   9% (469/5205)Updating files:  10% (521/5205)Updating files:  11% (573/5205)Updating files:  12% (625/5205)Updating files:  13% (677/5205)Updating files:  14% (729/5205)Updating files:  15% (781/5205)Updating files:  16% (833/5205)Updating files:  17% (885/5205)Updating files:  18% (937/5205)Updating files:  19% (989/5205)Updating files:  20% (1041/5205)Updating files:  21% (1094/5205)Updating files:  22% (1146/5205)Updating files:  23% (1198/5205)Updating files:  24% (1250/5205)Updating files:  25% (1302/5205)Updating files:  26% (1354/5205)Updating files:  27% (1406/5205)Updating files:  28% (1458/5205)Updating files:  29% (1510/5205)Updating files:  30% (1562/5205)Updating files:  31% (1614/5205)Updating files:  32% (1666/5205)Updating files:  33% (1718/5205)Updating files:  34% (1770/5205)Updating files:  35% (1822/5205)Updating files:  36% (1874/5205)Updating files:  37% (1926/5205)Updating files:  38% (1978/5205)Updating files:  39% (2030/5205)Updating files:  40% (2082/5205)Updating files:  41% (2135/5205)Updating files:  42% (2187/5205)Updating files:  43% (2239/5205)Updating files:  44% (2291/5205)Updating files:  45% (2343/5205)Updating files:  46% (2395/5205)Updating files:  47% (2447/5205)Updating files:  48% (2499/5205)Updating files:  49% (2551/5205)Updating files:  50% (2603/5205)Updating files:  51% (2655/5205)Updating files:  52% (2707/5205)Updating files:  53% (2759/5205)Updating files:  53% (2772/5205)Updating files:  54% (2811/5205)Updating files:  55% (2863/5205)Updating files:  56% (2915/5205)Updating files:  57% (2967/5205)Updating files:  58% (3019/5205)Updating files:  59% (3071/5205)Updating files:  60% (3123/5205)Updating files:  61% (3176/5205)Updating files:  62% (3228/5205)Updating files:  63% (3280/5205)Updating files:  64% (3332/5205)Updating files:  65% (3384/5205)Updating files:  66% (3436/5205)Updating files:  67% (3488/5205)Updating files:  68% (3540/5205)Updating files:  69% (3592/5205)Updating files:  70% (3644/5205)Updating files:  71% (3696/5205)Updating files:  72% (3748/5205)Updating files:  73% (3800/5205)Updating files:  74% (3852/5205)Updating files:  75% (3904/5205)Updating files:  76% (3956/5205)Updating files:  77% (4008/5205)Updating files:  78% (4060/5205)Updating files:  79% (4112/5205)Updating files:  80% (4164/5205)Updating files:  80% (4180/5205)Updating files:  81% (4217/5205)Updating files:  82% (4269/5205)Updating files:  83% (4321/5205)Updating files:  84% (4373/5205)Updating files:  85% (4425/5205)Updating files:  86% (4477/5205)Updating files:  87% (4529/5205)Updating files:  88% (4581/5205)Updating files:  89% (4633/5205)Updating files:  90% (4685/5205)Updating files:  91% (4737/5205)Updating files:  92% (4789/5205)Updating files:  93% (4841/5205)Updating files:  94% (4893/5205)Updating files:  95% (4945/5205)Updating files:  96% (4997/5205)Updating files:  97% (5049/5205)Updating files:  98% (5101/5205)Updating files:  99% (5153/5205)Updating files: 100% (5205/5205)Updating files: 100% (5205/5205), done.
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-wt -m 1G -- git -C /home/thc1006/dev/strata-git worktree add --detach /home/thc1006/dev/strata 477ac13cbe8e582c20484871ce459d20d82df09d
+Preparing worktree (detached HEAD 477ac13c)
+Updating files:   0% (2/3286)Updating files:   1% (33/3286)Updating files:   2% (66/3286)Updating files:   3% (99/3286)Updating files:   4% (132/3286)Updating files:   5% (165/3286)Updating files:   6% (198/3286)Updating files:   7% (231/3286)Updating files:   8% (263/3286)Updating files:   9% (296/3286)Updating files:  10% (329/3286)Updating files:  11% (362/3286)Updating files:  12% (395/3286)Updating files:  13% (428/3286)Updating files:  14% (461/3286)Updating files:  15% (493/3286)Updating files:  16% (526/3286)Updating files:  17% (559/3286)Updating files:  18% (592/3286)Updating files:  19% (625/3286)Updating files:  20% (658/3286)Updating files:  21% (691/3286)Updating files:  22% (723/3286)Updating files:  23% (756/3286)Updating files:  24% (789/3286)Updating files:  25% (822/3286)Updating files:  25% (823/3286)Updating files:  26% (855/3286)Updating files:  27% (888/3286)Updating files:  28% (921/3286)Updating files:  29% (953/3286)Updating files:  30% (986/3286)Updating files:  31% (1019/3286)Updating files:  32% (1052/3286)Updating files:  33% (1085/3286)Updating files:  34% (1118/3286)Updating files:  35% (1151/3286)Updating files:  36% (1183/3286)Updating files:  37% (1216/3286)Updating files:  38% (1249/3286)Updating files:  39% (1282/3286)Updating files:  40% (1315/3286)Updating files:  41% (1348/3286)Updating files:  42% (1381/3286)Updating files:  43% (1413/3286)Updating files:  44% (1446/3286)Updating files:  45% (1479/3286)Updating files:  46% (1512/3286)Updating files:  47% (1545/3286)Updating files:  48% (1578/3286)Updating files:  49% (1611/3286)Updating files:  50% (1643/3286)Updating files:  51% (1676/3286)Updating files:  52% (1709/3286)Updating files:  53% (1742/3286)Updating files:  54% (1775/3286)Updating files:  55% (1808/3286)Updating files:  56% (1841/3286)Updating files:  57% (1874/3286)Updating files:  58% (1906/3286)Updating files:  59% (1939/3286)Updating files:  60% (1972/3286)Updating files:  61% (2005/3286)Updating files:  62% (2038/3286)Updating files:  63% (2071/3286)Updating files:  64% (2104/3286)Updating files:  65% (2136/3286)Updating files:  66% (2169/3286)Updating files:  67% (2202/3286)Updating files:  68% (2235/3286)Updating files:  69% (2268/3286)Updating files:  70% (2301/3286)Updating files:  71% (2334/3286)Updating files:  72% (2366/3286)Updating files:  73% (2399/3286)Updating files:  74% (2432/3286)Updating files:  75% (2465/3286)Updating files:  76% (2498/3286)Updating files:  77% (2531/3286)Updating files:  78% (2564/3286)Updating files:  78% (2574/3286)Updating files:  79% (2596/3286)Updating files:  80% (2629/3286)Updating files:  81% (2662/3286)Updating files:  82% (2695/3286)Updating files:  83% (2728/3286)Updating files:  84% (2761/3286)Updating files:  85% (2794/3286)Updating files:  86% (2826/3286)Updating files:  87% (2859/3286)Updating files:  88% (2892/3286)Updating files:  89% (2925/3286)Updating files:  90% (2958/3286)Updating files:  91% (2991/3286)Updating files:  92% (3024/3286)Updating files:  93% (3056/3286)Updating files:  94% (3089/3286)Updating files:  95% (3122/3286)Updating files:  96% (3155/3286)Updating files:  97% (3188/3286)Updating files:  98% (3221/3286)Updating files:  99% (3254/3286)Updating files: 100% (3286/3286)Updating files: 100% (3286/3286), done.
+HEAD is now at 477ac13c verify: the side-projection q8_1 interleave copies need two or more columns (STRATA_SIDE_MIXER=2 on a 1-column window threw on Q2_0 packs: the queries' branch and the GDN gate branch)
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-check -m 512M -- sh -c git\ -C\ /home/thc1006/dev/strata\ rev-parse\ HEAD\;\ git\ -C\ /home/thc1006/dev/strata\ describe\ --tags\ --exact-match\;\ echo\ \"status\ lines:\ \$\(git\ -C\ /home/thc1006/dev/strata\ status\ --porcelain\ \|\ wc\ -l\)\"\;\ cd\ /home/thc1006/dev\ \&\&\ sha256sum\ strata/data/expert-profile.bin\ strata/data/draft_vocab.bin
+477ac13cbe8e582c20484871ce459d20d82df09d
+v0.1.45
+status lines: 0
+8f59b4aa8873209dff11c11e37bcda9529a1335b724a1afeea37bf6388975baf  strata/data/expert-profile.bin
+b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91  strata/data/draft_vocab.bin
+[exit 0]
+# expected: strata/data/expert-profile.bin 8f59b4aa8873209dff11c11e37bcda9529a1335b724a1afeea37bf6388975baf (config/deployed-artifacts.sha256:8); data/draft_vocab.bin b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91 (= Strata-data/mtp/rt/draft_vocab.bin, config/deployed-artifacts.sha256:18)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-sha -m 512M -- sh -c cd\ /home/thc1006/dev\ \&\&\ grep\ -E\ \"\ \ strata/data/expert-profile.bin\$\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -
+strata/data/expert-profile.bin: OK
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-tree -m 512M -- sh -c cd\ /home/thc1006/dev/strata\ \&\&\ git\ ls-files\ -z\ \|\ xargs\ -0\ sha256sum\ \>\ /tmp/r3-sandbox.sha\;\ cd\ /home/thc1006/rebuild-rehearsal/prod/dev/strata\ \&\&\ git\ -c\ safe.directory=\"\*\"\ ls-files\ -z\ 2\>/dev/null\ \|\ xargs\ -0\ sha256sum\ \>\ /tmp/r3-prod.sha\;\ wc\ -l\ \<\ /tmp/r3-sandbox.sha\;\ cmp\ /tmp/r3-sandbox.sha\ /tmp/r3-prod.sha\ \&\&\ echo\ \"every\ tracked\ file:\ the\ same\ sha256\ in\ the\ sandbox\ tree\ and\ in\ production\'s\ ~/dev/strata\"
+3286
+/tmp/r3-sandbox.sha /tmp/r3-prod.sha differ: byte 1, line 1
+[exit 1]
+# the last probe's second list is empty: inside rr, production's ~/dev/strata/.git names gitdir /home/thc1006/dev/strata-git/.git/worktrees/strata-0.1.45-prod, which inside resolves to the sandbox's clone, where no such worktree exists, so git listed nothing (its error went to /dev/null). Done again without git on the production side: the sandbox's list of the commit's files, hashed in both trees
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r3-tree2 -m 512M -- sh -c cd\ /home/thc1006/dev/strata\ \&\&\ git\ ls-files\ -z\ \>\ /tmp/r3-files\ \&\&\ xargs\ -0\ sha256sum\ \<\ /tmp/r3-files\ \>\ /tmp/r3-sandbox.sha\ \&\&\ cd\ /home/thc1006/rebuild-rehearsal/prod/dev/strata\ \&\&\ xargs\ -0\ sha256sum\ \<\ /tmp/r3-files\ \>\ /tmp/r3-prod.sha\;\ wc\ -l\ /tmp/r3-sandbox.sha\ /tmp/r3-prod.sha\;\ cmp\ /tmp/r3-sandbox.sha\ /tmp/r3-prod.sha\ \&\&\ echo\ \"all\ 3286\ files\ of\ commit\ 477ac13cb:\ the\ same\ sha256\ in\ the\ sandbox\ tree\ and\ in\ production\ ~/dev/strata\"
+  3286 /tmp/r3-sandbox.sha
+  3286 /tmp/r3-prod.sha
+  6572 total
+all 3286 files of commit 477ac13cb: the same sha256 in the sandbox tree and in production ~/dev/strata
+[exit 0]
+
+== R4. the llama.cpp zip at 3cf0325, rate-limited, with setup.py's finish mark (PLAN.md R4); run while R2's install ran (light: about 40 MB) (2026-10-30 00:55:17)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r4-dl -m 512M -- sh -c cd\ /home/thc1006/dev/strata/third_party\ \&\&\ curl\ -fsSL\ --limit-rate\ 5M\ -o\ llama.cpp-3cf0325.zip\ https://github.com/ggml-org/llama.cpp/archive/3cf03257f219afbe7334045ff7c6a06ac68c627d.zip\ \&\&\ ls\ -l\ llama.cpp-3cf0325.zip\ \&\&\ unzip\ -z\ llama.cpp-3cf0325.zip\ \|\ tail\ -1\ \&\&\ unzip\ -z\ llama.cpp-3cf0325.zip\ \|\ grep\ -qx\ 3cf03257f219afbe7334045ff7c6a06ac68c627d\ \&\&\ echo\ rehearsal\ \>\ llama.cpp-3cf0325.zip.done\ \&\&\ sha256sum\ llama.cpp-3cf0325.zip\ \&\&\ ls\ -l\ llama.cpp-3cf0325.zip.done
+-rw-rw-r-- 1 thc1006 thc1006 39564399  十  30 00:55 llama.cpp-3cf0325.zip
+3cf03257f219afbe7334045ff7c6a06ac68c627d
+cbe23c594282ead2937abb3f008e51fcec4609d9256652fff42c7cc1c21ea47b  llama.cpp-3cf0325.zip
+-rw-rw-r-- 1 thc1006 thc1006 10  十  30 00:55 llama.cpp-3cf0325.zip.done
+[exit 0]
+# setup.py skips a download whose .done mark exists (setup.py:1616-1618) and extracts this zip (setup.py:1999-2031); the zip comment holds the commit, as rebuild.md:22 checks for GitHub archives. Its files are compared with production's third_party/llama.cpp after setup extracts it (R6)
+# (R3 and R4 above ran at 00:54-00:55, during R2's first install; their records were kept apart and put here in step order)
+
+== R5. the data folder seeded without downloads (PLAN.md R5): IQ3_XXS shards and pack as links to production's read-only view, the MTP tensors and inventory copied (2026-10-30 01:09:23)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r5-links -m 256M -- sh -c $'set -e; P=/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data; D=/home/thc1006/dev/Strata-data\n  mkdir -p $D/models/IQ3_XXS $D/packs $D/mtp/tensors\n  for i in 1 2; do f=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-0000$i-of-00002.gguf; ln -s $P/models/IQ3_XXS/$f $D/models/IQ3_XXS/$f; echo rehearsal > $D/models/IQ3_XXS/$f.done; done\n  ln -s $P/packs/iq3_xxs $D/packs/iq3_xxs\n  ls -lA $D/models/IQ3_XXS $D/packs'
+/home/thc1006/dev/Strata-data/models/IQ3_XXS:
+total 4
+lrwxrwxrwx 1 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf.done
+lrwxrwxrwx 1 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf.done
+
+/home/thc1006/dev/Strata-data/packs:
+total 1
+lrwxrwxrwx 1 thc1006 thc1006 66  十  30 01:09 iq3_xxs -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/packs/iq3_xxs
+[exit 0]
+# copy of the MTP tensors started 01:09:23
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r5-mtp -m 1G -- sh -c $'set -e; P=/home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp; D=/home/thc1006/dev/Strata-data/mtp\n  cp $P/mtp-inventory.json $P/mtp-inventory.md $D/ && cp $P/tensors/*.bin $D/tensors/ && ls $D/tensors | wc -l && du -s -B1 --apparent-size $D/tensors'
+31
+5214301729	/home/thc1006/dev/Strata-data/mtp/tensors
+[exit 0]
+# copy ended 01:09:54
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r5-verify -m 1G -- sh -c $'cd /home/thc1006/dev/Strata-data/mtp && python3 -I -c "\nimport json, sys\ninv = json.load(open(\\"mtp-inventory.json\\"))\nprint(\\"inventory repo:\\", inv[\\"repo\\"], \\"tensors:\\", len(inv[\\"tensors\\"]), \\"bytes:\\", inv[\\"total_bytes\\"])\n" && cd /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp && sha256sum mtp-inventory.json mtp-inventory.md tensors/*.bin > /tmp/r5-prod.sha && cd /home/thc1006/dev/Strata-data/mtp && sha256sum -c --quiet /tmp/r5-prod.sha && echo "all $(wc -l < /tmp/r5-prod.sha) copied files: the same sha256 as production" && head -3 /tmp/r5-prod.sha'
+inventory repo: https://huggingface.co/Qwen/Qwen3.8-Flash-Next/resolve/de4b8e4d43b917e7706784d8bb445c9af86a3540/ tensors: 31 bytes: 5214301696
+all 33 copied files: the same sha256 as production
+09a2cae54f5c8624d828597ec0788ef14be26eff5c1710b0281875ba18fd15cc  mtp-inventory.json
+8e3ca07f66782ae85881a627357c2ea1c9e62260eb1b7c376e9760d78b487645  mtp-inventory.md
+241d6e87ded317a61b1aeb3ca4e28c53f1caba09ad5be66092e91fe5e3e14751  tensors/mtp.fc_embedding.weight.bin
+[exit 0]
+# the tensors are checked against Strata's own pinned SHA-256 by mtp_fetch.py when setup runs (R6); the inventory's repo is the pinned revision's URL, so fetch reads nothing from the network (tools/mtp_fetch.py:221-260)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r5-headers -m 1G -- sh -c cd\ /home/thc1006/dev/Strata-data/models/IQ3_XXS\ \&\&\ for\ f\ in\ \*.gguf\;\ do\ printf\ \"%s\ -\>\ %s\,\ %s\ bytes\,\ magic\ %s\\n\"\ \"\$f\"\ \"\$\(readlink\ \$f\)\"\ \"\$\(stat\ -L\ -c\ %s\ \$f\)\"\ \"\$\(head\ -c\ 4\ \$f\)\"\;\ done
+Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf, 47039860096 bytes, magic GGUF
+Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf, 28800138432 bytes, magic GGUF
+[exit 0]
+
+$ ls -lA /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_XXS
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev:
+total 29
+drwxrwxr-x 13 thc1006 thc1006 21  十  30 00:50 p100-q3-deployment
+-rw-rw-r--  1 thc1006 thc1006  0  十  30 00:44 .rehearsal-sandbox
+drwxrwxr-x 16 thc1006 thc1006 46  十  30 00:54 strata
+drwxrwxr-x  5 thc1006 thc1006  5  十  30 01:09 Strata-data
+drwxrwxr-x 25 thc1006 thc1006 60  十  30 00:54 strata-git
+
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/Strata-data/models/IQ3_XXS:
+total 4
+lrwxrwxrwx 1 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf.done
+lrwxrwxrwx 1 thc1006 thc1006 122  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf -> /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf
+-rw-rw-r-- 1 thc1006 thc1006  10  十  30 01:09 Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf.done
+[exit 0]
+# outside rr the links point into ~/rebuild-rehearsal/prod/dev, an empty directory there, so they dangle; nothing outside the sandbox resolves through them
+
+$ stat -c %n\ %i\ %h\ %Y\ %Z /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf /home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf /home/thc1006/dev/Strata-data/packs/iq3_xxs /home/thc1006/dev/Strata-data/mtp/tensors
+/home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf 438952 1 1792100234 1792100234
+/home/thc1006/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf 461004 2 1792099926 1792333867
+/home/thc1006/dev/Strata-data/packs/iq3_xxs 524166 3 1792101230 1792101230
+/home/thc1006/dev/Strata-data/mtp/tensors 524188 2 1792101533 1792101533
+[exit 0]
+# production's files (read outside): link count of the shards unchanged (1 and 2, the second being IQ3_S's shard 2), no new entry in mtp/tensors (its mtime is 2026-10-16)
+
+== after R1-R5: production paths against R0's list, the guard, the account, the service (2026-10-30 01:11:22)
+
+$ diff /home/thc1006/rebuild-rehearsal/verify/r0-prod-before.txt /home/thc1006/rebuild-rehearsal/verify/r5-prod-after.txt
+[exit 0]
+# the 33 production paths of R0 (inode, link count, size, mtime, ctime): unchanged since R0
+
+$ sh -c grep\ -c\ \':\ freeze\'\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ grep\ -c\ \':\ thaw\'\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ head\ -1\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ tail\ -1\ /home/thc1006/rebuild-rehearsal/logs/guard.log
+0
+43
+rr-guard 2026-10-30 00:49:58: service active, MemAvailable 22 GiB, / 47 %: thaw; scopes: none
+rr-guard 2026-10-30 01:11:01: service active, MemAvailable 22 GiB, / 49 %: thaw; scopes: rr-r5-verify.scope 
+[exit 0]
+# rr-guard: 0 freezes; the counts above are its rounds (every 30 s) that decided freeze and thaw
+
+$ systemctl is-active strata-q3.service strata-q3-health.timer
+active
+active
+[exit 0]
+
+$ sh -c cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.max\;\ grep\ -E\ \"\^\(oom\|oom_kill\)\ \"\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.events
+1591242752
+6442450944
+oom 19
+oom_kill 14
+[exit 0]
+
+$ df --output=avail\,pcent /
+    Avail Use%
+303440000  49%
+[exit 0]
+
+$ du -s -B1 --apparent-size /home/thc1006/rebuild-rehearsal
+15506322470	/home/thc1006/rebuild-rehearsal
+[exit 0]
+
+$ sh -c systemctl\ --user\ list-units\ --type=scope\ --plain\ --no-legend\ \'rr-\*\'\ \|\ grep\ -c\ \'\^rr-\'\ \|\|\ true
+0
+[exit 0]
+
+$ sh -c uptime\;\ ps\ -eo\ pid\,user\,ni\,pcpu\,rss\,etime\,args\ --sort=-pcpu\ \|\ awk\ \"NR==1\ \|\|\ \\\$4\ \>=\ 5.0\"\ \|\ cut\ -c1-160\ \|\ head\ -15
+ 01:11:31 up 16 days, 22:45,  1 user,  load average: 1.33, 2.55, 2.43
+    PID USER      NI %CPU   RSS     ELAPSED COMMAND
+1674591 thc1006    0 10.0 63812       13:25 python3 -B - /tmp/tmp.shDBaj7vgR/verdict
+[exit 0]
+
+$ sh -c ps\ -eo\ pid\,user\,pcpu\,rss\,etime\,args\ \|\ grep\ -E\ \"\[u\]nittest\|\[t\]est\\.sh\|\[n\]vcc\|\[c\]make\ --build\|\[n\]inja\|\[c\]c1plus\|\[i\]q_pack\|\[c\]heck-drift\"\ \|\ cut\ -c1-160\ \|\ head\ -15\;\ echo\ \"matches:\ \$\(ps\ -eo\ args\ \|\ grep\ -cE\ \"\[u\]nittest\|\[t\]est\\.sh\|\[n\]vcc\|\[c\]make\ --build\|\[n\]inja\|\[c\]c1plus\|\[i\]q_pack\|\[c\]heck-drift\"\)\"
+1618314 thc1006   0.0  2840    01:13:22 /bin/bash -c source /home/thc1006/.claude/shell-snapshots/snapshot-bash-1792099141296-f0sie6.sh 2>/dev/null || true && s
+1674580 thc1006   0.0  2912       13:26 /bin/bash -c source /home/thc1006/.claude/shell-snapshots/snapshot-bash-1792099141296-f0sie6.sh 2>/dev/null || true && s
+1674584 thc1006   0.0  1768       13:26 /bin/bash -c source /home/thc1006/.claude/shell-snapshots/snapshot-bash-1792099141296-f0sie6.sh 2>/dev/null || true && s
+1674585 thc1006   0.0  2972       13:26 bash scripts/test.sh
+1687817 thc1006   0.0  2844       12:33 /bin/bash -c source /home/thc1006/.claude/shell-snapshots/snapshot-bash-1792099141296-f0sie6.sh 2>/dev/null || true && s
+matches: 5
+[exit 0]
+
+$ sh -c for\ s\ in\ /sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/\*.scope\ /sys/fs/cgroup/user.slice/user-1003.slice/session-\*.scope\;\ do\ \[\ -f\ \$s/memory.current\ \]\ \&\&\ printf\ \"%12s\ %s\\n\"\ \"\$\(cat\ \$s/memory.current\)\"\ \"\$\{s##\*/\}\"\;\ done\ \|\ sort\ -rn\ \|\ head\ -8
+  1371529216 session-177.scope
+    86278144 run-r28c6291122f546079fcb016af6e39981.scope
+      655360 rrg-guard.scope
+           0 run-rffb65d23e2f345caba0f8eda64617881.scope
+           0 run-rad3c20f36567427fbc97dc9b4dbe93e9.scope
+           0 run-r92b55efb4b204e6a8eb06d99f4b28415.scope
+           0 run-r3aff642b676a4fd1be0f74cd81e771f5.scope
+           0 run-r1211b165a666458d84b00cf2b21d83a8.scope
+[exit 0]
+
+$ sh -c readlink\ /proc/1674585/cwd\;\ cat\ /proc/1674585/cgroup\;\ ps\ -o\ pid\,etime\,pcpu\,rss\,args\ --ppid\ 1674585\ \|\ cut\ -c1-120
+/home/thc1006/dev/p100-q3-ci
+0::/user.slice/user-1003.slice/user@1003.service/app.slice/run-r28c6291122f546079fcb016af6e39981.scope
+    PID     ELAPSED %CPU   RSS COMMAND
+1674590       13:34  0.1 41900 python3 -B - /tmp/tmp.shDBaj7vgR/verdict
+[exit 0]
+# another agent's job: scripts/test.sh in the checkout above, in its own 86 MB scope, about 10 % of one CPU, 13 min old (a full test.sh took 21 min 43 s on 10-27: results/test-sh-20261027.txt:63); no compiler, build or pack job of another agent runs

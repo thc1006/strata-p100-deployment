@@ -1,0 +1,380 @@
+# Copied on 2026-10-30 from the rehearsal's own record (written as the steps ran), unchanged below this preface.
+# The tools it names under ~/rebuild-rehearsal/bin are in bench/ now, each header saying how it differs from the copy
+# that ran: rr is bench/rehearsal_rr.sh, rr-guard bench/rehearsal_guard.sh, rr-memwatch bench/rehearsal_memwatch.sh,
+# rlog bench/rehearsal_log.sh, elfcmp.py bench/rehearsal_elfcmp.py, r0-selftest.sh bench/rehearsal_selftest.sh,
+# r0-probe.py bench/rehearsal_probe.py, r0-settings.py bench/rehearsal_settings.py, shim/sudo and shim/nvidia-smi
+# bench/rehearsal_shim_sudo.sh and bench/rehearsal_shim_nvidia_smi.sh.  "PLAN.md" is the plan of the session that ran
+# the rehearsal; it is not in this repository, and docs/runbooks/rebuild.md gives the procedure.
+# R6-R7 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 01:46:54 +0800.
+# The account's limit was lifted by the maintainer to MemoryMax=12G (runtime, 2026-10-30 01:46; MemorySwapMax 0).
+# Each build ran alone through ~/rebuild-rehearsal/bin/rr with -m 8G (its scope's MemoryMax), CPUs 1-7, SCHED_IDLE, nice 19,
+# ionice idle; rr-guard ran beside it (logs/guard.log).  Peak memory: the scope's memory.peak, read by the job itself as
+# its last command, and sampled every 5 s from outside by bin/rr-memwatch (logs/<scope>.mem).  No sudo was run.
+# The host name is written <host>; everything else is the output, unchanged (long build output is in logs/, as noted).
+
+== before R6 (2026-10-30 01:46:54)
+
+$ sh -c cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.max\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.swap.max\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current\;\ grep\ MemAvailable\ /proc/meminfo\;\ uptime\;\ systemctl\ is-active\ strata-q3.service\ strata-q3-health.timer
+12884901888
+0
+1506836480
+MemAvailable:   23278220 kB
+ 01:46:54 up 16 days, 23:20,  1 user,  load average: 0.17, 0.23, 0.50
+active
+active
+[exit 0]
+
+$ sh -c ps\ -eo\ pid\,pcpu\,rss\,etime\,args\ --sort=-pcpu\ \|\ head\ -6\ \|\ cut\ -c1-110
+    PID %CPU   RSS     ELAPSED COMMAND
+  67969  3.2 736040 13-20:28:46 claude --dangerously-skip-permissions
+     79  2.8     0 16-23:20:54 [kcompactd0]
+1076353  1.7 36661228 06:26:16 /home/thc1006/dev/strata/engine-cuda12/strata --serve --pack /home/thc1006/dev/
+1076343  1.3 221680   06:26:17 /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/serve/server
+1647673  0.8     0    01:15:51 [z_wr_iss]
+[exit 0]
+
+== R6. setup.sh in the sandbox's 0.1.45 tree (PLAN.md F5), the command of docs/runbooks/rebuild.md:50-53 (2026-10-30 01:47:07)
+# started 01:47:07
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-setup -m 8G -c 1-7 -- sh -c $'cd /home/thc1006/dev/strata && export STRATA_NVCC=/home/thc1006/cuda-12.9/bin/nvcc PATH=/home/thc1006/cuda-12.9/bin:$PATH && T0=$(date +%s) &&\n  ./setup.sh --setup --no-start --yes --build --family qwen --model IQ3_XXS --cuda 12 --gpus 0,1,2,3 --layer-split 12,24,36 --context 32768 --kv int8 --parallel 4 --vision no --draft-vocab cjk --low-ram resident --kv-streaming off --vram-reserve-mib 1536 --data-dir /home/thc1006/dev/Strata-data --no-browser > /home/thc1006/rebuild-rehearsal/logs/setup.log 2>&1\n  rc=$?; cg=/sys/fs/cgroup$(sed -n "s/^0:://p" /proc/self/cgroup); echo "setup.sh exit $rc after $(( $(date +%s) - T0 )) s; scope memory.peak $(cat $cg/memory.peak) B; $(grep -E "^(oom|oom_kill) " $cg/memory.events | tr "\\n" " ")"; exit $rc'
+setup.sh exit 0 after 772 s; scope memory.peak 6853582848 B; oom 0 oom_kill 0 
+[exit 0]
+# ended 01:59:59
+# setup.sh's full output: logs/setup.log (2164 lines; results/setup-20261016.log has 2272). Its step and [ok] lines:
+
+$ sh -c grep\ -nE\ \'\^===\|\^\ \ \\\[\|\^\ \ \>\ \|\^All\ set\|Compiling\|Writing\ the\ experts\|MTP\ draft\ layer\'\ /home/thc1006/rebuild-rehearsal/logs/setup.log\ \|\ cut\ -c1-230
+3:=== Step 1: checking your PC ===
+4:  [!]  older NVIDIA GPUs (Pascal / Volta) can be used (--cuda 12): experimental, through a second engine built with CUDA 12 (docs/OLDER_GPUS.md)
+10:  [ok] GPUs: GPU 0 (Tesla P100-PCIE-16GB, 16 GB) + GPU 1 (Tesla P100-PCIE-16GB, 16 GB) + GPU 2 (Tesla P100-PCIE-16GB, 16 GB) + GPU 3 (Tesla P100-PCIE-16GB, 16 GB) together (the model's layers are split across them)
+11:  [ok] GPU: Tesla P100-PCIE-16GB, 16.0 GB VRAM, compute capability 6.0, driver 535.230.02
+12:  [!]  CUDA 12: --cuda 12 (as you chose)
+13:  [ok] RAM: 63 GB
+14:  [ok] CPU: Intel(R) Xeon(R) CPU E5-2696 v4 @ 2.20GHz (AVX2)
+16:=== Step 2: your choices ===
+17:  [ok] model: Qwen3.8-Flash-Next
+23:  [ok] size: IQ3_XXS
+24:  [ok] context: 32768 tokens
+25:  [ok] KV cache: 8-bit
+26:  [ok] images: off
+27:  [ok] low-RAM mode on 4 GPUs: they hold ~100% of IQ3_XXS's experts (43 GB) and the other ~0 GB stay in RAM (63 GB), read once from a copy in the model folder
+33:  [ok] experimental speed projection: off
+35:=== Step 3: Python packages ===
+37:  > /home/thc1006/dev/strata/.venv/bin/python -m pip install --quiet --disable-pip-version-check numpy==2.5.3; python_version >= "3.12" numpy==2.4.6; python_version == "3.11" numpy==2.2.6; python_version < "3.11" jinja2==3.1.6 
+38:  [ok] numpy, jinja2, regex, pyyaml, tqdm, requests, cmake, ninja, pillow, psutil installed
+40:=== Step 4: the Strata engine ===
+41:  [ok] llama.cpp source already downloaded
+42:  [ok] llama.cpp 3cf0325 (gguf-py, ggml, mtmd)
+43:  [ok] build tools present (CUDA 12.9)
+44:  Compiling the Strata engine for your GPU (10-20 minutes, once) ...
+45:  > /home/thc1006/dev/strata/.venv/bin/cmake -G Ninja -DCMAKE_MAKE_PROGRAM=/home/thc1006/dev/strata/.venv/bin/ninja -S /home/thc1006/dev/strata -B /home/thc1006/dev/strata/build-cuda12 -DCMAKE_BUILD_TYPE=Release -DSTRATA_ENABLE
+85:  > /home/thc1006/dev/strata/.venv/bin/cmake --build /home/thc1006/dev/strata/build-cuda12 --target strata -j 4
+2076:  [ok] engine compiled: /home/thc1006/dev/strata/engine-cuda12/strata
+2077:  [ok] engine: /home/thc1006/dev/strata/engine-cuda12/strata
+2079:=== Step 5: downloading Qwen3.8-Flash-Next IQ3_XXS ===
+2080:  [ok] Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00001-of-00002.gguf already downloaded
+2081:  [ok] Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf already downloaded
+2082:  [ok] model files present
+2084:=== Step 6: preparing the model for Strata ===
+2085:  [ok] model prepared: /home/thc1006/dev/Strata-data/packs/iq3_xxs
+2086:  The MTP draft layer (speculative decoding, ~2x faster output) comes from the original Qwen checkpoint:
+2088:  > /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/tools/mtp_fetch.py fetch --out /home/thc1006/dev/Strata-data/mtp
+2089:  > /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/tools/mtp_pack.py --src /home/thc1006/dev/Strata-data/mtp --experts q2_0 --out /home/thc1006/dev/Strata-data/mtp/mtp-q2_0.gguf
+2122:  > /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/tools/mtp_rt.py --gguf /home/thc1006/dev/Strata-data/mtp/mtp-q2_0.gguf --out /home/thc1006/dev/Strata-data/mtp/rt
+2153:  [ok] MTP draft layer: /home/thc1006/dev/Strata-data/mtp/rt
+2155:=== Step 7: writing the start script ===
+2156:  [ok] VRAM kept free for other programs: 1536 MiB (--vram-reserve-mib; the expert cache takes that much less)
+2157:  [ok] layer split across GPUs [0, 1, 2, 3] (12,24,36)
+2158:  [ok] parallel requests: 4 at once (each takes ~0.6 GB of VRAM from the expert cache, 2.3 GB in all)
+2159:  [ok] start script: run-iq3_xxs.sh
+2161:All set.
+[exit 0]
+# phase times from file mtimes (stat, in the sandbox):
+
+$ sh -c cd\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev\ \&\&\ stat\ -c\ \'%y\ %n\'\ strata/.venv/.strata-pip.json\ strata/third_party/llama.cpp\ strata/build-cuda12/build.ninja\ strata/engine-cuda12/strata\ strata/engine-cuda12/BUILD.json\ Strata-data/mtp/mtp-manifest.json\ Strata-data/mtp/mtp-q2_0.gguf\ Strata-data/mtp/rt/experts.bin\ Strata-data/mtp/rt/draft_vocab.bin\ strata/strata-iq3_xxs.json\ strata/run-iq3_xxs.sh\ \|\ cut\ -c12-19\,36-
+01:47:25 strata/.venv/.strata-pip.json
+01:47:27 strata/third_party/llama.cpp
+01:47:36 strata/build-cuda12/build.ninja
+01:54:06 strata/engine-cuda12/strata
+01:54:06 strata/engine-cuda12/BUILD.json
+01:54:28 Strata-data/mtp/mtp-manifest.json
+01:59:34 Strata-data/mtp/mtp-q2_0.gguf
+01:59:48 Strata-data/mtp/rt/experts.bin
+01:59:58 Strata-data/mtp/rt/draft_vocab.bin
+01:59:59 strata/strata-iq3_xxs.json
+01:59:59 strata/run-iq3_xxs.sh
+[exit 0]
+# memory of the scope over time (logs/rr-r6-setup.scope.mem, every 5 s; one line a minute here: time, memory.current, memory.peak)
+
+$ sh -c awk\ \'NR%12==1\ \{print\ \$1\,\ \$3\,\ \$5\}\'\ /home/thc1006/rebuild-rehearsal/logs/rr-r6-setup.scope.mem\;\ tail\ -2\ /home/thc1006/rebuild-rehearsal/logs/rr-r6-setup.scope.mem
+01:47:08 37986304 39219200
+01:48:08 431525888 965423104
+01:49:09 807501824 1126813696
+01:50:09 1737965568 2473312256
+01:51:09 1379917824 2473312256
+01:52:10 773726208 2473312256
+01:53:10 1006034944 2473312256
+01:54:10 165253120 2473312256
+01:55:11 878657536 2473312256
+01:56:11 2090565632 2473312256
+01:57:11 3604750336 3604992000
+01:58:12 4888092672 4888133632
+01:59:12 6068080640 6087028736
+01:59:57 current 6824321024 peak 6853582848 oom 0 oom_kill 0 
+02:00:02 rr-r6-setup.scope ended
+[exit 0]
+# R6 times: venv and pip 01:47:08-01:47:25; engine build 01:47:27-01:54:06 (6 min 39 s, -j 4); MTP fetch (no download) to 01:54:28; mtp_pack 01:54:28-01:59:34; mtp_rt to 01:59:48; config 01:59:59; total 772 s. Peak memory of the scope: 2,473,312,256 B (2.30 GiB) through the engine build (memory.peak at 01:54:10, just after it), 6,853,582,848 B (6.38 GiB) overall, reached during mtp_pack and mtp_rt, while memory.current grew about 1.2 GB a minute as the 5.2 GB of MTP tensors and the 0.9 GB GGUF were read through mmap (page cache charged to the scope: docs/decisions/0007, Context). No oom or oom_kill in the scope
+
+== R6 checks (2026-10-30 02:00:36)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-cfg -m 256M -- sh -c cd\ /home/thc1006/dev\ \&\&\ cmp\ strata/strata-iq3_xxs.json\ p100-q3-deployment/config/strata-iq3_xxs.setup.json\ \&\&\ echo\ \"0.1.45\ setup\ config\ =\ config/strata-iq3_xxs.setup.json\ \(0.1.43.1\ setup\,\ 2026-10-16\)\,\ byte\ for\ byte\"\;\ sha256sum\ strata/strata-iq3_xxs.json\ p100-q3-deployment/config/strata-iq3_xxs.setup.json
+0.1.45 setup config = config/strata-iq3_xxs.setup.json (0.1.43.1 setup, 2026-10-16), byte for byte
+6e7cc82ea2a0e2395eeb7cdc5cc18c31702d3846e5b0b097673be9423ad3ac88  strata/strata-iq3_xxs.json
+6e7cc82ea2a0e2395eeb7cdc5cc18c31702d3846e5b0b097673be9423ad3ac88  p100-q3-deployment/config/strata-iq3_xxs.setup.json
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-venv -m 512M -- sh -c for\ d\ in\ /home/thc1006/dev/strata/.venv/lib/python3\*/site-packages/\*.dist-info\;\ do\ echo\ \"\$\(sed\ -n\ \"s/\^Name:\ //p\"\ \"\$d/METADATA\"\ \|\ head\ -1\)==\$\(sed\ -n\ \"s/\^Version:\ //p\"\ \"\$d/METADATA\"\ \|\ head\ -1\)\ \ \$\(sha256sum\ \<\ \"\$d/RECORD\"\ \|\ cut\ -d\"\ \"\ -f1\)\"\;\ done\ \|\ LC_ALL=C\ sort\ \>\ /tmp/venv.txt\;\ grep\ -v\ \"\^#\"\ /home/thc1006/dev/p100-q3-deployment/config/strata-venv.txt\ \|\ diff\ -\ /tmp/venv.txt\ \&\&\ echo\ \"all\ \$\(wc\ -l\ \<\ /tmp/venv.txt\)\ packages:\ name\,\ version\ and\ RECORD\ sha256\ as\ config/strata-venv.txt\"
+all 17 packages: name, version and RECORD sha256 as config/strata-venv.txt
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-sha -m 512M -- sh -c cd\ /home/thc1006/dev\ \&\&\ grep\ -E\ \"\ \ \(strata/.venv/pyvenv.cfg\|strata/.venv/.strata-pip.json\|Strata-data/mtp/rt/.\*\|strata/data/expert-profile.bin\)\$\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -
+strata/data/expert-profile.bin: OK
+strata/.venv/pyvenv.cfg: OK
+Strata-data/mtp/rt/dense.bin: OK
+Strata-data/mtp/rt/dense.txt: OK
+Strata-data/mtp/rt/draft_vocab.bin: OK
+Strata-data/mtp/rt/experts.bin: OK
+strata/.venv/.strata-pip.json: OK
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-venvtree -m 512M -- sh -c diff\ -r\ -x\ __pycache__\ /home/thc1006/rebuild-rehearsal/prod/dev/strata/.venv\ /home/thc1006/dev/strata/.venv\ \&\&\ echo\ \"venv:\ every\ file\ the\ same\ as\ production\'s\ \(bytecode\ caches\ left\ out\)\"
+venv: every file the same as production's (bytecode caches left out)
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-llama -m 512M -- sh -c diff\ -r\ -x\ __pycache__\ /home/thc1006/rebuild-rehearsal/prod/dev/strata/third_party/llama.cpp\ /home/thc1006/dev/strata/third_party/llama.cpp\ \&\&\ echo\ \"third_party/llama.cpp:\ every\ file\ the\ same\ as\ production\'s\"\;\ ls\ /home/thc1006/dev/strata/third_party
+third_party/llama.cpp: every file the same as production's
+ggml
+llama.cpp
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-mtp -m 512M -- sh -c cd\ /home/thc1006/dev/Strata-data/mtp\ \&\&\ for\ f\ in\ mtp-manifest.json\ mtp-q2_0.gguf\ rt/dense.bin\ rt/dense.txt\ rt/draft_vocab.bin\ rt/experts.bin\;\ do\ a=\$\(sha256sum\ \<\ \$f\ \|\ cut\ -c1-64\)\;\ b=\$\(sha256sum\ \<\ /home/thc1006/rebuild-rehearsal/prod/dev/Strata-data/mtp/\$f\ \|\ cut\ -c1-64\)\;\ \[\ \"\$a\"\ =\ \"\$b\"\ \]\ \&\&\ echo\ \"same\ as\ production:\ \$f\ \$a\"\ \|\|\ echo\ \"DIFFERS:\ \$f\ sandbox\ \$a\ production\ \$b\"\;\ done
+same as production: mtp-manifest.json 1ad281ed87ad9cd42f9c048e9c49172165ea714a600d15f1d80cd0a02db12328
+same as production: mtp-q2_0.gguf a22206a4d74eafbf31063a84610292535fb3b49af9a339963817fd04aed81e4d
+same as production: rt/dense.bin c724dc0b0822ada5d2977bf5bde821605feabaa64ea2e0045b67ca656329070a
+same as production: rt/dense.txt 991456cf4eb266eb8a888c349e548d11bc640f5dbd9149439aa9786af0f732fd
+same as production: rt/draft_vocab.bin b1e1d3a7a9e4bf862dcd5923ce661fb59bbd07907e594df5cf86a62ac235cb91
+same as production: rt/experts.bin 09398406be61f1f54c93861f449e48b8df0bfccbc9ec9b2b7636775a6ea9244f
+[exit 0]
+
+$ sh -c cat\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config/strata/settings.json\;\ echo\;\ ls\ -A\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/.config\ /home/thc1006/rebuild-rehearsal/root/home/thc1006/.cache
+{
+ "data_dir": "/home/thc1006/dev/Strata-data",
+ "installs": [
+  "/home/thc1006/dev/strata"
+ ]
+}
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.cache:
+pip
+
+/home/thc1006/rebuild-rehearsal/root/home/thc1006/.config:
+strata
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r6-engine -m 512M -- sh -c cd\ /home/thc1006/dev/strata/engine-cuda12\ \&\&\ ls\ -l\ \&\&\ cat\ BUILD.json\ \&\&\ echo\ \&\&\ grep\ -a\ -c\ \"engine=0.1.45\"\ strata\ \&\&\ grep\ -a\ -o\ \"/home/thc1006/\[A-Za-z0-9._-\]\*/\[A-Za-z0-9._-\]\*\"\ strata\ \|\ sort\ \|\ uniq\ -c\ \&\&\ grep\ -a\ -o\ \"tmpxft_\[0-9a-f\]\*\"\ strata\ \|\ sort\ -u\ \|\ wc\ -l\ \&\&\ readelf\ -p\ .comment\ strata\ \|\ grep\ GCC
+total 46371
+-rw-rw-r-- 1 thc1006 thc1006      236  十  30 01:54 BUILD.json
+-rwxrwxr-x 1 thc1006 thc1006  8859192  十  30 01:52 libstrata_kq.so
+-rwxrwxr-x 1 thc1006 thc1006 66722632  十  30 01:54 strata
+{
+ "source": "local",
+ "version": "0.1.45",
+ "archs": [
+  60
+ ],
+ "vision": "none",
+ "toolkit": 12,
+ "cuda_dirs": [
+  "/home/thc1006/cuda-12.9/bin",
+  "/home/thc1006/cuda-12.9/lib64"
+ ],
+ "src": "b95137167bd9b751",
+ "vision_src": null
+}
+1
+      1 /home/thc1006/cuda-12.9/lib64
+     33 /home/thc1006/dev/strata
+62
+  [     0]  GCC: (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+[exit 0]
+# setup's engine is built in /home/thc1006/dev/strata (its strings), with setup's BUILD.json (src: setup's source hash, not git-477ac13cb); it is replaced in R7. It is kept for reference at logs/setup-engine-cuda12/
+
+$ diff /home/thc1006/rebuild-rehearsal/verify/r0-prod-before.txt /home/thc1006/rebuild-rehearsal/verify/r6-prod-after.txt
+[exit 0]
+# after R6: the 33 production paths of R0 unchanged; guard freezes so far: 0
+
+== R7. bench/build-engine.sh in a second worktree, /home/thc1006/dev/strata-0.1.45 inside the sandbox (PLAN.md F6; allowed by the maintainer on sandbox paths) (2026-10-30 02:01:27)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-wt -m 1G -- git -C /home/thc1006/dev/strata-git worktree add --detach /home/thc1006/dev/strata-0.1.45 477ac13cbe8e582c20484871ce459d20d82df09d
+Preparing worktree (detached HEAD 477ac13c)
+Updating files:  90% (2986/3286)Updating files:  91% (2991/3286)Updating files:  92% (3024/3286)Updating files:  93% (3056/3286)Updating files:  94% (3089/3286)Updating files:  95% (3122/3286)Updating files:  96% (3155/3286)Updating files:  97% (3188/3286)Updating files:  98% (3221/3286)Updating files:  99% (3254/3286)Updating files: 100% (3286/3286)Updating files: 100% (3286/3286), done.
+HEAD is now at 477ac13c verify: the side-projection q8_1 interleave copies need two or more columns (STRATA_SIDE_MIXER=2 on a 1-column window threw on Q2_0 packs: the queries' branch and the GDN gate branch)
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-cp -m 1G -- cp -a /home/thc1006/dev/strata/third_party/llama.cpp /home/thc1006/dev/strata-0.1.45/third_party/
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-pre -m 256M -- sh -c cd\ /home/thc1006/dev/strata-0.1.45\ \&\&\ git\ rev-parse\ HEAD\ \&\&\ git\ status\ --porcelain\ \|\ wc\ -l\ \&\&\ sha256sum\ /home/thc1006/dev/p100-q3-deployment/bench/build-engine.sh\ /home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment/bench/build-engine.sh
+477ac13cbe8e582c20484871ce459d20d82df09d
+0
+b4b292ebdc64d5119a3f70303126e0fddcf8723c06f110e5ddda47f6b8b8edfd  /home/thc1006/dev/p100-q3-deployment/bench/build-engine.sh
+b4b292ebdc64d5119a3f70303126e0fddcf8723c06f110e5ddda47f6b8b8edfd  /home/thc1006/rebuild-rehearsal/prod/dev/p100-q3-deployment/bench/build-engine.sh
+[exit 0]
+
+$ sh -c uptime\;\ grep\ MemAvailable\ /proc/meminfo\;\ cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current
+ 02:01:37 up 16 days, 23:35,  1 user,  load average: 1.73, 1.54, 1.45
+MemAvailable:   23425392 kB
+7490666496
+[exit 0]
+
+$ sh -c grep\ -E\ \'\^\(anon\|file\|file_mapped\|file_dirty\|shmem\|active_file\|inactive_file\)\ \'\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.stat
+anon 722776064
+file 6643130368
+shmem 241664
+file_mapped 86650880
+file_dirty 0
+inactive_file 45441024
+active_file 6597480448
+[exit 0]
+# the account's memory.current after R6 is mostly page cache that R6's scope charged and that moved to the account's slice when the scope ended (file vs anon above); it is reclaimable and is given back under pressure or when the limit is set lower
+# build started 02:01:53
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-build -m 8G -c 1-7 -- sh -c T0=\$\(date\ +%s\)\;\ /home/thc1006/dev/p100-q3-deployment/bench/build-engine.sh\ /home/thc1006/dev/strata-0.1.45\ 0.1.45\;\ rc=\$\?\;\ cg=/sys/fs/cgroup\$\(sed\ -n\ \"s/\^0:://p\"\ /proc/self/cgroup\)\;\ echo\ \"build-engine.sh\ exit\ \$rc\ after\ \$\(\(\ \$\(date\ +%s\)\ -\ T0\ \)\)\ s\;\ scope\ memory.peak\ \$\(cat\ \$cg/memory.peak\)\ B\;\ \$\(grep\ -E\ \"\^\(oom\|oom_kill\)\ \"\ \$cg/memory.events\ \|\ tr\ \"\\n\"\ \"\ \"\)\"\;\ exit\ \$rc
+built /home/thc1006/dev/strata-0.1.45 in 305 s: engine sha256 5bb3ed2b56fdf92c (git-477ac13cb)
+build-engine.sh exit 0 after 305 s; scope memory.peak 3260432384 B; oom 0 oom_kill 0 
+[exit 0]
+# build ended 02:06:59
+# R7 time and memory: 305 s wall (-j 6 on CPUs 1-7, as the script sets); scope memory.peak 3,260,432,384 B (3.04 GiB), no oom or oom_kill. Memory every minute (logs/rr-r7-build.scope.mem):
+
+$ sh -c awk\ \'NR%12==1\ \{print\ \$1\,\ \$3\,\ \$5\}\'\ /home/thc1006/rebuild-rehearsal/logs/rr-r7-build.scope.mem\;\ tail\ -2\ /home/thc1006/rebuild-rehearsal/logs/rr-r7-build.scope.mem
+02:01:54 14106624 14245888
+02:02:55 736829440 1336430592
+02:03:55 1974267904 3005509632
+02:04:55 1475887104 3260432384
+02:05:56 872923136 3260432384
+02:06:56 1080643584 3260432384
+02:06:56 current 1080643584 peak 3260432384 oom 0 oom_kill 0 
+02:07:01 rr-r7-build.scope ended
+[exit 0]
+
+== R7 checks (2026-10-30 02:07:16)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-ls -m 256M -- sh -c cd\ /home/thc1006/dev/strata-0.1.45\ \&\&\ ls\ -l\ engine-cuda12\ \&\&\ tail\ -3\ build.log\ \&\&\ cat\ engine-cuda12/BUILD.json\ \&\&\ echo
+total 46347
+-rw-rw-r-- 1 thc1006 thc1006      234  十  30 02:06 BUILD.json
+-rwxrwxr-x 1 thc1006 thc1006  8859192  十  30 02:05 libstrata_kq.so
+-rwxrwxr-x 1 thc1006 thc1006 66722632  十  30 02:06 strata
+11257 |                 const double w = (double) bt_windows, wall = std::chrono::duration<double, std::milli>(Clock::now() - bt_start).count();
+      |                              ^
+[153/153] Linking CXX executable strata
+{
+ "source": "local",
+ "version": "0.1.45",
+ "archs": [
+  60
+ ],
+ "vision": "none",
+ "toolkit": 12,
+ "cuda_dirs": [
+  "/home/thc1006/cuda-12.9/bin",
+  "/home/thc1006/cuda-12.9/lib64"
+ ],
+ "src": "git-477ac13cb",
+ "vision_src": null
+}
+
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-sha -m 256M -- sh -c cd\ /home/thc1006/dev/strata-0.1.45/engine-cuda12\ \&\&\ sha256sum\ BUILD.json\ strata\ libstrata_kq.so\;\ cd\ /home/thc1006/rebuild-rehearsal/prod/dev/strata/engine-cuda12\ \&\&\ sha256sum\ BUILD.json\ strata\ libstrata_kq.so
+f58245bcb89c3d86a2e38b7eb407716da37948017392af3667001f11e2c532f9  BUILD.json
+5bb3ed2b56fdf92c9802ceba33990da0ce97a49c255c361f0cbf7c062bcafce5  strata
+59b9865380a4b205abeb6f18bdf1d4647f17990c9954efcdab9d0029c41060df  libstrata_kq.so
+f58245bcb89c3d86a2e38b7eb407716da37948017392af3667001f11e2c532f9  BUILD.json
+00869ac7b733d8214216d25004dbb1dd2fa878a4848d8af555a42c84f679e304  strata
+937244cf786147b6a6c3d107b0400e068a8b71fbae8138a356738cf268dfb13e  libstrata_kq.so
+[exit 0]
+# the second three are production's (config/deployed-artifacts.sha256:4-6)
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-elf -m 1G -- sh -c cd\ /home/thc1006/dev/strata-0.1.45/engine-cuda12\ \&\&\ for\ f\ in\ strata\ libstrata_kq.so\;\ do\ echo\ \"==\ \$f:\ tmpxft\ names\ \$\(grep\ -a\ -o\ \"tmpxft_\[0-9a-f\]\*\"\ \$f\ \|\ sort\ -u\ \|\ wc\ -l\)\,\ source-path\ strings\ \$\(grep\ -a\ -o\ \"/home/thc1006/dev/strata-0.1.45\"\ \$f\ \|\ wc\ -l\)\,\ \$\(readelf\ -n\ \$f\ \|\ grep\ \"Build\ ID\"\)\,\ \$\(readelf\ -p\ .comment\ \$f\ \|\ grep\ -o\ \"GCC.\*\"\)\"\;\ python3\ -I\ /home/thc1006/rebuild-rehearsal/bin/elfcmp.py\ /home/thc1006/rebuild-rehearsal/prod/dev/strata/engine-cuda12/\$f\ \$f\;\ echo\ \"elfcmp\ exit\ \$\?\"\;\ done
+== strata: tmpxft names 62, source-path strings 33,     Build ID: ea8d27d2809c2f37197fc05c4fb1a63dba44e8ec, GCC: (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+66722632 66722632 e3c268f95dda5259 e3c268f95dda5259 bytes that differ: 0
+elfcmp exit 0
+== libstrata_kq.so: tmpxft names 6, source-path strings 14,     Build ID: 36cdb368b718689f8974503876b494b6bf76a682, GCC: (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0
+GCC: (GNU) 8.5.0 20210514 (Red Hat 8.5.0-20)
+8859192 8859192 448be0ec0aeb819f 448be0ec0aeb819f bytes that differ: 0
+elfcmp exit 0
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-cmp -m 1G -- sh -c P=/home/thc1006/rebuild-rehearsal/prod/dev/strata/engine-cuda12\;\ S=/home/thc1006/dev/strata-0.1.45/engine-cuda12\;\ for\ f\ in\ strata\ libstrata_kq.so\;\ do\ echo\ \"\$f:\ \$\(cmp\ -l\ \$P/\$f\ \$S/\$f\ \|\ wc\ -l\)\ bytes\ differ\ unmasked\;\ nvcc\ names\ in\ production\ \$\(grep\ -a\ -o\ \"tmpxft_\[0-9a-f\]\*_\[0-9a-f\]\*\"\ \$P/\$f\ \|\ sort\ -u\ \|\ head\ -2\ \|\ tr\ \"\\n\"\ \"\ \"\)\|\ rebuilt\ \$\(grep\ -a\ -o\ \"tmpxft_\[0-9a-f\]\*_\[0-9a-f\]\*\"\ \$S/\$f\ \|\ sort\ -u\ \|\ head\ -2\ \|\ tr\ \"\\n\"\ \"\ \"\)\"\;\ done\;\ readelf\ -n\ \$P/strata\ \|\ grep\ \"Build\ ID\"\;\ readelf\ -n\ \$P/libstrata_kq.so\ \|\ grep\ \"Build\ ID\"
+strata: 298 bytes differ unmasked; nvcc names in production tmpxft_00058d13_00000000 tmpxft_00058d1e_00000000 | rebuilt tmpxft_000000de_00000000 tmpxft_000000e9_00000000 
+libstrata_kq.so: 30 bytes differ unmasked; nvcc names in production tmpxft_0005931f_00000000 tmpxft_0005932a_00000000 | rebuilt tmpxft_0000057b_00000000 tmpxft_00000583_00000000 
+    Build ID: ea8d27d2809c2f37197fc05c4fb1a63dba44e8ec
+    Build ID: 36cdb368b718689f8974503876b494b6bf76a682
+[exit 0]
+# R7 result: BUILD.json f58245bc... = config/deployed-artifacts.sha256:6. strata and libstrata_kq.so have other sha256s than the deployed ones (lines 4-5), as expected (PLAN.md section 4), and the same sizes and the same GNU build IDs; with the nvcc temporary-file names tmpxft_<8 hex>_<8 hex> masked, both are byte for byte the deployed binaries (elfcmp.py: 0 bytes differ). So the bytes that differ are only those names, which nvcc makes from process IDs
+# the rebuilt names are small numbers (0xde, 0xe9, ...) because the build ran in the sandbox's own PID namespace, where PIDs start at 1; production's (0x58d13, ...) are the host's PIDs of 2026-10-17
+
+== R7: the build-engine.sh engine put into the sandbox's ~/dev/strata in place of setup's (PLAN.md F6; done by the sandbox's own paths, outside rr) (2026-10-30 02:07:56)
+
+$ rm -rf /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/engine-cuda12 /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/build-cuda12
+[exit 0]
+
+$ cp -a /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata-0.1.45/engine-cuda12 /home/thc1006/rebuild-rehearsal/root/home/thc1006/dev/strata/
+[exit 0]
+
+$ /home/thc1006/rebuild-rehearsal/bin/rr -n rr-r7-ldd -m 256M -- sh -c ldd\ /home/thc1006/dev/strata/engine-cuda12/strata\ \|\ grep\ -E\ \"cudart\|cublas\|not\ found\"\;\ cd\ /home/thc1006/dev\ \&\&\ grep\ -E\ \"\ \ strata/engine-cuda12/\"\ p100-q3-deployment/config/deployed-artifacts.sha256\ \|\ sha256sum\ -c\ -\;\ ls\ -A\ /home/thc1006/dev/strata\ \|\ grep\ -E\ \"build\|run-\|engine\|strata-iq3\"
+	libcudart.so.12 => /home/thc1006/cuda-12.9/lib64/libcudart.so.12 (0x0000775a89400000)
+	libcublas.so.12 => /home/thc1006/cuda-12.9/lib64/libcublas.so.12 (0x0000775a82c00000)
+	libcublasLt.so.12 => /home/thc1006/cuda-12.9/lib64/libcublasLt.so.12 (0x0000775a50400000)
+strata/engine-cuda12/strata: FAILED
+strata/engine-cuda12/libstrata_kq.so: FAILED
+strata/engine-cuda12/BUILD.json: OK
+sha256sum: WARNING: 2 computed checksums did NOT match
+engine-cuda12
+run-iq3_xxs.sh
+strata-iq3_xxs.json
+[exit 0]
+# expected: BUILD.json OK; strata and libstrata_kq.so FAILED (not reproducible byte for byte; equal with the nvcc names masked, above). ~/dev/strata now has no build-cuda12, as production
+
+$ diff /home/thc1006/rebuild-rehearsal/verify/r0-prod-before.txt /home/thc1006/rebuild-rehearsal/verify/r7-prod-after.txt
+[exit 0]
+
+== after R7 (2026-10-30 02:07:57)
+
+$ sh -c grep\ -c\ \':\ freeze\'\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ tail\ -1\ /home/thc1006/rebuild-rehearsal/logs/guard.log\;\ systemctl\ is-active\ strata-q3.service\ strata-q3-health.timer\;\ cat\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.current\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.max\;\ grep\ -E\ \'\^\(anon\|file\)\ \'\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.stat\;\ grep\ -E\ \'\^\(oom\|oom_kill\)\ \'\ /sys/fs/cgroup/user.slice/user-1003.slice/memory.events\;\ grep\ MemAvailable\ /proc/meminfo\;\ df\ --output=avail\,pcent\ /\ \|\ tail\ -1\;\ du\ -s\ -B1\ --apparent-size\ /home/thc1006/rebuild-rehearsal\;\ systemctl\ --user\ list-units\ --type=scope\ --plain\ --no-legend\ \'rr-\*\'\ \|\ grep\ -c\ \'\^rr-\'\ \|\|\ true
+0
+rr-guard 2026-10-30 02:07:38: service active, MemAvailable 22 GiB, / 50 %: thaw; scopes: none
+active
+active
+7499407360
+12884901888
+anon 724361216
+file 6650122240
+oom 19
+oom_kill 14
+MemAvailable:   23611340 kB
+301024000  50%
+18282536508	/home/thc1006/rebuild-rehearsal
+0
+[exit 0]
+# the 33 production paths of R0 unchanged after R7; rr-guard: no freeze during R6-R7; oom and oom_kill of the account as before R6 (no new kill)
+
+$ sh -c sed\ -n\ \'2086\,2090p\'\ /home/thc1006/rebuild-rehearsal/logs/setup.log\ \|\ cut\ -c1-200
+  The MTP draft layer (speculative decoding, ~2x faster output) comes from the original Qwen checkpoint:
+  only its ~5 GB of MTP tensors are downloaded.
+  > /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/tools/mtp_fetch.py fetch --out /home/thc1006/dev/Strata-data/mtp
+  > /home/thc1006/dev/strata/.venv/bin/python /home/thc1006/dev/strata/tools/mtp_pack.py --src /home/thc1006/dev/Strata-data/mtp --experts q2_0 --out /home/thc1006/dev/Strata-data/mtp/mtp-q2_0.gguf
+mtp.fc_embedding.weight: BF16 13.1 MB
+[exit 0]
+# mtp_fetch.py printed nothing between its command line (2088) and mtp_pack's (2089): no tensor was fetched (on 2026-10-16 it printed one progress line per tensor: results/setup-20261016.log:2054-2196)
+
+== R6-R7 summary (2026-10-30 02:08:09)
+# 0.1.45's setup.sh, run with the flags of docs/runbooks/rebuild.md:50-53, wrote config/strata-iq3_xxs.setup.json byte for byte; the venv matches config/strata-venv.txt (17 packages), pyvenv.cfg and .strata-pip.json match the manifest, and every venv file equals production's; third_party/llama.cpp equals production's; the MTP head (manifest, GGUF and the four rt files) equals production's and the manifest's rt lines. build-engine.sh's BUILD.json matches the manifest; its strata and libstrata_kq.so differ from the deployed ones only in nvcc's tmpxft names. Peaks: setup.sh 6.38 GiB (2.30 GiB through its engine build), build-engine.sh 3.04 GiB; walls 772 s and 305 s

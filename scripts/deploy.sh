@@ -57,7 +57,8 @@ KEEP=(PATH HOME LANG LANGUAGE USER LOGNAME XDG_RUNTIME_DIR TERM)
 AT_START=(scripts/strata-preflight.sh scripts/strata-wait-ready.sh tools/)
 LIMIT=1800                                        # seconds for each check of the new commit: a bound for one that
                                                   # hangs, above what scripts/test.sh takes here (1504 s on
-                                                  # 2026-10-30: results/test-sh-20261030.txt)
+                                                  # 2026-10-30, with another run beside it from its tenth minute
+                                                  # on: results/test-sh-20261030.txt)
 SLACK=30                                          # seconds past the limit of a check or of the fetch after which this
                                                   # script ends it itself: its timeout (-k 10) has ended it by then,
                                                   # unless the timeout was stopped (SIGSTOP), say by the check

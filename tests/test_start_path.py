@@ -124,13 +124,13 @@ class MemoryGate(unittest.TestCase):
         # The gate was 36 GiB, set for IQ3_XXS: IQ3_S's starts took up to 35.6 GiB of it.  It must stay below what
         # those starts saw usable, or every start would wait for memory and fail
         took, saw = [], []
-        for f in sorted((ROOT / "results").glob("ab[23]-iq3s-*-switch.txt")):
+        for f in sorted((ROOT / "results").glob("ab3-iq3s-*-switch.txt")):
             text = f.read_text()
             usable = int(re.search(r"ok: 4 GPUs, (\d+) GiB usable", text).group(1))
             after = int(re.search(r"MemAvailable before \d+ MiB, after (\d+) MiB", text).group(1))
             took.append(usable - after / 1024)
             saw.append(usable)
-        self.assertEqual(len(took), 6, "the six IQ3_S starts of decision 0004")
+        self.assertEqual(len(took), 3, "the three IQ3_S starts of decision 0004's ab3 runs")
         gate = re.search(r"^MIN_AVAIL_GIB=\$\{STRATA_MIN_AVAIL_GIB:-(\d+)\}$",
                          (ROOT / "scripts/strata-preflight.sh").read_text(), re.M)
         self.assertGreaterEqual(int(gate.group(1)), max(took) + 6, took)

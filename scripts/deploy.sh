@@ -600,7 +600,7 @@ EOF
   [ $rc = 0 ] || refuse "git merge --ff-only $short failed"
   merged=$short
   echo "deployed $short: $(git log -1 --format=%s | printable)"
-  # a restart with IQ3_S took 550-560 s (results/ab2-iq3s-*-switch.txt, results/ab3-iq3s-*-switch.txt)
+  # a restart with IQ3_S took 550-556 s (results/ab3-iq3s-*-switch.txt)
   [ -z "$changed" ] || echo "to run them now: sudo systemctl restart strata-q3 (ready after about 9 minutes)"
   final=1                                         # this check decides the outcome
   if ! check_of_target scripts/check-drift.sh "no drift" "$tmp/drift.log"; then

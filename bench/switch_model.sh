@@ -34,8 +34,8 @@
 # and its checks finish (timeout, in a process group of its own, gets no Ctrl-C either).  Each restart is preceded by
 # systemctl reset-failed, which also resets the unit's start limit (4 starts an hour): earlier starts do not make it
 # fail.  It is waited for up to SWITCH_RESTART_WAIT_S seconds (default 4800: the unit's TimeoutStartSec is 75 min; a
-# start takes 7-9 minutes (IQ3_XXS 460-470 s, IQ3_S 550-560 s: results/ab2-*-switch.txt, ab3-*-switch.txt), and the
-# preflight may wait up to 25 for memory).
+# start takes 7-9 minutes (IQ3_XXS 469 s, IQ3_S 550-556 s: results/ab3-*-switch.txt), and the preflight may wait up to
+# 25 for memory).
 # (Test hooks: STRATA_DIR replaces ~/dev/strata, SWITCH_URL the service's URL, SWITCH_ARC_FILE
 # /sys/module/zfs/parameters/zfs_arc_max, SWITCH_PREFLIGHT_RE the preflight's pattern; SWITCH_BUSY_UNDER counts only
 # processes with an argument under that directory, so that test sandboxes running at the same time do not see each
@@ -310,8 +310,8 @@ switch_to() {   # switch_to <model> <Q> <file>: restart, record the start in <fi
   [ $ok = yes ]
 }
 journal_tail() { sudo -n journalctl -u $UNIT -n 30 --no-pager 2>/dev/null | redact | tail -30; }
-by_hand() {   # the commands that bring the service back on IQ3_XXS (it restarted in 456-470 s:
-              # results/ab*-iq3xxs-*-switch.txt)
+by_hand() {   # the commands that bring the service back on IQ3_XXS (it restarted in 469 s:
+              # results/ab3-iq3xxs-*-switch.txt)
   say "strata-q3 is not running as switched; these commands bring it back on IQ3_XXS (the restart takes 7-9 minutes):"
   echo "  # first: systemctl status $UNIT. 120 s after a failed start systemd starts it again by itself, with the"
   echo "  # files as they are (Restart=on-failure); a restart during that load cuts it short"

@@ -12,6 +12,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 ### Changed
 
 - The entry of 2026-10-27 is much shorter: for detail that the scripts' headers and the decision records hold, it points there. In the entries up to 2026-10-27, four statements are corrected or dated, among them the 2026-10-20 entry's "is not committed" for a log that has been in git since 2026-10-27, and the older entries no longer give the number of tests in each file. The other documents lost repetition and gained corrections, and most are about as long as before. The protocols and criteria written before their runs, in `docs/engine-experiments.md` and decision 0004, keep their words; one sentence of decision 0004's option analysis, also written before the runs, has a dated note: its routing shares are the budget script's estimate.
+- The figures that rest on decision 0004's restarts come from its `ab3` runs alone, since the decision keeps the `ab2` runs as raw results only: a restart with IQ3_S took 550-556 s and one with IQ3_XXS 469 s, 22.4-22.7 GiB remained after the load, a start at the old 36 GiB gate would have left 0.4-0.7 GiB (`results/ab3-*-switch.txt`), and decision 0004's 476 MiB growth of CUDA2's use rests on the `ab3` robustness run's monitor. The most a start took, 35.6 GiB of the 58 GiB that the preflight counted usable, and the 42 GiB gate do not change. This is in decision 0004, the deployment record, the comments of `scripts/strata-preflight.sh`, `scripts/strata-wait-ready.sh`, `scripts/deploy.sh`, `tools/configure_strata_q3.py` and `bench/switch_model.sh`, where only comments change, and `tests/test_start_path.py`, which checks the gate against the three `ab3` starts. The comments of `systemd/strata-q3.service` keep the load time of the `ab2` and `ab3` runs together, 538-548 s (the `ab3` runs alone: 538-544 s), until the unit next changes: a change to it has to be installed and the service restarted.
 
 ### Fixed
 
@@ -27,6 +28,7 @@ Notable changes to this machine and this repository, newest first. There are no 
   - `docs/runbooks/upgrade-strata.md`: pasted as one block, the window went on after a failed `test.sh` or `cmp`, up to the start of the service, and the rollback ran two steps in the wrong order.
   - The deployment record and the README called PR #2918's rebase target, `9ae93f7`, 0.2.1.1; it is 0.2.1 with the 0.1.46.1 hotfix.
   - CONTRIBUTING.md said CI runs the contributors' command (it adds `--harnesses`), and `results/README.md` had two rows that cited the wrong document and two with a wrong date.
+- Decision 0004, the deployment record and the preflight's comment gave the 42 GiB gate as in force since 2026-10-22. It is in git since `cc4f7bf` (2026-10-27), and the service first started with it on 2026-10-29 (`results/restart-after-confirm-20261029.txt`); the deploy of 2026-10-27 moved the live checkout from `15ab1da`, which had the 36 GiB gate, without a restart (`results/deploy-review-fixes-20261027.txt`).
 
 ## 2026-10-27
 

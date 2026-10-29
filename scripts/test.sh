@@ -69,8 +69,8 @@ tmp=$(cd -- "$tmp" && pwd -P) || { echo "cannot enter the temporary directory"; 
 step "unit tests (tests/)"
 # the runner writes its verdict last: a test that ends the process (os._exit) leaves none
 TEST_REPO_ONLY=$REPO_ONLY STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, cProfile, ctypes, functools, inspect, json, os, pathlib, signal, stat, symtable, sys, time, \
-    traceback, types, unittest, warnings
+import ast, atexit, cProfile, ctypes, functools, inspect, json, os, pathlib, signal, stat, symtable, sys, threading, \
+    time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -408,10 +408,17 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # process then merges that, prints unittest's report and runs the checks.  A unit is a test, or a suite other than a
 # plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of the loader are cut into
 # their tests, which unittest's fixtures then see in the same order, so a worker sets a class or module up (setUpClass,
-# setUpModule) and tears it down again for each run of its tests that it takes.  A worker that ends without its record
-# (a test that ends the process) leaves no verdict; a signal to this process (SIGINT, SIGTERM, SIGHUP) goes on to the
-# workers, each in a process group of its own so that a signal to the whole group reaches it once, and leaves no
-# verdict either.  A worker gets SIGTERM when this process ends before it (PR_SET_PDEATHSIG).
+# setUpModule) and tears it down again for each run of its tests that it takes.
+# Signals reach the tests as when they ran in this process: the workers stay in the process group of scripts/test.sh,
+# so that a signal to that group (a Ctrl-C, a hang-up, kill -- -PGID, deploy.sh's timeout) reaches them and what their
+# tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
+# not reach; one sent to it alone (SIGINT, SIGTERM, SIGHUP) goes on to each worker.  So no worker gets a signal twice.
+# Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
+# worker that does not hold it.  A worker runs the atexit handlers that its tests registered (the loading's run here,
+# once) and ends as Python ends; after a KeyboardInterrupt, of SIGINT.  When a worker ends without its record (a test
+# that ends the process, a signal) the run has no verdict, and when one died of a signal this process then dies of the
+# same signal, as the process of the tests did before, so that after a Ctrl-C bash stops too.  A worker gets SIGKILL
+# when this process ends before it (PR_SET_PDEATHSIG).
 jobs = int(os.environ["TEST_JOBS"])
 units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
 
@@ -431,24 +438,30 @@ if [tid(t) for u in units for t in (tests_of(u) if isinstance(u, unittest.TestSu
         [tid(t) for t, _, _ in bodies]:
     bad.append("the units the workers take are not the loaded tests, in their order")
 LISTS = ("errors", "failures", "skipped", "expectedFailures", "unexpectedSuccesses")
-QUEUE = sys.argv[1] + ".units"
-pathlib.Path(QUEUE).write_bytes(b"".join(i.to_bytes(4, "big") for i in range(len(units))))
-queue = os.open(QUEUE, os.O_RDONLY)
+QUEUES = [sys.argv[1] + ".units"]
+for n, path in enumerate(QUEUES):
+    pathlib.Path(path).write_bytes(b"".join(i.to_bytes(4, "big") for i in range(n, len(units), len(QUEUES))))
+queues = [os.open(path, os.O_RDONLY) for path in QUEUES]
 runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=1, resultclass=Result)
 SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
 parent = os.getpid()
 
 
+def no_more_units():
+    for q in queues:
+        os.lseek(q, 0, os.SEEK_END)
+
+
 class Queue(unittest.TestSuite):
     """A worker's units, as it takes them; marks: (unit, the length of each of the result's lists) as each starts."""
-    def __init__(self, result):
+    def __init__(self, result, queue):
         super().__init__()
-        self.result, self.took, self.marks = result, [], []
+        self.result, self.queue, self.took, self.marks = result, queue, [], []
 
     def __iter__(self):
         global now
         while True:
-            b = os.read(queue, 4)
+            b = os.read(self.queue, 4)
             if len(b) != 4:
                 return
             now = int.from_bytes(b, "big")
@@ -488,58 +501,94 @@ def record(k, result, q):
         "body_ran": [i for i, (_, code, _) in enumerate(bodies) if code is not None and code in ran]}))
 
 
-def work(k, saved):
-    """Worker k: it runs the units it takes and records its run; it ends with os._exit, so that nothing of this
-    process's exit (atexit, buffers, the verdict) happens twice."""
-    status = 1
+def finish():
+    """What Python does as it ends, before the end itself: it waits for the threads, runs the atexit handlers and
+    flushes the streams."""
+    for end in (threading._shutdown, atexit._run_exitfuncs):
+        try:
+            end()
+        except BaseException:
+            traceback.print_exc()
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except BaseException:
+            pass
+
+
+def die(signum):
+    """End of signum, as its default action does."""
+    signal.signal(signum, signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signum})
+    os.kill(os.getpid(), signum)
+
+
+def work(k, saved, mask, gate, report):
+    """Worker k: it runs the units it takes and records its run; it ends as Python ends, but with os._exit, so that
+    nothing of this process's exit (the loading's atexit handlers, buffers, the verdict) happens twice."""
+    status, interrupted = 1, False
     try:
-        os.setpgid(0, 0)
-        while signal.sigtimedwait(SIGNALS, 0) is not None:   # what came before it left the group: this process
-            pass                                              # passes that on
-        for s, handler in saved.items():
-            if handler is not None:             # (None: a handler that Python did not set, which stays)
-                signal.signal(s, handler)
-        signal.pthread_sigmask(signal.SIG_UNBLOCK, SIGNALS)
-        if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM) != 0:       # PR_SET_PDEATHSIG
-            raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
-        if os.getppid() != parent:
-            raise RuntimeError("the runner ended while the worker started")
-        result = runner._makeResult()
-        unittest.registerResult(result)
-        result.failfast, result.buffer, result.tb_locals = runner.failfast, runner.buffer, runner.tb_locals
-        q = Queue(result)
-        with warnings.catch_warnings():             # as TextTestRunner.run()
-            if runner.warnings:
-                warnings.simplefilter(runner.warnings)
-                if runner.warnings in ("default", "always"):
-                    warnings.filterwarnings("module", category=DeprecationWarning,
-                                            message=r"Please use assert\w+ instead.")
-            result.startTestRun()
-            try:
-                q(result)
-            finally:
-                result.stopTestRun()
-        profile.disable()
-        record(k, result, q)
-        status = 0
-    except BaseException:
-        traceback.print_exc()
-    finally:
-        for stream in (sys.stdout, sys.stderr):
-            try:
-                stream.flush()
-            except Exception:
+        try:
+            atexit._clear()                     # the loading's handlers run in this process's parent
+            if weakref.finalize._registered_with_atexit:     # and so do the loading's finalizers; this one's here
+                for f in list(weakref.finalize._registry):
+                    f.atexit = False
+                atexit.register(weakref.finalize._exitfunc)
+            for s, handler in saved.items():
+                if handler is not None:         # (None: a handler that Python did not set, which stays)
+                    signal.signal(s, handler)
+            if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL) != 0:       # PR_SET_PDEATHSIG
+                raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
+            if os.getppid() != parent:
+                raise RuntimeError("the runner ended while the worker started")
+            while os.read(gate, 1):             # until the runner has left the group (the end of the pipe)
                 pass
+            os.write(report, f"{k} {' '.join(str(int(s)) for s in signal.sigpending())}\n".encode())
+            os.close(report)
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)          # what it holds acts now
+            result = runner._makeResult()
+            unittest.registerResult(result)
+            result.failfast, result.buffer, result.tb_locals = runner.failfast, runner.buffer, runner.tb_locals
+            q = Queue(result, queues[k % len(queues)])
+            with warnings.catch_warnings():             # as TextTestRunner.run()
+                if runner.warnings:
+                    warnings.simplefilter(runner.warnings)
+                    if runner.warnings in ("default", "always"):
+                        warnings.filterwarnings("module", category=DeprecationWarning,
+                                                message=r"Please use assert\w+ instead.")
+                result.startTestRun()
+                try:
+                    q(result)
+                finally:
+                    result.stopTestRun()
+            profile.disable()
+            record(k, result, q)
+            status = 0
+        except KeyboardInterrupt:
+            traceback.print_exc()
+            interrupted = True
+        except BaseException:
+            traceback.print_exc()
+        finish()
+        if interrupted:
+            die(signal.SIGINT)
+    finally:
         os._exit(status)
 
 
 saved = {s: signal.getsignal(s) for s in SIGNALS}
-alive, came = {}, []            # pid: worker; the signals that came
+home = os.getpgrp()             # scripts/test.sh's group
+alive, came = {}, []            # pid: worker; the signals that went on to the workers
 
 
 def forward(signum, frame):
+    """A signal sent to this process alone, while it is out of the group: to each worker; when none runs any more, it
+    acts as it would have without the workers."""
+    if not alive:
+        signal.signal(signum, saved[signum])
+        signal.raise_signal(signum)
+        return
     came.append(signum)
-    os.lseek(queue, 0, os.SEEK_END)             # no more units
     for pid in list(alive):
         try:
             os.kill(pid, signum)
@@ -547,25 +596,49 @@ def forward(signum, frame):
             pass
 
 
-for s, handler in saved.items():
-    if handler is not signal.SIG_IGN and handler is not None:   # what is ignored stays so, in the workers too
-        signal.signal(s, forward)
 sys.stdout.flush()
 sys.stderr.flush()
 start = time.perf_counter()
+mask = signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
+gate, gate_w = os.pipe()
+report_r, report = os.pipe()
 for k in range(jobs):
-    signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
     pid = os.fork()
     if pid == 0:
-        work(k, saved)
-    try:
-        os.setpgid(pid, pid)
-    except OSError:
-        pass
+        try:
+            os.close(gate_w)
+            os.close(report_r)
+            work(k, saved, mask, gate, report)
+        finally:
+            os._exit(1)
     alive[pid] = k
-    signal.pthread_sigmask(signal.SIG_UNBLOCK, SIGNALS)
+os.close(gate)
+os.close(report)
+os.setpgid(0, 0)                # out of the group: what is sent to the group now reaches the workers only
+os.close(gate_w)
+pending = {}                    # worker: the signals it holds, once this process is out of the group
+with os.fdopen(report_r, "rb") as f:
+    for line in f:
+        k, *signums = line.split()
+        pending[int(k)] = {int(s) for s in signums}
+mine = []                       # what this process got until it left the group, to this process or to the group
+while (info := signal.sigtimedwait(SIGNALS, 0)) is not None:
+    mine.append(info.si_signo)
+for s in mine:
+    if saved[s] is not signal.SIG_IGN:
+        came.append(s)
+        for pid, k in alive.items():
+            if s not in pending.get(k, ()):
+                try:
+                    os.kill(pid, s)
+                except OSError:
+                    pass
+for s, handler in saved.items():
+    if handler is not signal.SIG_IGN and handler is not None:   # what is ignored stays so, in the workers too
+        signal.signal(s, forward)
+signal.pthread_sigmask(signal.SIG_SETMASK, mask)
 profile.disable()
-records, lost = {}, []
+records, lost, died = {}, [], []
 while alive:
     try:
         pid, status = os.wait()
@@ -581,15 +654,29 @@ while alive:
     if status != 0 or k not in records:
         lost.append(f"worker {k + 1} of {jobs} ended with {os.waitstatus_to_exitcode(status)}" +
                     ("" if k in records else ", without its record"))
-        os.lseek(queue, 0, os.SEEK_END)
+        if os.WIFSIGNALED(status):
+            died.append(os.WTERMSIG(status))
+        no_more_units()
 taken = time.perf_counter() - start
 for s, handler in saved.items():                # a signal from now on acts as it did before the workers
     if handler is not None:
         signal.signal(s, handler)
-if came or lost:
-    sys.stdout.flush()
-    for why in [f"stopped by {signal.Signals(s).name}" for s in dict.fromkeys(came)] + lost:
-        print(f"FAIL: the unit tests did not finish (no verdict): {why}")
+try:
+    os.setpgid(0, home)                         # back, before this process writes again
+except OSError:                                 # (the group has ended: scripts/test.sh and the workers)
+    pass
+if lost:
+    try:
+        sys.stdout.flush()
+        for why in [f"stopped by {signal.Signals(s).name}" for s in dict.fromkeys(came)] + lost:
+            print(f"FAIL: the unit tests did not finish (no verdict): {why}")
+        sys.stdout.flush()
+    except OSError:                             # (a terminal that has hung up)
+        pass
+    if died:
+        if died[0] == signal.SIGINT:            # as Python ends at a KeyboardInterrupt
+            finish()
+        die(died[0])
     sys.exit(1)                                 # no verdict
 took = sorted(u for r in records.values() for u in r["took"])
 if took != list(range(len(units))):

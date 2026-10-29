@@ -58,12 +58,20 @@ class TestSh(unittest.TestCase):
     def unit(d: Path, name: str, text: str) -> None:
         (d / "systemd" / name).write_text("[Unit]\nDescription=test\n\n" + text)
 
+    JOBS: tuple[str, ...] = ()      # what TestShJobs adds to the arguments of each run, and to its environment
+    DEAL: dict[str, str] = {}
+
+    def environment(self, d: Path) -> dict:
+        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
+        e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
+        return {**e, **self.DEAL}
+
     def run_sh(self, d: Path, *args: str, env: dict | None = None, timeout: int = 120) -> subprocess.CompletedProcess:
         """The copy of scripts/test.sh in d, run in a session of its own: one that does not end in time is killed with
         what it started (the runner's Python too)."""
-        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
-        e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
-        with subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args], cwd=d, env={**e, **(env or {})},
+        e = self.environment(d)
+        with subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args, *self.JOBS], cwd=d,
+                              env={**e, **(env or {})},
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="backslashreplace",
                               start_new_session=True) as p:
             try:
@@ -73,6 +81,35 @@ class TestSh(unittest.TestCase):
                 p.communicate()
                 raise
         return subprocess.CompletedProcess(p.args, p.returncode, out, err)
+
+    def start_sh(self, d: Path, *args: str) -> tuple[subprocess.Popen, Path]:
+        """As run_sh, but in the background, with its output (stdout and stderr) in a file, which a process that it
+        leaves behind does not keep open as it would a pipe; killed with its process group after the test."""
+        out = d.parent / "out"
+        with open(out, "w") as f:
+            p = subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args, *self.JOBS], cwd=d,
+                                 env=self.environment(d), stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT,
+                                 start_new_session=True)
+        self.addCleanup(lambda: (p.poll() is None and os.killpg(p.pid, signal.SIGKILL), p.wait()))
+        return p, out
+
+    @staticmethod
+    def with_text(text: str) -> list[int]:
+        """The processes whose command line holds text."""
+        found = []
+        for q in filter(str.isdigit, os.listdir("/proc")):
+            try:
+                if text.encode() in Path(f"/proc/{q}/cmdline").read_bytes().replace(b"\0", b" "):
+                    found.append(int(q))
+            except OSError:
+                pass
+        return found
+
+    def wait_for(self, what, seconds: float = 30):
+        deadline = time.monotonic() + seconds
+        while not what():
+            self.assertLess(time.monotonic(), deadline, "it did not come")
+            time.sleep(0.05)
 
     def passes(self, d: Path, *args: str, env: dict | None = None) -> None:
         r = self.run_sh(d, *args, env=env)
@@ -2379,8 +2416,10 @@ class TestSh(unittest.TestCase):
                 self.passes(d, "--jobs", jobs)
 
     def test_a_signal_to_the_runner_ends_its_workers(self):
-        # the workers run in process groups of their own: a signal to the runner alone goes on to them, and the
-        # end of the runner (SIGKILL) gives each a SIGTERM; either way the run leaves no verdict
+        # the workers run in scripts/test.sh's process group, the runner meanwhile in one of its own: a signal to the
+        # runner alone goes on to them, once, and the end of the runner (SIGKILL) gives each a SIGKILL; either way the
+        # run leaves no verdict.  The runner then ends as the workers did (of the signal), and scripts/test.sh, which
+        # did not get the signal, goes on, as it did when the tests ran in the runner
         for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGKILL):
             with self.subTest(signal=sig.name):
                 d = self.tree()
@@ -2403,13 +2442,17 @@ class TestSh(unittest.TestCase):
                 workers = [int(line.split()[0]) for line in lines]
                 runners = {int(line.split()[1]) for line in lines}
                 self.assertEqual((len(workers), len(runners)), (2, 1), lines)
-                for w in workers:
-                    self.assertNotEqual(os.getpgid(w), os.getpgid(p.pid))
-                os.kill(runners.pop(), sig)
+                runner = runners.pop()
+                self.assertEqual([os.getpgid(w) for w in workers], [p.pid, p.pid])
+                self.assertEqual(os.getpgid(runner), runner)
+                os.kill(runner, sig)
                 out, _ = p.communicate(timeout=60)
                 self.assertEqual((p.returncode, out.splitlines()[-1:]), (1, ["FAILED"]), out)
                 if sig != signal.SIGKILL:
                     self.assertIn(f"FAIL: the unit tests did not finish (no verdict): stopped by {sig.name}", out)
+                    self.assertIn(f"FAIL: the unit tests did not finish (no verdict): worker 1 of 2 ended with "
+                                  f"-{sig.value}, without its record", out)
+                self.assertIn("\n== shell syntax", out)
                 for w in workers:
                     for _ in range(100):
                         if not os.path.exists(f"/proc/{w}"):
@@ -2417,13 +2460,134 @@ class TestSh(unittest.TestCase):
                         time.sleep(0.1)
                     self.assertFalse(os.path.exists(f"/proc/{w}"), f"worker {w} outlived the run")
 
+    def test_a_signal_to_the_group_reaches_what_the_tests_started(self):
+        # a Ctrl-C, a hang-up or a kill -- -PGID reaches scripts/test.sh's whole process group: the runner, or its
+        # workers, and what the tests started in it, which the signal ends.  Before, the workers ran in groups of their
+        # own, and a test's child outlived the run
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                tag = f"sleep 296.{os.getpid()}{sig.value}{time.monotonic_ns() % 10**6}"
+                (d / "tests" / "test_sl.py").write_text(
+                    "import subprocess, unittest\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+                    f"        subprocess.run(['bash', '-c', {tag + '; true'!r}])\n")
+                self.addCleanup(lambda tag=tag: [os.kill(q, signal.SIGKILL) for q in self.with_text(tag)])
+                p, out = self.start_sh(d)
+                self.wait_for(lambda: self.with_text(tag))
+                time.sleep(0.3)
+                os.killpg(p.pid, sig)
+                p.wait(timeout=60)
+                time.sleep(0.5)
+                self.assertEqual(self.with_text(tag), [], "a process of the test outlived the run")
+
+    def test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests(self):
+        # scripts/test.sh ends of the signal and runs none of its other steps, as when the tests ran in the runner,
+        # which then died of it: bash stops after a Ctrl-C only when its command died of SIGINT.  Before, the runner
+        # ended with exit 1 after a Ctrl-C, and bash went on with the other steps
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                started = d.parent / "started"
+                (d / "tests" / "test_sl.py").write_text(
+                    "import time, unittest\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+                    f"        open({str(started)!r}, 'w').close()\n        time.sleep(60)\n")
+                p, out = self.start_sh(d)
+                self.wait_for(started.exists)
+                time.sleep(0.3)
+                os.killpg(p.pid, sig)
+                self.assertEqual(p.wait(timeout=60), -sig, out.read_text())
+                self.assertNotIn("\n== shell syntax", out.read_text())
+
+    def test_a_signal_to_the_group_reaches_each_test_once(self):
+        # a test that handles SIGINT itself gets a Ctrl-C to the group once, and the run goes on to its verdict, as
+        # when the tests ran in the runner: the runner, which passes on what is sent to it alone, is not in the group
+        d = self.tree()
+        got, started = d.parent / "got", d.parent / "started"
+        (d / "tests" / "test_c.py").write_text(
+            "import signal, time, unittest\nclass C(unittest.TestCase):\n    def test_c(self):\n"
+            f"        signal.signal(signal.SIGINT, lambda *a: open({str(got)!r}, 'a').write('x'))\n"
+            f"        open({str(started)!r}, 'w').close()\n        time.sleep(2)\n")
+        p, out = self.start_sh(d)
+        self.wait_for(started.exists)
+        os.killpg(p.pid, signal.SIGINT)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(got.read_text(), "x")
+
+    def test_a_stop_of_the_group_stops_the_tests(self):
+        # SIGSTOP to scripts/test.sh's process group (as a Ctrl-Z stops the job at a terminal) stops the tests, and
+        # SIGCONT lets them go on.  Before, the workers ran on in groups of their own
+        d = self.tree()
+        tick = d.parent / "tick"
+        (d / "tests" / "test_t.py").write_text(
+            "import time, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n        for _ in range(40):\n"
+            f"            with open({str(tick)!r}, 'a') as f:\n                f.write('x')\n            time.sleep(0.1)\n")
+        p, out = self.start_sh(d)
+        self.wait_for(tick.exists)
+        time.sleep(0.3)
+        os.killpg(p.pid, signal.SIGSTOP)
+        try:
+            time.sleep(0.3)
+            before = tick.stat().st_size
+            time.sleep(1.5)
+            self.assertEqual(tick.stat().st_size, before, "the test went on while its group was stopped")
+        finally:
+            os.killpg(p.pid, signal.SIGCONT)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(tick.stat().st_size, 40)
+
+    def test_what_python_does_as_the_tests_end(self):
+        # as a process ends: it waits for its threads, then runs the atexit handlers, the finalizers of weakref (as
+        # tempfile.TemporaryDirectory's cleanup) among them.  Those registered at the loading of the tests run once,
+        # at the end of the run, and not while another worker still runs tests.  Before, a worker ended with os._exit
+        # and none of those of its tests ran
+        d = self.tree()
+        o = d.parent / "o"
+        o.mkdir()
+        (d / "tests" / "test_end.py").write_text(f"""import atexit, os, shutil, tempfile, threading, time, unittest
+OUT = {str(o)!r}
+def note(what):
+    with open(os.path.join(OUT, 'log'), 'a') as f:
+        f.write(what + '\\n')
+atexit.register(note, 'loading')
+D = tempfile.TemporaryDirectory(dir=OUT)
+keep = []
+class A(unittest.TestCase):
+    def test_0(self):
+        d = tempfile.mkdtemp(dir=OUT)
+        atexit.register(shutil.rmtree, d)
+        keep.append(tempfile.TemporaryDirectory(dir=OUT))
+        threading.Thread(target=lambda: (time.sleep(1), note('thread'))).start()
+    def test_1(self):
+        time.sleep(2)
+        self.assertTrue(os.path.isdir(D.name))
+""")
+        self.passes(d)
+        self.assertEqual(sorted(os.listdir(o)), ["log"])
+        self.assertEqual(sorted((o / "log").read_text().splitlines()), ["loading", "thread"])
+
+    def test_a_signal_that_the_loading_holds(self):
+        # a test module that blocks a signal at its import and sends it to itself: it stays pending as it did in the
+        # runner, also in the workers, which start without it; a test that unblocks it then gets it, and the run ends
+        # (SIGTERM) as it ended in the runner.  Before, the workers unblocked SIGINT, SIGTERM and SIGHUP
+        head = ("import os, signal, time, unittest\nsignal.pthread_sigmask(signal.SIG_BLOCK, {{signal.{0}}})\n"
+                "os.kill(os.getpid(), signal.{0})\nclass H(unittest.TestCase):\n    def test_h(self):\n")
+        d = self.tree()
+        (d / "tests" / "test_held.py").write_text(head.format("SIGINT") + "        time.sleep(0.5)\n")
+        self.passes(d)
+        (d / "tests" / "test_held.py").write_text(
+            head.format("SIGTERM") + "        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})\n"
+                                     "        time.sleep(5)\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("\n== shell syntax", r.stdout)
+        self.assertNotIn("\nOK", r.stdout)
+
 
 class TestShJobs(TestSh):
     """The cases of TestSh about the unit-test step, again with --jobs 3: what one worker sees (a test that fails,
     never runs, returns a value, is skipped for another reason ...) fails the run as it does with one, also when the
     code that makes something a helper ran in another worker."""
-    def run_sh(self, d: Path, *args: str, env: dict | None = None, timeout: int = 120) -> subprocess.CompletedProcess:
-        return super().run_sh(d, *args, "--jobs", "3", env=env, timeout=timeout)
+    JOBS = ("--jobs", "3")
 
 
 for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
@@ -2439,7 +2603,10 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_a_helper_that_a_skipped_tests_method_reads_through_self",
         "test_forms_round_9_mutation_testing_found_untested",
         "test_helpers_through_methods_of_related_classes_and_more_forms",
-        "test_forms_round_10_mutation_testing_found_untested"}]:
+        "test_forms_round_10_mutation_testing_found_untested", "test_a_signal_to_the_group_reaches_what_the_tests_started",
+        "test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests", "test_a_stop_of_the_group_stops_the_tests",
+        "test_a_signal_to_the_group_reaches_each_test_once",
+        "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

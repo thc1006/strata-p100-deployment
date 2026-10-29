@@ -19,8 +19,8 @@ at the next start of the service. Other people use the service.
 - `scripts/check-drift.sh`: read-only comparison of the machine, and of the running service, with the repository. It
   ends with `no drift`. Uncommitted changes in the checkout the service runs are drift: run it after a commit.
   `--full` also hashes the files over 1 GiB. From another checkout or worktree it passes only at the commit of the
-  live checkout; `--candidate` compares the machine with that tree instead, as with a commit to be deployed
-  (`scripts/deploy.sh` does).
+  live checkout; `--candidate` compares the machine with that tree instead, for a commit to be deployed (as
+  `scripts/deploy.sh` does).
 - `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json $(sed -e 's/#.*//' config/profile.conf) --dry-run`: shows what
   the tool would change in the live config without writing it.
 - `scripts/deploy.sh`: whether `origin/main` can be deployed to this checkout. To find out, it runs that commit's

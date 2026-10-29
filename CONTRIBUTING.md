@@ -10,9 +10,11 @@ measurement. For a security problem, follow the [security policy](SECURITY.md) i
 
 ## Pull requests
 
-- Run `scripts/test.sh --repo-only` before you open a pull request, on Linux with Python 3.10, git and
-  `systemd-analyze`. It must end with `all checks passed`. The `test` workflow runs the same command on every pull
-  request. Without `--repo-only`, the script also checks programs that exist only on the production machine.
+- Run `scripts/test.sh --repo-only` before you open a pull request, on Linux with the packages that
+  [`.github/workflows/test.yml`](.github/workflows/test.yml) installs (among them Python 3.10, git, systemd, gcc and
+  shellcheck). It must end with `all checks passed`. The `test` workflow runs it with `--harnesses` (the stub
+  harnesses too) on every pull request. Without `--repo-only`, the script also checks programs that exist
+  only on the production machine.
 - A change to `tools/configure_strata_q3.py` needs a unit test in `tests/`.
 - A change to the deployed configuration needs measurements from this hardware. Put the raw output in `results/` and
   explain the change in [docs/deployment-record.md](docs/deployment-record.md).
@@ -22,4 +24,4 @@ measurement. For a security problem, follow the [security policy](SECURITY.md) i
 ## License
 
 This repository is licensed under Apache-2.0. Under section 5 of the [license](LICENSE), a contribution you submit is
-under the same terms.
+under the same terms, unless you explicitly state otherwise.

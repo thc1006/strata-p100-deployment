@@ -14,7 +14,7 @@ Only the default branch is supported. The repository has no releases.
 
 ## Report a vulnerability
 
-Report it privately through GitHub's private vulnerability reporting: open the repository's Security tab and select
+Report it through GitHub's private vulnerability reporting: open the repository's Security tab and select
 "Report a vulnerability". Do not open a public issue for it. Include what you found, how to reproduce it and what an
 attacker gains.
 

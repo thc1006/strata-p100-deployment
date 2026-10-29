@@ -284,8 +284,32 @@ class Loader(unittest.TestLoader):
         return suite
 
 
+TESTS = os.path.realpath("tests") + os.sep
+exits, seen = [], 0     # what atexit.register got while the tests loaded, in order: (function, arguments, keywords,
+                        # whether code in tests/ called it); and how many calls (atexit counts unregistered ones too)
+real_register, real_unregister = atexit.register, atexit.unregister
+
+
+def register(func, *args, **kwargs):
+    global seen
+    real_register(func, *args, **kwargs)
+    seen += 1
+    exits.append((func, args, kwargs, os.path.realpath(sys._getframe(1).f_code.co_filename).startswith(TESTS)))
+    return func
+
+
+def unregister(func):
+    real_unregister(func)
+    exits[:] = [e for e in exits if not e[0] == func]
+
+
+atexit.register, atexit.unregister = register, unregister
 profile.enable()
 suite = Loader().discover("tests", pattern=PATTERN)
+atexit.register, atexit.unregister = real_register, real_unregister
+if atexit._ncallbacks() != seen:
+    bad.append("atexit has handlers that the runner did not see registered as the tests loaded: a worker would not run "
+               "them")
 
 
 def unwrapped(fn):
@@ -419,11 +443,13 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
 # not reach; one sent to it alone (SIGINT, SIGTERM, SIGHUP) goes on to each worker.  So no worker gets a signal twice.
 # Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
-# worker that does not hold it.  A worker runs the atexit handlers that its tests registered (the loading's run here,
-# once) and ends as Python ends; after a KeyboardInterrupt, of SIGINT.  When a worker ends without its record (a test
-# that ends the process, a signal) the run has no verdict, and when one died of a signal this process then dies of the
-# same signal, also of SIGKILL (the OOM killer's), as the process of the tests did before, so that after a Ctrl-C bash
-# stops too.  A worker gets SIGKILL when this process ends before it (PR_SET_PDEATHSIG).
+# worker that does not hold it.  A worker runs the atexit handlers that its tests registered, and those that a library
+# registered as the tests loaded (logging's, multiprocessing's, which ends its daemonic children); those that code in
+# tests/ registered as they loaded run here, once.  It ends as Python ends; after a KeyboardInterrupt, of SIGINT.  When
+# a worker ends without its record (a test that ends the process, a signal) the run has no verdict, and when one died
+# of a signal this process then dies of the same signal, also of SIGKILL (the OOM killer's), as the process of the
+# tests did before, so that after a Ctrl-C bash stops too.  A worker gets SIGKILL when this process ends before it
+# (PR_SET_PDEATHSIG).
 jobs = int(os.environ["TEST_JOBS"])
 units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
 
@@ -536,11 +562,12 @@ def work(k, saved, mask, gate, report):
     status, interrupted = 1, False
     try:
         try:
-            atexit._clear()                     # the loading's handlers run in this process's parent
-            if weakref.finalize._registered_with_atexit:     # and so do the loading's finalizers; this one's here
-                for f in list(weakref.finalize._registry):
-                    f.atexit = False
-                atexit.register(weakref.finalize._exitfunc)
+            atexit._clear()                     # what the tests registered as they loaded runs in this process's
+            for f in list(weakref.finalize._registry):              # parent, and so do the loading's finalizers;
+                f.atexit = False
+            for func, args, kwargs, ours in exits:  # what a library registered (logging's, multiprocessing's, that
+                if not ours:                        # of weakref.finalize, for this process's own) runs here too
+                    atexit.register(func, *args, **kwargs)
             for s, handler in saved.items():
                 if handler is not None:         # (None: a handler that Python did not set, which stays)
                     signal.signal(s, handler)

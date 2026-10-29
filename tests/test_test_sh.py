@@ -2652,6 +2652,52 @@ class A(unittest.TestCase):
         self.assertEqual(sorted(os.listdir(o)), ["log"])
         self.assertEqual(sorted((o / "log").read_text().splitlines()), ["loading", "thread"])
 
+    def test_what_libraries_register_as_the_tests_load(self):
+        # an atexit handler that a library registers as a test module imports it runs in each worker too:
+        # multiprocessing.util's, which ends the daemonic children of the process.  One that a test module registers as it
+        # loads runs once, at the end of the run, also when its function is a library's (shutil.rmtree), and not while
+        # another worker still runs tests.  Before, a worker ran none of the loading's handlers, and a daemonic child
+        # outlived the run
+        d = self.tree()
+        o, pids = d.parent / "o", d.parent / "pids"
+        o.mkdir()
+        self.addCleanup(self.end_children, pids)
+        (d / "tests" / "test_mp.py").write_text(
+            "import atexit, multiprocessing, multiprocessing.util, os, shutil, tempfile, time, unittest\n"
+            f"E = tempfile.mkdtemp(dir={str(o)!r})\natexit.register(shutil.rmtree, E)\n"
+            "class M(unittest.TestCase):\n    def test_0(self):\n"
+            "        c = multiprocessing.Process(target=time.sleep, args=(60,), daemon=True)\n        c.start()\n"
+            f"        with open({str(pids)!r}, 'a') as f:\n            f.write(f'{{c.pid}}\\n')\n"
+            "    def test_1(self):\n        time.sleep(2)\n        self.assertTrue(os.path.isdir(E))\n")
+        p, out = self.start_sh(d)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(os.listdir(o), [])
+        children = pids.read_text().split()
+        self.assertEqual(len(children), 1)
+        for _ in range(50):
+            if not os.path.exists(f"/proc/{children[0]}"):
+                break
+            time.sleep(0.1)
+        self.assertFalse(os.path.exists(f"/proc/{children[0]}"), "the daemonic child outlived the run")
+        # a handler registered before the tests load (here by a sitecustomize module) is one that the runner did not
+        # see: a worker would drop it, so the run fails
+        site = d.parent / "site"
+        site.mkdir()
+        (site / "sitecustomize.py").write_text("import atexit\natexit.register(print, end='')\n")
+        (d / "tests" / "test_mp.py").unlink()
+        self.fails(d, "FAIL: atexit has handlers that the runner did not see registered as the tests loaded: a worker "
+                      "would not run them", env={"PYTHONPATH": str(site)})
+
+    @staticmethod
+    def end_children(pids: Path) -> None:
+        """SIGKILL to each process named in pids that runs a copy of the runner (its command line names the verdict)."""
+        for q in pids.read_text().split() if pids.exists() else ():
+            try:
+                if b"verdict" in Path(f"/proc/{q}/cmdline").read_bytes():
+                    os.kill(int(q), signal.SIGKILL)
+            except OSError:
+                pass
+
     def test_a_signal_that_the_loading_holds(self):
         # a test module that blocks a signal at its import and sends it to itself: it stays pending as it did in the
         # runner, also in the workers, which start without it; a test that unblocks it then gets it, and the run ends
@@ -2696,7 +2742,7 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests", "test_a_stop_of_the_group_stops_the_tests",
         "test_a_signal_to_the_group_reaches_each_test_once",
         "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
-        "test_a_worker_that_dies_of_sigkill"}]:
+        "test_what_libraries_register_as_the_tests_load", "test_a_worker_that_dies_of_sigkill"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

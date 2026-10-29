@@ -2557,15 +2557,29 @@ class TestSh(unittest.TestCase):
 
     def test_a_signal_to_the_group_reaches_each_test_once(self):
         # a test that handles SIGINT itself gets a Ctrl-C to the group once, and the run goes on to its verdict, as
-        # when the tests ran in the runner: the runner, which passes on what is sent to it alone, is not in the group
+        # when the tests ran in the runner: the runner, which passes on what is sent to it alone, is not in the group.
+        # (The signal reaches every worker, and one whose test does not handle it ends: here it comes once the other
+        # workers have ended)
         d = self.tree()
         got, started = d.parent / "got", d.parent / "started"
         (d / "tests" / "test_c.py").write_text(
-            "import signal, time, unittest\nclass C(unittest.TestCase):\n    def test_c(self):\n"
+            "import os, signal, time, unittest\nclass C(unittest.TestCase):\n    def test_c(self):\n"
             f"        signal.signal(signal.SIGINT, lambda *a: open({str(got)!r}, 'a').write('x'))\n"
-            f"        open({str(started)!r}, 'w').close()\n        time.sleep(2)\n")
+            f"        open({str(started)!r}, 'w').write(str(os.getppid()))\n        time.sleep(5)\n")
         p, out = self.start_sh(d)
-        self.wait_for(started.exists)
+        self.wait_for(lambda: started.exists() and started.read_text())
+        runner = started.read_text()
+
+        def children():
+            found = []
+            for q in filter(str.isdigit, os.listdir("/proc")):
+                try:
+                    if Path(f"/proc/{q}/stat").read_text().rpartition(")")[2].split()[1] == runner:
+                        found.append(q)
+                except OSError:
+                    pass
+            return found
+        self.wait_for(lambda: len(children()) == 1)
         os.killpg(p.pid, signal.SIGINT)
         self.assertEqual(p.wait(timeout=60), 0, out.read_text())
         self.assertEqual(got.read_text(), "x")

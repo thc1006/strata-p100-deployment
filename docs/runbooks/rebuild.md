@@ -12,13 +12,19 @@
 - Scope: today's deployment, Strata 0.1.45 (`477ac13cb`) with GSQ-RCO IQ3_S and `--profile deployed --model iq3_s`. The commands that built 0.1.43.1 with IQ3_XXS on 2026-10-16 are this file at commit `68cb17f`.
 - Last verified: steps 1–3 and 5–11 and the file checks of step 15 were rehearsed on 2026-10-30 on this machine, in a sandbox, while the service ran ([the rehearsal](#the-rehearsal-of-2026-10-30)). Some inputs were not fetched as the steps fetch them (they were copies or links of production's, or an earlier step's download); each step says which, and which record covers it. Step 4 was not downloaded. Steps 0 and 12–14 change the system or need the GPUs, so they were not rehearsed. The whole procedure has not been run on a new VM.
 - Prerequisites:
-  - The account is `thc1006`, uid 1003. `strata-q3.service` and the logrotate file in `systemd/`, the preflight, watchdog and `check-deployment.sh` in `scripts/`, the two config snapshots and `deployed-artifacts.sha256` (the CUDA libraries) in `config/`, and `scripts/test.sh` hard-code `/home/thc1006`; the drop-in directory `systemd/user-1003.slice.d/` and `check-deployment.sh` hard-code the uid. To use another account, change these files first; otherwise the comparisons below do not match either.
-  - At least 233.1 GiB (250.3 GB) of space by apparent size (ZFS's compression makes the disk use smaller): `~/dev/Strata-data` with both models 217.8 GiB (`results/strata-data-du-20261021.txt`), `~/cuda-12.9` 9.35 GiB, the CUDA installer 5.46 GiB and `~/dev/strata` 0.46 GiB (`results/rebuild-sizes-20261022.txt`).
+  - The account is `thc1006`, uid 1003. `strata-q3.service` and the logrotate file in `systemd/`, the preflight, watchdog and `check-deployment.sh` in `scripts/`, the two config snapshots and `deployed-artifacts.sha256` (the CUDA libraries) in `config/`, `scripts/test.sh` and step 15's `bench/arms-rebuild.json` hard-code `/home/thc1006`, and `bench/ab_engine.sh` the account's name; the drop-in directory `systemd/user-1003.slice.d/` and `check-deployment.sh` hard-code the uid. To use another account, change these files first; otherwise the comparisons below do not match either.
+  - At least 233.1 GiB (250.3 GB) of space by apparent size (ZFS's compression makes the disk use smaller): `~/dev/Strata-data` with both models 217.8 GiB (`results/strata-data-du-20261021.txt`), `~/cuda-12.9` 9.35 GiB, the CUDA installer 5.46 GiB and `~/dev/strata` 0.46 GiB (`results/rebuild-sizes-20261022.txt`). Step 6's second worktree and the git clone come on top; they were not measured.
 
 ## Before you start
 
-- setup.py moves model files. Its `data_folder()` (`setup.py:4459-4510` at `477ac13cb`) takes as sources the data folder that `~/.config/strata/settings.json` names, the Strata folders remembered there, every folder whose name starts with `strata` (in any case) and holds a `setup.py`, in the tree's parent and grandparent directories or one level inside such a folder (`other_installs()`, `setup.py:4380-4398`), and a `Strata-data` folder inside any of these. From each one on the same file system it moves `models/`, `packs/*` and `mtp/` into the new data folder, and points that folder's configs there (`setup.py:4490-4502`). On a new VM there is nothing to move. Do not run step 5 where another Strata tree or data folder must stay where it is.
-- In the rehearsal, setup.sh's scope reached a memory peak of 6.38 GiB (R6 in `results/rebuild-rehearsal-r6-r7-20261030.txt`; samples in `results/rebuild-rehearsal-memory-20261030.txt`). It came while setup read the MTP files through mmap, which charges their page cache to the scope; through the engine build the peak was 2.30 GiB. How much of it setup needs was not measured, and a run under the account's 6 GiB, which step 12 installs ([decision 0007](../decisions/0007-memory-limit-of-the-maintainers-account.md)), was not tried. So steps 5 and 6 come before step 12. Where the limit is already in force, lift it for them as [Daily operations](operations.md#the-memory-limit-of-the-maintainers-account) says (the rehearsal used 12G), and set it back after.
+- setup.py moves model files. Its `data_folder()` (`setup.py:4459-4510` at `477ac13cb`) takes these folders as sources:
+  - the data folder that `~/.config/strata/settings.json` names, and the Strata folders remembered there;
+  - every folder whose name starts with `strata` (in any case) and holds a `setup.py`, in the tree's parent and grandparent directories or one level inside such a folder (`other_installs()`, `setup.py:4380-4398`);
+  - a `Strata-data` folder inside any of these.
+
+  From each one on the same file system it moves `models/`, `packs/*` and `mtp/` into the new data folder, and points that folder's configs there (`setup.py:4490-4502`). On a new VM there is nothing to move. Do not run step 5 where another Strata tree or data folder must stay where it is.
+- In the rehearsal, setup.sh's scope reached a memory peak of 6.38 GiB (R6 in `results/rebuild-rehearsal-r6-r7-20261030.txt`; samples in `results/rebuild-rehearsal-memory-20261030.txt`). It came while setup read the MTP files through mmap, which charges their page cache to the scope; through the engine build the peak was 2.30 GiB.
+- How much of that setup needs was not measured, and a run under the account's 6 GiB, which step 12 installs ([decision 0007](../decisions/0007-memory-limit-of-the-maintainers-account.md)), was not tried. So steps 5 and 6 come before step 12. Where the limit is already in force, lift it for them as [Daily operations](operations.md#the-memory-limit-of-the-maintainers-account) says (the rehearsal used 12G), and set it back after.
 - The engine binaries cannot be rebuilt byte for byte. nvcc puts temporary file names made from process IDs into them. With those names and the GNU build ID masked, the rehearsal's `strata` and `libstrata_kq.so` equal the deployed ones (R7 in `results/rebuild-rehearsal-r6-r7-20261030.txt`), on this machine's CPU and compiler. ggml-cpu is built with `-march=native` (`results/rebuild-rehearsal-setup-20261030.log`, line 81), so on another CPU or compiler the code can differ too. Step 15's `check-drift.sh` reports the two files; commit their new sha256 only after the engine screen of step 15.
 
 ## Steps
@@ -94,7 +100,7 @@ cd ~/dev/strata && export STRATA_NVCC=$HOME/cuda-12.9/bin/nvcc PATH=$HOME/cuda-1
   --low-ram resident --kv-streaming off --vram-reserve-mib 1536 --data-dir $HOME/dev/Strata-data --no-browser
 cmp ~/dev/strata/strata-iq3_xxs.json ~/dev/p100-q3-deployment/config/strata-iq3_xxs.setup.json && echo "setup's config as on 2026-10-16"
 ```
-Rehearsed (R6, `results/rebuild-rehearsal-r6-r7-20261030.txt`; output `results/rebuild-rehearsal-setup-20261030.log`): 772 s, of which 6 min 39 s for the engine. The config equals `config/strata-iq3_xxs.setup.json`, which 0.1.43.1's setup wrote on 2026-10-16. The venv's packages, `pyvenv.cfg`, `.strata-pip.json`, `third_party/llama.cpp` and the MTP head equal production's. Setup's downloads were seeded, not run: R4 had downloaded the llama.cpp zip and written setup's `.done` mark for it, and R5 had copied production's MTP tensors, linked production's IQ3_XXS shards and pack, and written `.done` marks for the shards, so setup skipped them without asking the server (`setup.py:1616-1618`) and made no IQ3_XXS pack. On 2026-10-16 setup downloaded and made all of these (`results/setup-20261016.log`).
+Rehearsed (R6, `results/rebuild-rehearsal-r6-r7-20261030.txt`; output `results/rebuild-rehearsal-setup-20261030.log`): 772 s, of which 6 min 39 s for the engine. The config equals `config/strata-iq3_xxs.setup.json`, which 0.1.43.1's setup wrote on 2026-10-16. The venv's packages, `pyvenv.cfg`, `.strata-pip.json`, `third_party/llama.cpp` and the MTP head equal production's. Setup's downloads were seeded, not run. R4 had downloaded the llama.cpp zip and written setup's `.done` mark for it, and R5 had linked production's IQ3_XXS shards and pack and written `.done` marks for the shards, so setup skipped them without asking the server (`setup.py:1616-1618`) and made no IQ3_XXS pack. R5 had also copied production's MTP tensors, which `tools/mtp_fetch.py` kept because they were whole and had the pinned sha256 (`tools/mtp_fetch.py:221-260`). On 2026-10-16 setup downloaded and made all of these (`results/setup-20261016.log`).
 
 ### 6. The deployed build of the engine
 
@@ -107,7 +113,7 @@ rm -rf ~/dev/strata/engine-cuda12 ~/dev/strata/build-cuda12 && cp -a ~/dev/strat
 ```
 `build-engine.sh` uses the venv of `~/dev/strata`, so it comes after step 5. Do not run setup.sh again after this step: it compiles again when BUILD.json's `src` is not its own source hash (`setup.py:4047-4050`).
 
-Rehearsed (R7, same file): 305 s, a memory peak of 3.04 GiB. BUILD.json is OK against the manifest. With nvcc's temporary names and the build ID masked, `strata` and `libstrata_kq.so` are byte for byte the deployed ones (`bench/rehearsal_elfcmp.py`); unmasked they differ in 298 and 30 bytes. The rehearsal ran the `mv`, `rm` and `cp` steps of R7 and R8 outside the sandbox, on the sandbox's paths.
+Rehearsed (R7, same file): 305 s, a memory peak of 3.04 GiB. BUILD.json is OK against the manifest. With nvcc's temporary names and the build ID masked, `strata` and `libstrata_kq.so` are byte for byte the deployed ones (`bench/rehearsal_elfcmp.py`); unmasked they differ in 298 and 30 bytes. The rehearsal ran the `mv`, `ln`, `rm` and `cp` steps of R7 and R8 outside the sandbox, on the sandbox's paths. A job could have left a link there that leads into production outside; `bench/rehearsal_rr.sh` now says to run such steps as jobs.
 
 ### 7. IQ3_S's shards
 
@@ -116,11 +122,10 @@ M=~/dev/Strata-data/models; mkdir -p $M/IQ3_S
 f=Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf
 nice -n 19 ionice -c 3 curl -L --fail -C - --limit-rate 60M -o $M/IQ3_S/$f.part \
   https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF/resolve/ed59f92082b1e93c0e96d60a8b11aab089b52f09/IQ3_S/$f
-sha256sum $M/IQ3_S/$f.part    # must be 4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3
-mv $M/IQ3_S/$f.part $M/IQ3_S/$f
+echo "4c1eb2ceb4915e1192f4f386021897bde56a97f40a0bb78bb86465e0f7d2aca3  $M/IQ3_S/$f.part" | sha256sum -c - && mv $M/IQ3_S/$f.part $M/IQ3_S/$f
 ln $M/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf $M/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00002-of-00002.gguf
 ```
-Expected: shard 1 has 54,817,524,224 bytes (`results/iq3s-model-files-20261019.txt`). The hard link takes no space.
+Expected: `OK` (if not, handle it as in step 4), and shard 1 has 54,817,524,224 bytes (`results/iq3s-model-files-20261019.txt`). The hard link takes no space.
 
 Rehearsed (R8, `results/rebuild-rehearsal-r8-r11-20261030.txt`): the sha256 is the pinned one; 1728 s with `--limit-rate 30M`. The hard link is of R5's symbolic link, so it leads to production's shard 2.
 

@@ -18,6 +18,7 @@
 # sha256 then.
 # --home was added before R2a ("Fix: rr --home" below), and R2a checked only that mode.  R2a, R2b and R5 ran the version
 # with the sha256 728591a9..., unchanged since 00:58:04 (results/rebuild-rehearsal-copies-20261030.txt).
+# The rebuild.md line numbers below are those of docs/runbooks/rebuild.md at commit 68cb17f.
 # R1-R5 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 00:49:55 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr (capped user scope, choom -n 500, nice -n 19, chrt -i 0, ionice -c3,
 # taskset, then the bubblewrap sandbox of R0-selftest.txt); rr-guard ran beside it (logs/guard.log).  No sudo was run.

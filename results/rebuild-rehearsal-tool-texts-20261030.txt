@@ -1,0 +1,312 @@
+# The text of the rebuild rehearsal's tool copies in ~/rebuild-rehearsal (bin/ and shim/), read on
+# 2026-10-30 16:23:53 +0800 without changing anything.  bin/rr's text is in results/rebuild-rehearsal-copies-20261030.txt.
+# The host name is written <host>.
+
+$ cd /home/thc1006/rebuild-rehearsal
+[exit 0]
+
+$ sha256sum bin/elfcmp.py bin/prod-stat.sh bin/r0-probe.py bin/r0-selftest.sh bin/r0-settings.py bin/rlog bin/rr bin/rr-guard bin/rr-memwatch shim/nvidia-smi shim/sudo
+4fff4c1cdd2c2e92d1c23b7ad551a073969757787f421fd79ddc9e72475b30b6  bin/elfcmp.py
+b8aee9a6fdd0dc319b5460b980262c37425931c93c942aca452651a26b5fe656  bin/prod-stat.sh
+ca9543a7aafe52c82fe5aa40cea1c0c1dce20da50e9e54d36d8628004ce93482  bin/r0-probe.py
+6f6cbddb7f3f2303cadeff4a3d8df22a71ddda2675282a206276a6f801550247  bin/r0-selftest.sh
+9dd4f79f5c65b4f5623ee47430160048436ad33214b0b3232d6f9520e11bad7a  bin/r0-settings.py
+a53f82db76b06d7cd07205a4fd3134862cb1ce6b9d1e63f91a85dcbac75a1f3b  bin/rlog
+728591a9175e179413420960f8e8686aa634ce3aae3f4979c7dc15a551b01e7b  bin/rr
+ff8bc7fb5289180848f7f30c5755f3f053956361f0e86a94ecc63a861012fcd3  bin/rr-guard
+3aa7faa0f2e666e1f37d0d35f8e996ad31cffc485fd8a8ba70eaf963aa81d6cd  bin/rr-memwatch
+5cd16e8ec34416611d3b937aee5cf8336f29578c7bb3724a275d4d1862d21a68  shim/nvidia-smi
+03da5182ceadbc2f1219b9dd09650a50f3f4a00eda71da8ab8d051b5866bc23c  shim/sudo
+[exit 0]
+
+$ stat -c %n\ %s\ %y\ %z bin/elfcmp.py bin/prod-stat.sh bin/r0-probe.py bin/r0-selftest.sh bin/r0-settings.py bin/rlog bin/rr bin/rr-guard bin/rr-memwatch shim/nvidia-smi shim/sudo
+bin/elfcmp.py 812 2026-10-30 00:44:44.585441894 +0800 2026-10-30 00:44:44.589442228 +0800
+bin/prod-stat.sh 1230 2026-10-30 01:11:22.783266105 +0800 2026-10-30 01:11:22.783266105 +0800
+bin/r0-probe.py 3178 2026-10-30 00:45:49.772892300 +0800 2026-10-30 00:45:49.781893053 +0800
+bin/r0-selftest.sh 7833 2026-10-30 00:48:13.771969425 +0800 2026-10-30 00:48:13.771969425 +0800
+bin/r0-settings.py 1344 2026-10-30 00:45:49.777892718 +0800 2026-10-30 00:45:49.781893053 +0800
+bin/rlog 597 2026-10-30 00:54:17.220611161 +0800 2026-10-30 00:54:17.220611161 +0800
+bin/rr 3543 2026-10-30 00:58:04.124813384 +0800 2026-10-30 00:58:04.124813384 +0800
+bin/rr-guard 1407 2026-10-30 00:47:17.014203659 +0800 2026-10-30 00:47:17.014203659 +0800
+bin/rr-memwatch 732 2026-10-30 02:46:20.520011003 +0800 2026-10-30 02:46:20.520011003 +0800
+shim/nvidia-smi 323 2026-10-30 00:44:10.574603069 +0800 2026-10-30 00:44:10.577603319 +0800
+shim/sudo 56 2026-10-30 00:44:10.569602652 +0800 2026-10-30 00:44:10.577603319 +0800
+[exit 0]
+
+$ cat bin/elfcmp.py
+#!/usr/bin/env python3
+"""elfcmp.py A B: compare two ELF files with nvcc's temporary-file names (tmpxft_<8 hex>_<8 hex>) and the GNU build
+ID masked; exit 0 when they are then equal."""
+import hashlib, re, subprocess, sys
+def norm(p):
+    d = open(p, "rb").read()
+    m = re.search(r"Build ID: ([0-9a-f]+)", subprocess.run(["readelf", "-n", p], capture_output=True, text=True).stdout)
+    if m:
+        d = d.replace(bytes.fromhex(m.group(1)), bytes(len(m.group(1)) // 2))
+    return re.sub(rb"tmpxft_[0-9a-f]{8}_[0-9a-f]{8}", b"tmpxft_00000000_00000000", d)
+a, b = norm(sys.argv[1]), norm(sys.argv[2])
+n = sum(x != y for x, y in zip(a, b)) + abs(len(a) - len(b))
+print(len(a), len(b), hashlib.sha256(a).hexdigest()[:16], hashlib.sha256(b).hexdigest()[:16], "bytes that differ:", n)
+sys.exit(0 if a == b else 1)
+[exit 0]
+
+$ cat bin/prod-stat.sh
+prod_stat() {   # production paths that the probes aim at: inode, links, size, mtime, ctime (read only)
+  stat -c '%n %i %h %s %Y %Z' ~/dev/strata ~/dev/strata/strata-iq3_xxs.json ~/dev/strata/engine-cuda12 \
+    ~/dev/strata/engine-cuda12/strata ~/dev/strata/.venv ~/dev/strata/.venv/pyvenv.cfg ~/dev/Strata-data \
+    ~/dev/Strata-data/models ~/dev/Strata-data/models/IQ3_S ~/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf \
+    ~/dev/Strata-data/models/IQ3_XXS ~/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
+    ~/dev/Strata-data/packs ~/dev/Strata-data/packs/iq3_s ~/dev/Strata-data/packs/iq3_s/experts.bin ~/dev/Strata-data/packs/iq3_xxs \
+    ~/dev/Strata-data/packs/iq3_xxs/index.txt ~/dev/Strata-data/mtp ~/dev/Strata-data/mtp/mtp-inventory.json ~/dev/Strata-data/mtp/rt \
+    ~/dev/Strata-data/mtp/rt/experts.bin ~/dev/p100-q3-deployment ~/dev/p100-q3-deployment/config/profile.conf ~/cuda-12.9 \
+    ~/cuda-12.9/version.json ~/.config/strata ~/.config/strata/settings.json /etc /etc/hostname /etc/systemd/system \
+    /etc/systemd/system/strata-q3.service /usr/local/sbin /usr/local/sbin/strata-q3-health \
+    | sed "s|$HOME|~|"
+}
+prod_stat
+[exit 0]
+
+$ cat bin/r0-probe.py
+#!/usr/bin/env python3
+"""R0 write probes, run inside rr.  For each production path: create a file, create a directory, open an existing
+file for writing (no byte is written), delete a name, and rename an existing file to itself.  Every one must fail.
+The delete probe names a file that does not exist, and the rename is to the same name, so that neither could change
+anything even if the kernel allowed it; on a read-only mount the kernel refuses both before it looks the name up
+(EROFS), which an allowed operation on a missing name would not give (ENOENT).  An unexpected success of a create
+is undone at once and reported."""
+import errno, os, sys
+tok = sys.argv[1]
+P = "/home/thc1006/rebuild-rehearsal/prod/dev"
+C = "/home/thc1006/rebuild-rehearsal/prod/cuda-12.9"
+targets = [  # (directory, an existing file in it or None)
+    (P + "/strata", P + "/strata/strata-iq3_xxs.json"),
+    (P + "/strata/engine-cuda12", P + "/strata/engine-cuda12/strata"),
+    (P + "/strata/.venv", P + "/strata/.venv/pyvenv.cfg"),
+    (P + "/Strata-data", None),
+    (P + "/Strata-data/models", None),
+    (P + "/Strata-data/models/IQ3_S", P + "/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf"),
+    (P + "/Strata-data/models/IQ3_XXS", P + "/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf"),
+    (P + "/Strata-data/packs", None),
+    (P + "/Strata-data/packs/iq3_s", P + "/Strata-data/packs/iq3_s/experts.bin"),
+    (P + "/Strata-data/packs/iq3_xxs", P + "/Strata-data/packs/iq3_xxs/index.txt"),
+    (P + "/Strata-data/mtp", P + "/Strata-data/mtp/mtp-inventory.json"),
+    (P + "/Strata-data/mtp/rt", P + "/Strata-data/mtp/rt/experts.bin"),
+    (P + "/p100-q3-deployment", P + "/p100-q3-deployment/config/profile.conf"),
+    (C, C + "/version.json"),
+    ("/home/thc1006/.config/strata", "/home/thc1006/.config/strata/settings.json"),
+    ("/etc", "/etc/hostname"),
+    ("/etc/systemd/system", "/etc/systemd/system/strata-q3.service"),
+    ("/usr/local/sbin", "/usr/local/sbin/strata-q3-health"),
+]
+bad = 0
+def probe(what, fn):
+    global bad
+    try:
+        r = fn()
+    except OSError as e:
+        return f"{what} refused ({errno.errorcode.get(e.errno, e.errno)})"
+    bad += 1
+    if isinstance(r, int):
+        os.close(r)
+    return f"{what} ALLOWED (unexpected)"
+def create(d):
+    p = f"{d}/.rr-probe-{tok}"
+    try:
+        fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except OSError:
+        raise
+    os.close(fd); os.unlink(p)            # undone at once; reported as allowed
+    return None
+def mkdir(d):
+    p = f"{d}/.rr-probe-dir-{tok}"
+    os.mkdir(p); os.rmdir(p)
+for d, f in targets:
+    out = [probe("create", lambda: create(d)), probe("mkdir", lambda: mkdir(d)),
+           probe("delete", lambda: os.unlink(f"{d}/.rr-probe-absent-{tok}"))]
+    if f:
+        out += [probe("open for writing", lambda: os.open(f, os.O_WRONLY | os.O_APPEND)),
+                probe("rename to itself", lambda: os.rename(f, f))]
+    else:
+        out += [probe("rename dir to itself", lambda: os.rename(d, d))]
+    print(f"{d}: " + "; ".join(out))
+print(f"probes allowed: {bad}")
+sys.exit(1 if bad else 0)
+[exit 0]
+
+$ cat bin/r0-selftest.sh
+#!/bin/bash
+# R0 of the rebuild rehearsal: the sandbox's self-test.  Reads production only; writes only under ~/rebuild-rehearsal.
+set -u
+SB=/home/thc1006/rebuild-rehearsal; R=$SB/root/home/thc1006; RR=$SB/bin/rr
+TOK=$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')
+run() { printf '\n$'; printf ' %q' "$@"; printf '\n'; "$@" 2>&1; printf '[exit %s]\n' "$?"; }
+prod_stat() {   # production paths that the probes aim at: inode, links, size, mtime, ctime (read only)
+  stat -c '%n %i %h %s %Y %Z' ~/dev/strata ~/dev/strata/strata-iq3_xxs.json ~/dev/strata/engine-cuda12 \
+    ~/dev/strata/engine-cuda12/strata ~/dev/strata/.venv ~/dev/strata/.venv/pyvenv.cfg ~/dev/Strata-data \
+    ~/dev/Strata-data/models ~/dev/Strata-data/models/IQ3_S ~/dev/Strata-data/models/IQ3_S/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_S-00001-of-00002.gguf \
+    ~/dev/Strata-data/models/IQ3_XXS ~/dev/Strata-data/models/IQ3_XXS/Qwen3.8-Flash-Next-GSQ-RCO-IQ3_XXS-00002-of-00002.gguf \
+    ~/dev/Strata-data/packs ~/dev/Strata-data/packs/iq3_s ~/dev/Strata-data/packs/iq3_s/experts.bin ~/dev/Strata-data/packs/iq3_xxs \
+    ~/dev/Strata-data/packs/iq3_xxs/index.txt ~/dev/Strata-data/mtp ~/dev/Strata-data/mtp/mtp-inventory.json ~/dev/Strata-data/mtp/rt \
+    ~/dev/Strata-data/mtp/rt/experts.bin ~/dev/p100-q3-deployment ~/dev/p100-q3-deployment/config/profile.conf ~/cuda-12.9 \
+    ~/cuda-12.9/version.json ~/.config/strata ~/.config/strata/settings.json /etc /etc/hostname /etc/systemd/system \
+    /etc/systemd/system/strata-q3.service /usr/local/sbin /usr/local/sbin/strata-q3-health \
+    | sed "s|$HOME|~|"
+}
+echo "# R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, $(date '+%F %T %z')."
+echo "# Every job ran through ~/rebuild-rehearsal/bin/rr: its own user scope (MemoryMax, MemorySwapMax=0), choom -n 500,"
+echo "# nice -n 19, chrt -i 0, ionice -c3, taskset -c 7, then bwrap.  No sudo was run.  Production was read only."
+echo "# Probe token (in every probe file name): $TOK.  The host name is written <host>; everything else is the output, unchanged."
+echo; echo "== 0. the state before"
+run systemctl is-active strata-q3.service strata-q3-health.timer
+run cat /sys/fs/cgroup/user.slice/user-1003.slice/memory.current
+run df --output=avail,pcent /
+run sha256sum $SB/bin/rr $SB/bin/rr-guard $SB/bin/r0-probe.py $SB/bin/r0-settings.py $SB/shim/sudo $SB/shim/nvidia-smi
+prod_stat > $SB/verify/r0-prod-before.txt
+echo; echo "== 1. the namespace and the job's limits, seen from inside"
+run $RR -n rr-r0-props -m 256M -- sh -c 'id; echo "pid $$"; chrt -p $$; echo "nice $(nice)"; ionice -p $$; echo "oom_score_adj $(cat /proc/self/oom_score_adj)"; taskset -pc $$
+  cg=$(sed -n "s/^0:://p" /proc/self/cgroup); echo "cgroup $cg"; echo "memory.max $(cat /sys/fs/cgroup$cg/memory.max) memory.swap.max $(cat /sys/fs/cgroup$cg/memory.swap.max)"
+  for p in / /etc /usr/local/sbin /home/thc1006 /home/thc1006/.config /home/thc1006/rebuild-rehearsal /home/thc1006/rebuild-rehearsal/prod/dev \
+           /home/thc1006/rebuild-rehearsal/prod/cuda-12.9 /home/thc1006/dev /home/thc1006/cuda-12.9 /home/thc1006/downloads /tmp /run/user/1003 /run/dbus /proc; do
+    printf "%-45s %s\n" "$p" "$(findmnt -no SOURCE,OPTIONS -T $p | cut -c1-90)"; done'
+echo; echo "== 2. writes into production paths, from inside (each must be refused)"
+run $RR -n rr-r0-probe -m 256M -- python3 -I $SB/bin/r0-probe.py "$TOK"
+echo; echo "== 3. the production paths at their own names, inside: they are the sandbox's"
+run $RR -n rr-r0-names -m 256M -- sh -c 'ls -A /home/thc1006/dev /home/thc1006/cuda-12.9 /home/thc1006/downloads /tmp; for p in /home/thc1006/dev/strata /home/thc1006/dev/Strata-data /home/thc1006/dev/p100-q3-deployment /home/thc1006/cuda-12.9/bin/nvcc; do [ -e $p ] && echo "$p exists" || echo "$p does not exist inside"; done'
+echo; echo "== 4. markers written through the mapped paths inside, found under ~/rebuild-rehearsal outside"
+run $RR -n rr-r0-mark -m 256M -- sh -c 'set -e; T='"$TOK"'; mkdir -p /home/thc1006/dev/strata /home/thc1006/dev/Strata-data/models /home/thc1006/dev/Strata-data/packs /home/thc1006/dev/Strata-data/mtp
+  for p in /home/thc1006/dev /home/thc1006/dev/strata /home/thc1006/dev/Strata-data/models /home/thc1006/dev/Strata-data/packs /home/thc1006/dev/Strata-data/mtp /home/thc1006/cuda-12.9 /home/thc1006/downloads /tmp "$XDG_CONFIG_HOME"; do
+    echo "written inside through $p" > $p/.rr-marker-$T && echo "wrote $p/.rr-marker-$T"; done'
+run find $SB -name ".rr-marker-$TOK" -printf '%p\n'
+printf '\n$ ls -d <the same names outside, in production>\n'
+for p in ~/dev ~/dev/strata ~/dev/Strata-data/models ~/dev/Strata-data/packs ~/dev/Strata-data/mtp ~/cuda-12.9 ~/downloads /tmp ~/.config; do
+  [ -e "$p/.rr-marker-$TOK" ] && echo "FOUND $p/.rr-marker-$TOK" || echo "absent ${p/#$HOME/~}/.rr-marker-$TOK"; done
+echo "# cleanup of the markers and of the two directories made for them, by their sandbox paths, outside:"
+run rm -rf "$R/dev/strata" "$R/dev/Strata-data"
+run find $SB -name ".rr-marker-$TOK" -delete -print
+echo; echo "== 5. no GPU inside; the stand-ins"
+run $RR -n rr-r0-gpu -m 256M -- sh -c 'ls -l /dev/nvidia* 2>&1; ls /dev | grep -c nvidia; command -v nvidia-smi sudo; nvidia-smi --query-gpu=index,name,memory.total,compute_cap,driver_version --format=csv,noheader,nounits; nvidia-smi -L; echo "nvidia-smi -L exit $?"; sudo -n true; echo "sudo exit $?"'
+echo; echo "== 6. setup.py's settings inside: its own settings_path() and load_settings()"
+run $RR -n rr-r0-settings -m 256M -- python3 -I $SB/bin/r0-settings.py
+run $RR -n rr-r0-dirs -m 256M -- sh -c 'echo "strata* in /home/thc1006 (setup.py other_installs, grandparent of the tree):"; ls -d /home/thc1006/[Ss]trata* 2>&1; echo "in /home/thc1006/dev (its parent):"; ls -A /home/thc1006/dev'
+echo; echo "== 7. routes out of the namespace, closed"
+run $RR -n rr-r0-routes -m 256M -- sh -c 'echo "processes visible: $(ls /proc | grep -c "^[0-9]")"; pgrep -fa "[e]ngine-cuda12/strata|[s]erver.py" || echo "no Strata engine or server process visible"; ls -A /run/user/1003 /run/dbus; systemctl --user is-system-running 2>&1 | head -2; systemctl is-active strata-q3.service 2>&1 | head -2'
+echo; echo "== 8. the guard: one freeze and thaw of a dummy job (sleep), then one unforced round"
+$RR -n rr-r0-dummy -m 64M -- sleep 600 > /dev/null 2>&1 &
+sleep 3
+cg=$(systemctl --user show -p ControlGroup --value rr-r0-dummy.scope)
+run systemctl --user show -p ActiveState -p FreezerState rr-r0-dummy.scope
+run env RR_GUARD_FORCE=freeze $SB/bin/rr-guard --once
+sleep 1
+run systemctl --user show -p FreezerState rr-r0-dummy.scope
+run cat /sys/fs/cgroup$cg/cgroup.events
+run sh -c "ps -o pid,stat,cmd -p \$(tr '\n' , < /sys/fs/cgroup$cg/cgroup.procs | sed 's/,\$//')"
+run env RR_GUARD_FORCE=thaw $SB/bin/rr-guard --once
+sleep 1
+run systemctl --user show -p FreezerState rr-r0-dummy.scope
+run cat /sys/fs/cgroup$cg/cgroup.events
+run $SB/bin/rr-guard --once
+run systemctl --user stop rr-r0-dummy.scope
+wait
+run sh -c "systemctl --user list-units --type=scope --plain --no-legend 'rr-*' | grep -c '^rr-' || true"
+echo; echo "== 9. the state after"
+prod_stat > $SB/verify/r0-prod-after.txt
+run diff $SB/verify/r0-prod-before.txt $SB/verify/r0-prod-after.txt
+printf '\n$ <the %s production paths of section 2, before = after>\n' "$(wc -l < $SB/verify/r0-prod-before.txt)"
+cmp -s $SB/verify/r0-prod-before.txt $SB/verify/r0-prod-after.txt && echo "inode, link count, size, mtime and ctime unchanged for every path"
+run sh -c "find ~/dev/strata ~/dev/Strata-data ~/dev/p100-q3-deployment ~/cuda-12.9 ~/.config/strata /etc /etc/systemd/system /usr/local/sbin ~/dev ~/downloads /tmp -maxdepth 1 -name '.rr-*' 2>/dev/null | wc -l"
+run systemctl is-active strata-q3.service strata-q3-health.timer
+run cat /sys/fs/cgroup/user.slice/user-1003.slice/memory.current
+[exit 0]
+
+$ cat bin/r0-settings.py
+#!/usr/bin/env python3
+"""Inside rr: setup.py's own settings_path() and load_settings(), taken from production's setup.py source with ast
+(no other code of setup.py runs), and where the paths the real settings name resolve inside the namespace."""
+import ast, json, os, sys
+from pathlib import Path
+src = Path("/home/thc1006/rebuild-rehearsal/prod/dev/strata/setup.py").read_text(encoding="utf-8")
+mod = ast.parse(src)
+fns = [n for n in mod.body if isinstance(n, ast.FunctionDef) and n.name in ("settings_path", "load_settings")]
+ns = {"WIN": False, "Path": Path, "os": os, "json": json}
+exec(compile(ast.Module(body=fns, type_ignores=[]), "setup.py", "exec"), ns)
+p = ns["settings_path"]()
+print("setup.py settings_path() inside:", p, "| exists:", p.exists())
+print("setup.py load_settings() inside:", ns["load_settings"]())
+real = Path("/home/thc1006/.config/strata/settings.json")
+s = json.loads(real.read_text(encoding="utf-8"))
+print("the real ~/.config/strata/settings.json, read-only inside, names:", {k: s[k] for k in ("data_dir", "installs") if k in s})
+for q in [s.get("data_dir")] + list(s.get("installs", [])):
+    print(f"  {q} inside: exists {os.path.exists(q)}; it is under the bind of /home/thc1006/dev:",
+          os.stat("/home/thc1006/dev").st_ino == os.stat("/home/thc1006/rebuild-rehearsal/root/home/thc1006/dev").st_ino)
+[exit 0]
+
+$ cat bin/rlog
+#!/bin/bash
+# rlog COMMAND...: run COMMAND, append "$ COMMAND", its output and its exit status to ~/rebuild-rehearsal/logs/R1-R5.raw
+# (and show them).  rlog -s TITLE: append a section title.  rlog -n TEXT: append a note line.
+L=${RLOG:-/home/thc1006/rebuild-rehearsal/logs/R1-R5.raw}
+case ${1:-} in
+  -s) printf '\n== %s (%s)\n' "$2" "$(date '+%F %T')" | tee -a "$L"; exit 0 ;;
+  -n) printf '# %s\n' "$2" | tee -a "$L"; exit 0 ;;
+esac
+{ printf '\n$'; printf ' %q' "$@"; printf '\n'; } | tee -a "$L"
+"$@" 2>&1 | tee -a "$L"; rc=${PIPESTATUS[0]}
+printf '[exit %s]\n' "$rc" | tee -a "$L"
+exit "$rc"
+[exit 0]
+
+$ cat bin/rr-guard
+#!/bin/bash
+# rr-guard [--once]: freezes the rehearsal's scopes (rr-*.scope of this user) while strata-q3 is not active, while
+# MemAvailable is under 12 GiB, or while / is more than 80 % full; thaws them when all three hold.  Reads only;
+# acts only on rr-* scopes.  --once: one round, then exit.  RR_GUARD_FORCE=freeze|thaw: that action, for a test.
+set -u
+once=0; [ "${1:-}" = --once ] && once=1
+while :; do
+  why=()
+  systemctl is-active --quiet strata-q3.service || why+=("strata-q3 is $(systemctl is-active strata-q3.service)")
+  avail=$(awk '/^MemAvailable:/ {print int($2/1048576)}' /proc/meminfo)
+  [ "${avail:-0}" -ge 12 ] || why+=("MemAvailable ${avail:-?} GiB < 12")
+  pct=$(df --output=pcent / | tail -1 | tr -dc 0-9)
+  [ "${pct:-100}" -le 80 ] || why+=("/ is ${pct:-?} % full")
+  act=thaw; [ ${#why[@]} -gt 0 ] && act=freeze
+  case ${RR_GUARD_FORCE:-} in freeze|thaw) act=$RR_GUARD_FORCE; why+=("forced by RR_GUARD_FORCE") ;; esac
+  units=$(systemctl --user list-units --type=scope --plain --no-legend 'rr-*' | grep -o '^rr-[A-Za-z0-9_.-]*\.scope' | tr '\n' ' ')
+  echo "rr-guard $(date '+%F %T'): service $(systemctl is-active strata-q3.service), MemAvailable ${avail} GiB, / ${pct} %: $act${why:+ (${why[*]})}; scopes: ${units:-none}"
+  for u in $units; do
+    case $u in rr-*.scope) systemctl --user "$act" "$u" 2>&1 | sed 's/^/  /' ;; esac
+  done
+  [ $once = 1 ] && exit 0
+  sleep 30
+done
+[exit 0]
+
+$ cat bin/rr-memwatch
+#!/bin/bash
+# rr-memwatch UNIT LOG: while UNIT (a user scope) exists, append every 5 s: time, memory.current, memory.peak, and the
+# oom/oom_kill counts of its cgroup; the last line before it ends is its peak.  Reads only.
+U=$1; LOG=$2; C=/sys/fs/cgroup/user.slice/user-1003.slice/user@1003.service/app.slice/$U
+for i in $(seq 120); do [ -d "$C" ] && break; sleep 1; done
+while [ -d "$C" ]; do
+  printf '%s current %s peak %s %s\n' "$(date +%T)" "$(cat $C/memory.current 2>/dev/null)" "$(cat $C/memory.peak 2>/dev/null)" \
+    "$(grep -E '^(oom|oom_kill) ' $C/memory.events 2>/dev/null | tr '\n' ' ')$(grep -E '^(anon|file) ' $C/memory.stat 2>/dev/null | tr '\n' ' ')" >> "$LOG"
+  sleep 5
+done
+echo "$(date +%T) $U ended" >> "$LOG"
+[exit 0]
+
+$ cat shim/nvidia-smi
+#!/bin/sh
+# rehearsal stand-in: no GPU is reachable in the sandbox; prints the four GPUs as results/setup-20261016.log records them
+case "$*" in
+  *--query-gpu=index,name,memory.total,compute_cap,driver_version*)
+    for i in 0 1 2 3; do echo "$i, Tesla P100-PCIE-16GB, 16384, 6.0, 535.230.02"; done ;;
+  *) exit 6 ;;
+esac
+[exit 0]
+
+$ cat shim/sudo
+#!/bin/sh
+echo "rehearsal: sudo refused: $*" >&2
+exit 1
+[exit 0]

@@ -113,7 +113,7 @@ rm -rf ~/dev/strata/engine-cuda12 ~/dev/strata/build-cuda12 && cp -a ~/dev/strat
 ```
 `build-engine.sh` uses the venv of `~/dev/strata`, so it comes after step 5. Do not run setup.sh again after this step: it compiles again when BUILD.json's `src` is not its own source hash (`setup.py:4047-4050`).
 
-Rehearsed (R7, same file): 305 s, a memory peak of 3.04 GiB. BUILD.json is OK against the manifest. With nvcc's temporary names and the build ID masked, `strata` and `libstrata_kq.so` are byte for byte the deployed ones (`bench/rehearsal_elfcmp.py`); unmasked they differ in 298 and 30 bytes. The rehearsal ran the `mv`, `ln`, `rm` and `cp` steps of R7 and R8 outside the sandbox, on the sandbox's paths. A job could have left a link there that leads into production outside; `bench/rehearsal_rr.sh` now says to run such steps as jobs.
+Rehearsed (R7, same file): 305 s, a memory peak of 3.04 GiB. BUILD.json is OK against the manifest. With nvcc's temporary names and the build ID masked, `strata` and `libstrata_kq.so` are byte for byte the deployed ones (the rehearsal's `elfcmp.py`); unmasked they differ in 298 and 30 bytes. The rehearsal ran the `mv`, `ln`, `rm` and `cp` steps of R7 and R8 outside the sandbox, on the sandbox's paths. A job could have left a link there that leads into production outside.
 
 ### 7. IQ3_S's shards
 
@@ -232,13 +232,12 @@ Rehearsed in part (R11, `results/rebuild-rehearsal-r8-r11-20261030.txt`): `check
 ## The rehearsal of 2026-10-30
 
 - Each step ran as a job of a sandbox runner: in a capped user scope at idle priority, inside a bubblewrap namespace in which the root file system is read-only, production's `~/dev` and `~/cuda-12.9` are read-only views, and `~/dev`, `~/cuda-12.9`, `~/downloads` and `/tmp` are directories of `~/rebuild-rehearsal`. The files it made carry production's paths, so they compare byte for byte with production's. There is no GPU device inside, and `sudo` and `nvidia-smi` are stand-ins.
-- The runner, guard and self-test that ran R0–R11 were copies in `~/rebuild-rehearsal/bin`, named in the records. Their successors are `bench/rehearsal_*`, whose headers say how they differ.
+- The runner, guard and self-test that ran R0–R11 were copies in `~/rebuild-rehearsal/bin`, named in the records; their sha256 after the rehearsal are in `results/rebuild-rehearsal-copies-20261030.txt`. Later versions of the tools are kept in the private repository `thc1006/strata-rebuild-rehearsal-tools`. They are not safe to run as they are.
 - The runner that ran showed the whole home directory read-only to every job but the four of R2a and R2b with `--home`, credentials such as gh's GitHub token too. It gave every job the host's network and the environment of the shell that started it but `DBUS_SESSION_BUS_ADDRESS`, the four with `--home` too; R6's `setup.sh` ran pip that way. The records do not show whether a job read the credentials, nor what that environment held.
 - R0's self-test checked the runner's first version (sha256 2009c269..., `results/rebuild-rehearsal-r0-20261030.txt`): writes into production failed inside. `--home` was added before R2a, and R2a checked only that mode. The version that R2a–R11 ran, 728591a9..., has not changed since 00:58:04, before R2a (`results/rebuild-rehearsal-copies-20261030.txt`, with its text).
 - The guard was ready to freeze the jobs while the service was not active, under 12 GiB was available or `/` was more than 80 % full; it froze none of the steps' jobs (`results/rebuild-rehearsal-guard-20261030.log`).
 - The account's limit was lifted to 12G for steps 5 and 6 only.
 - A second run of the self-test after R11 removed the rehearsal's tree and data folder from the sandbox, not from production (`results/rebuild-rehearsal-selftest-rerun-20261030.txt`). A run at 04:14 of the self-test with its first refusals is in `results/rebuild-rehearsal-selftest-committed-20261030.txt`.
-- The tools are in `bench/`, so run them only when the maintainer asks.
 
 ## Rollback
 

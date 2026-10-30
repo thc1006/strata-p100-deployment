@@ -1,6 +1,7 @@
-# rr-guard's log (bench/rehearsal_guard.sh, run in the user scope rrg-guard) from before R1 to after R11 of the rebuild
-# rehearsal, on <host>, 2026-10-30 00:49:58-03:34:50 (UTC+8): one line every 30 s, no freeze.  Copied from
-# ~/rebuild-rehearsal/logs/guard.log, unchanged below these three lines.
+# rr-guard's log (~/rebuild-rehearsal/bin/rr-guard, run in the user scope rrg-guard) from before R1 to after R11 of the
+# rebuild rehearsal, on <host>, 2026-10-30 00:49:58-03:34:50 (UTC+8): one line every 30 s, no freeze.  rr-guard was last
+# written at 00:47:17; its sha256 is in results/rebuild-rehearsal-copies-20261030.txt.  Copied from
+# ~/rebuild-rehearsal/logs/guard.log, unchanged below these four lines.
 rr-guard 2026-10-30 00:49:58: service active, MemAvailable 22 GiB, / 47 %: thaw; scopes: none
 rr-guard 2026-10-30 00:50:28: service active, MemAvailable 22 GiB, / 47 %: thaw; scopes: rr-r2-dl.scope 
 rr-guard 2026-10-30 00:50:58: service active, MemAvailable 22 GiB, / 47 %: thaw; scopes: rr-r2-dl.scope 

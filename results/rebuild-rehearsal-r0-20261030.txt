@@ -1,15 +1,12 @@
 # Copied on 2026-10-30 from the rehearsal's own record (written as the steps ran), unchanged below this preface.
-# The tools it names under ~/rebuild-rehearsal/bin are in bench/ now, each header saying how it differs from the copy
-# that ran: rr is bench/rehearsal_rr.sh, rr-guard bench/rehearsal_guard.sh, rr-memwatch bench/rehearsal_memwatch.sh,
-# rlog bench/rehearsal_log.sh, elfcmp.py bench/rehearsal_elfcmp.py, r0-selftest.sh bench/rehearsal_selftest.sh,
-# r0-probe.py bench/rehearsal_probe.py, r0-settings.py bench/rehearsal_settings.py, shim/sudo and shim/nvidia-smi
-# bench/rehearsal_shim_sudo.sh and bench/rehearsal_shim_nvidia_smi.sh.  "PLAN.md" is the plan of the session that ran
+# The tools it names under ~/rebuild-rehearsal/bin and shim/ were copies there, whose sha256 after the rehearsal are in
+# results/rebuild-rehearsal-copies-20261030.txt.  Later versions of them are kept in the private repository
+# thc1006/strata-rebuild-rehearsal-tools; they are not safe to run as they are.  "PLAN.md" is the plan of the session that ran
 # the rehearsal; it is not in this repository, and docs/runbooks/rebuild.md gives the procedure.
 # Every job here ran in rr's default mode, in which the whole real home was readable inside, credentials too
 # (~/.config/gh/hosts.yml, gh's GitHub token, among them), the network was the host's, and a job got the environment
 # of the shell that started it but DBUS_SESSION_BUS_ADDRESS (R0's section 1 shows /home/thc1006 read-only from the
 # root file system). The records do not show whether a job read them, nor what that environment held.
-# bench/rehearsal_rr.sh no longer shows them.
 # R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, 2026-10-30 00:48:13 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr: its own user scope (MemoryMax, MemorySwapMax=0), choom -n 500,
 # nice -n 19, chrt -i 0, ionice -c3, taskset -c 7, then bwrap.  No sudo was run.  Production was read only.

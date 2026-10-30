@@ -16,6 +16,8 @@
 # resolve under ~/rebuild-rehearsal/root).
 # Its jobs ran in rr's default mode, in which the whole real home was readable inside, credentials too, and the network
 # was the host's (results/rebuild-rehearsal-r0-20261030.txt, section 1).
+# The bench/ tools named here are no longer in this repository; later versions of them are kept in the private
+# repository thc1006/strata-rebuild-rehearsal-tools and are not safe to run as they are.
 # Part 2 is not part of the self-test's output; it was added after the run.  Its check-drift.sh line describes the
 # command instead of giving it, and only the last two sections of that run's output are here.
 #

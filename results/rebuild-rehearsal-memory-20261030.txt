@@ -1,6 +1,8 @@
-# Memory of the rehearsal's heavy jobs, sampled every 5 s from outside by rr-memwatch (bench/rehearsal_memwatch.sh) while each
+# Memory of the rehearsal's heavy jobs, sampled every 5 s from outside by ~/rebuild-rehearsal/bin/rr-memwatch while each
 # job's user scope existed: time, memory.current, memory.peak, oom and oom_kill of the scope's memory.events, and from R9 on
 # anon and file of its memory.stat (bytes).  On <host>, 2026-10-30 (UTC+8).  The five logs, unchanged, one after another.
+# rr-memwatch was last written at 02:46:20, before R9 (its sha256 is in results/rebuild-rehearsal-copies-20261030.txt);
+# R6, R7 and R8 were sampled by an earlier text, whose sha256 no record gives.
 
 == rr-r6-setup.scope (~/rebuild-rehearsal/logs/rr-r6-setup.scope.mem)
 01:47:08 current 37986304 peak 39219200 oom 0 oom_kill 0 

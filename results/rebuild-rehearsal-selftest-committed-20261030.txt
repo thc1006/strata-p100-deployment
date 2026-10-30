@@ -3,7 +3,8 @@
 # 03:38 run had removed the rehearsal's tree and data folder from the sandbox
 # (results/rebuild-rehearsal-selftest-rerun-20261030.txt).  It ran bench/rehearsal_selftest.sh and
 # bench/rehearsal_rr.sh as committed in 2731c92 (their sha256 in section 0: 059bd7c7... and 98e339f9...), the first
-# version with rm_sandbox and the refusals to start; the bench/ tools of later commits differ (their headers say how).
+# version with rm_sandbox and the refusals to start.  These tools are no longer in this repository; later versions of
+# them are kept in the private repository thc1006/strata-rebuild-rehearsal-tools and are not safe to run as they are.
 # Every section ran: no probe of section 2 was allowed, and the 33 production paths were unchanged (section 9).
 # Its own lines still name ~/rebuild-rehearsal/bin/rr, as the header text of that version did.  That
 # bench/rehearsal_rr.sh showed jobs the whole real home read-only, credentials too, and the host's network, and gave

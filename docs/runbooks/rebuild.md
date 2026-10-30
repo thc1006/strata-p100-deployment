@@ -1,7 +1,14 @@
 # Rebuilding the deployment from scratch
 
 - When to use: on a new VM, to build today's deployment where none of it exists.
-- Not covered: the loss of only `~/dev/strata`, `~/dev/Strata-data` or `~/cuda-12.9` on this machine. The steps assume an empty machine. On this one, step 2 installs over the live `~/cuda-12.9`, steps 3 and 6 fail because `~/dev/strata-git` and `~/dev/strata-0.1.45` exist, step 5 compiles again in the live tree and rewrites its config, and setup.py would move into `~/dev/Strata-data` the model files that other `~/dev/strata*` folders hold ([Before you start](#before-you-start)). No procedure for a partial loss has been worked out or run. What each directory holds comes from these steps: `~/cuda-12.9` from step 2, `~/dev/Strata-data` from steps 4, 5 (the MTP files), 7 and 8.
+- Not covered: this machine, and the loss of only `~/dev/strata`, `~/dev/Strata-data` or `~/cuda-12.9` on it. No procedure for a partial loss has been worked out or run. What each directory holds comes from these steps: `~/cuda-12.9` from step 2, `~/dev/Strata-data` from steps 4, 5 (the IQ3_XXS pack and the MTP files), 7 and 8.
+- Do not run any step of this runbook on this machine. The steps are blocks to paste, without `set -e`, so a line that fails does not stop the lines after it. Here:
+  - steps 1 and 3 fail, because their directories exist;
+  - step 2 installs over the live `~/cuda-12.9`;
+  - step 5 compiles again in the live tree and rewrites its config, and setup.py would move into `~/dev/Strata-data` the model files that other `~/dev/strata*` folders hold ([Before you start](#before-you-start));
+  - in step 6 only the first line fails: the next lines rebuild `~/dev/strata-0.1.45`, and the last one replaces the live engine's directory;
+  - step 7 moves a new download over the live IQ3_S shard 1, step 8 rewrites the live IQ3_S pack, and step 9 rewrites the live config without `--dry-run`;
+  - steps 12–14 change the system with sudo, and step 15's engine screen stops the service while it runs.
 - Scope: today's deployment, Strata 0.1.45 (`477ac13cb`) with GSQ-RCO IQ3_S and `--profile deployed --model iq3_s`. The commands that built 0.1.43.1 with IQ3_XXS on 2026-10-16 are this file at commit `68cb17f`.
 - Last verified: steps 1–3 and 5–11 and the file checks of step 15 were rehearsed on 2026-10-30 on this machine, in a sandbox, while the service ran ([the rehearsal](#the-rehearsal-of-2026-10-30)). Some inputs were not fetched as the steps fetch them (they were copies or links of production's, or an earlier step's download); each step says which, and which record covers it. Step 4 was not downloaded. Steps 0 and 12–14 change the system or need the GPUs, so they were not rehearsed. The whole procedure has not been run on a new VM.
 - Prerequisites:

@@ -30,7 +30,7 @@ print("setup.py load_settings() inside:", ns["load_settings"]())
 real = Path("/home/thc1006/.config/strata/settings.json")
 s = json.loads(real.read_text(encoding="utf-8"))
 print("the real ~/.config/strata/settings.json, read-only inside, names:", {k: s[k] for k in ("data_dir", "installs") if k in s})
-dev_is_sandbox = os.stat("/home/thc1006/dev").st_ino == os.stat(SBDEV).st_ino
+dev_is_sandbox = os.path.samefile("/home/thc1006/dev", SBDEV)  # device and inode
 for q in [s.get("data_dir")] + list(s.get("installs", [])):
     if not q:
         continue

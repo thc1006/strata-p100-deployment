@@ -1,0 +1,49 @@
+{
+  "tree": "/home/thc1006/dev/strata-0.1.45",
+  "settle_s": 300,
+  "screen_n": 3,
+  "arms": {
+    "K1": {
+      "config": "cfg-s-k1.json",
+      "env": {
+        "STRATA_MMQ_GROUP_SORT": "1",
+        "STRATA_MMQ_RESIDENT_SORT_NE": "0",
+        "STRATA_PIPED_CONCURRENT": "1",
+        "STRATA_ADAPT_NOWAIT": "0"
+      },
+      "must": [
+        "session is up \\(engine 0\\.1\\.45\\)",
+        "strata: prompt MMQ sorts the full expert groups \\(STRATA_MMQ_GROUP_SORT=1\\): [1-9][0-9]* of [0-9]+ layers",
+        "strata generate: expert cache auto: [0-9.]+ GiB free, 1536 MiB reserved"
+      ],
+      "engaged": [
+        "^strata batch: read [0-9]+ tokens on a thread of its own"
+      ],
+      "never": [
+        "STRATA_PIPED_CONCURRENT is off beside",
+        "\\(--prefill-pipe [0-9]"
+      ]
+    },
+    "R1": {
+      "config": "cfg-s-k1.json",
+      "env": {
+        "STRATA_MMQ_GROUP_SORT": "1",
+        "STRATA_MMQ_RESIDENT_SORT_NE": "0",
+        "STRATA_PIPED_CONCURRENT": "1",
+        "STRATA_ADAPT_NOWAIT": "0"
+      },
+      "must": [
+        "session is up \\(engine 0\\.1\\.45\\)",
+        "strata: prompt MMQ sorts the full expert groups \\(STRATA_MMQ_GROUP_SORT=1\\): [1-9][0-9]* of [0-9]+ layers",
+        "strata generate: expert cache auto: [0-9.]+ GiB free, 1536 MiB reserved"
+      ],
+      "engaged": [
+        "^strata batch: read [0-9]+ tokens on a thread of its own"
+      ],
+      "never": [
+        "STRATA_PIPED_CONCURRENT is off beside",
+        "\\(--prefill-pipe [0-9]"
+      ]
+    }
+  }
+}

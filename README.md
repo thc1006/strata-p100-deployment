@@ -48,7 +48,7 @@ On Strata 0.1.45, deployed on 2026-10-19:
 
 ## Install and use
 
-[Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) gives the procedure for today's deployment, 0.1.45 with IQ3_S; its file steps were rehearsed in a sandbox on this machine on 2026-10-30, and it has not been run on a new VM. To reinstall only the files in `/etc` and `/usr/local/sbin`, run `scripts/install-system-files.sh` (with `--dry-run` first to see what it would install).
+[Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) gives the procedure for today's deployment, 0.1.45 with IQ3_S, on a new VM; it has not been run on one. Its file steps were rehearsed in a sandbox on this machine on 2026-10-30. It does not cover a partial loss on this machine. To reinstall only the files in `/etc` and `/usr/local/sbin`, run `scripts/install-system-files.sh` (with `--dry-run` first to see what it would install).
 
 ```bash
 scripts/check-deployment.sh        # service status; exits with 1 if it finds a problem
@@ -65,7 +65,7 @@ sudo systemctl restart strata-q3   # the service is ready after about 9 minutes 
 | [Daily operations](docs/runbooks/operations.md) | Status, start and stop, logs, test requests, recovery from the failed state, preparation for long tests, rerunning the benchmarks |
 | [Changing the configuration](docs/runbooks/change-config.md) | Changing Strata parameters, systemd units or the watchdog |
 | [Deploying a commit from GitHub](docs/runbooks/deploy.md) | Bringing this checkout up to a newer `main` whose `test` workflow passed |
-| [Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) | CUDA 12.9.1, the Strata 0.1.45 tree, setup, the engine build, IQ3_S's files and pack, the config, the systemd install, and how each step was checked in the rehearsal of 2026-10-30 |
+| [Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) | CUDA 12.9.1, the Strata 0.1.45 tree, setup, the engine build, IQ3_S's files and pack, the config, the systemd install and the engine screen on a new VM, and which steps the rehearsal of 2026-10-30 checked |
 | [Evaluating and upgrading Strata](docs/runbooks/upgrade-strata.md) | Building a new release and comparing it with the deployed one |
 | [System changes and how to undo them](docs/reference/system-changes.md) | Everything the deployment changed outside the repository |
 | [Deployment record](docs/deployment-record.md) | The evidence for each setting, measured results, known limits and the test method |

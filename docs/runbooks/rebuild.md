@@ -25,7 +25,9 @@
 
 ### 0. The system
 
-Ubuntu 22.04.5 with the kernel 6.8.0-138-generic and the root file system on ZFS; 4x Tesla P100 PCIe 16 GB; 8 CPUs (Xeon E5-2696 v4) and 65,846,904 kB of RAM; sudo (`results/host-os-20261025.txt`, `results/host-versions-20261024.txt`, `results/zfs-dataset-20261022.txt`, `results/setup-20261016.log`). `bench/build-engine.sh` builds on CPUs 1–7, and the preflight waits for 42 GiB of available memory before a start (`scripts/strata-preflight.sh`). Steps 1–7 download from GitHub, NVIDIA, Hugging Face and pip's package index.
+Ubuntu 22.04.5 with the kernel 6.8.0-138-generic and the root file system on ZFS; 4x Tesla P100 PCIe 16 GB; 8 CPUs (Xeon E5-2696 v4) and 65,846,904 kB of RAM (`results/host-os-20261025.txt`, `results/host-versions-20261024.txt`, `results/zfs-dataset-20261022.txt`, `results/setup-20261016.log`). `bench/build-engine.sh` builds on CPUs 1–7, and the preflight waits for 42 GiB of available memory before a start (`scripts/strata-preflight.sh`). Steps 1–7 download from GitHub, NVIDIA, Hugging Face, pip's package index and, for setup.sh's packages, Ubuntu's archive.
+
+- sudo for the account, without a password for step 15: `bench/ab_engine.sh` refuses to start without `sudo -n` (`bench/ab_engine.sh:178`), and after each run it reads the journal with `sudo -n`; a run whose journal it cannot read is not used (`bench/ab_engine_summary.py:122-125`).
 
 - NVIDIA driver 535.230.02: Ubuntu's `nvidia-driver-535` 535.230.02-0ubuntu0.22.04.1, with the NVIDIA packages on hold. Do not install the 575 driver that comes with the CUDA runfile.
 - gcc and g++ 11.4.0-1ubuntu1~22.04.3 (they built the engine), `git`, `curl` and `jq` (`check-deployment.sh` uses it).
@@ -204,13 +206,19 @@ scripts/check-deployment.sh
 ```
 Expected: drift on the two engine binaries only, and `no problems found` from `check-deployment.sh`.
 
-Then screen the rebuilt engine on the GPUs. The arm R1 of `bench/arms-rebuild.json` is the deployed configuration (K1 of `bench/arms-iq3s.json`) run from the rebuilt engine in `~/dev/strata-0.1.45`; the baseline is K1's four runs of 2026-10-29 with the deployed binary (`cf-k1-1` to `cf-k1-4`, [Engine experiments](../engine-experiments.md)). `bench/ab_engine.sh` stops the service for each run and starts it again at the end; the eight runs of 2026-10-29 took 15:51–19:20 (`results/ab_engine-confirm-20261029.log`).
+Then screen the rebuilt engine on the GPUs. The arm R1 of `bench/arms-rebuild.json` is the deployed configuration (K1 of `bench/arms-iq3s.json`) run from the rebuilt engine in `~/dev/strata-0.1.45`; the baseline is K1's four runs of 2026-10-29 with the deployed binary (`cf-k1-1` to `cf-k1-4`, [Engine experiments](../engine-experiments.md)). `bench/ab_engine.sh` stops the service before the first run and starts it again after the last; the eight runs of 2026-10-29 took 15:51–19:20 (`results/ab_engine-confirm-20261029.log`). It refuses tags it has used before, so a second attempt needs new ones (`bench/ab_engine.sh:170-176`).
 ```bash
 bench/make_engine_configs.py ~/dev/strata-0.1.45 cfg-s-k1
 ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns bench/ab_engine.sh bench/arms-rebuild.json rb-1:R1 rb-2:R1
 python3 -B bench/ab_engine_summary.py --arms bench/arms-rebuild.json --baseline K1 cf-k1-1 cf-k1-2 cf-k1-3 cf-k1-4 rb-1 rb-2
 ```
-`make_engine_configs.py` prints how `cfg-s-k1.json` differs from the live config: in `exe`, `cwd` and `log` only. The check, from what the baseline shows: K1's four runs gave the same answers to the 12 requests that run alone (9 in the prefill phase, 3 in the decode phase), and each run's median rates lay within 200.0–200.6, 378.1–379.4 and 679.5–681.5 tokens/s for reading 1.2K, 4K and 16K prompts and 43.8–44.6 tokens/s for one user's decode (`results/engine-screen.jsonl`). Pass: R1 gives those 12 answers (the summary's Answers part shows no difference in the prefill or decode phase), and its rates lie in those ranges. These are the screens' own measures; no rebuilt engine has been screened, and on another CPU (see [Before you start](#before-you-start)) a difference is not by itself a fault: the maintainer decides then. After a pass, commit the new sha256 of the two binaries in `config/deployed-artifacts.sha256` and run `check-drift.sh` again: `no drift`.
+`make_engine_configs.py` prints how `cfg-s-k1.json` differs from the live config: in `exe`, `cwd` and `log` only.
+
+The baseline: K1's four runs gave the same answers to the 12 requests that run alone (9 in the prefill phase, 3 in the decode phase), and their median rates for reading 1.2K, 4K and 16K prompts and for one user's decode varied by 0.30 %, 0.34 %, 0.29 % and 1.80 % (`results/engine-screen.jsonl`).
+
+Pass: in the summary, R1's Answers line shows no difference in the prefill or decode phase, and in the Numbers part R1's means for those four rates are marked `within the baseline's spread`. Two runs of the deployed binary with the same configuration on 2026-10-20 (`s2-k1-1` and `s2-k1-2`, `results/s2-k1-*-arm.txt`) meet this rule. These are the screens' own measures; no rebuilt engine has been screened, and on another CPU (see [Before you start](#before-you-start)) a difference is not by itself a fault: the maintainer decides then.
+
+After a pass, commit the screen's results files (`results/rb-*` and `results/engine-screen.jsonl`, which `ab_engine.sh` writes in this checkout) with the new sha256 of the two binaries in `config/deployed-artifacts.sha256`, and run `check-drift.sh` again: `no drift`.
 
 Rehearsed in part (R11, `results/rebuild-rehearsal-r8-r11-20261030.txt`): `check-drift.sh --full` in the sandbox found the config, the tree, the venv, the checkout and every file of the manifest as production has them, but the two engine binaries. Its other DRIFT lines came from the sandbox (root's files show as uid 65534, and it has no user bus and its own PID namespace); the same check outside, on production, reported no drift. `check-deployment.sh` and the engine screen need the running service and were not rehearsed; `check-deployment.sh`'s output after the start of 2026-10-19 is in `results/deploy-0.1.45-20261019.txt`.
 

@@ -242,8 +242,9 @@ class HostUnitsCheck(unittest.TestCase):
         self.assertIn("ok     system colord.service masked, inactive\n", r.stdout)
 
     def test_a_unit_it_cannot_read_is_still_drift(self):
-        # only an empty is-enabled with LoadState not-found, and not running, is a unit that is not installed: an
-        # unreadable LoadState (no manager), any other, an is-enabled that says something, or a unit that runs is drift
+        # only a disabled line whose is-enabled is empty or not-found, with LoadState not-found and not running, is a
+        # unit that is not installed: an unreadable LoadState (no manager), any other, another is-enabled answer, or a
+        # unit that runs is drift
         conf = self.CONF + "disabled system docker.service\n"
         cases = {"LoadState unreadable": "system docker.service - inactive\n",
                  "LoadState unreadable, is-active too": "system docker.service - - -\n",

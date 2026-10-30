@@ -129,7 +129,9 @@ def sweep(path: str, session: int | None = None) -> list[str]:
     process group when it leads one (its children need not name it), pass after pass until one finds none and another
     0.2 s later finds none either (one that has left the session with setsid and is in the middle of its exec has a
     command line that reads empty), at most 20 passes; the command lines killed, and those it could not kill (said
-    so)."""
+    so).  A process of this user that names path is killed also when the harness did not start it, such as a tail -f
+    of its output: what ab_model_run_stubs.sh starts under env -i has nothing of the test in its environment, so only
+    its command line names it.  path is new for each run, so a process that started before it cannot name it."""
     out, refused, quiet = [], set(), 0
     me, mine, names = os.getpid(), os.getpgrp(), _names(path)
     for _ in range(20):

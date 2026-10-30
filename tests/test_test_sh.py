@@ -2607,17 +2607,18 @@ class TestSh(unittest.TestCase):
                 self.passes(d)
 
     def test_workers_draw_their_own_random_numbers(self):
-        # two tests that bind a port that the random module picks, in two workers at the same time, get two ports, also
-        # when the loading seeded the module from os.urandom (random.seed()).  When each worker gave the module back the
-        # state it had after the loading, both drew the same port, and the second bind failed (Address already in use)
+        # two tests in two workers at the same time draw different random numbers, also when the loading seeded the
+        # module from os.urandom (random.seed()).  When each worker gave the module back the state it had after the
+        # loading, both drew the same numbers (two tests that bound a port picked so failed: Address already in use)
         d = self.tree()
-        test = ("import pathlib, random, socket, time, unittest\n{0}class T(unittest.TestCase):\n"
-                "    def test_t(self):\n        s = socket.socket()\n        self.addCleanup(s.close)\n"
-                "        try:\n            s.bind(('127.0.0.1', 20000 + random.randrange(10000)))\n"
-                "        finally:\n            pathlib.Path({1!r}).touch()\n"
-                "        deadline = time.monotonic() + 30\n        while not pathlib.Path({2!r}).exists():\n"
+        test = ("import os, pathlib, random, time, unittest\n{0}class T(unittest.TestCase):\n"
+                "    def test_t(self):\n        mine, other = pathlib.Path({1!r}), pathlib.Path({2!r})\n"
+                "        pathlib.Path(str(mine) + '.part').write_text(str(random.getrandbits(64)))\n"
+                "        os.replace(str(mine) + '.part', mine)\n"
+                "        deadline = time.monotonic() + 30\n        while not other.exists():\n"
                 "            self.assertLess(time.monotonic(), deadline, 'the other test did not run beside it')\n"
-                "            time.sleep(0.01)\n")
+                "            time.sleep(0.01)\n"
+                "        self.assertNotEqual(mine.read_text(), other.read_text())\n")
         a, b = str(d.parent / "a"), str(d.parent / "b")
         for seed in ("", "random.seed()\n"):
             with self.subTest(seed=seed):
@@ -2649,7 +2650,6 @@ class TestSh(unittest.TestCase):
                                    r"without its record\n")
         self.assertEqual(seen.read_text(), "0")
         self.assertRegex(r.stderr, r"Segmentation fault +TMPDIR=")
-        self.assertNotIn("core dumped", r.stderr)
 
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function

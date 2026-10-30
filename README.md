@@ -48,7 +48,7 @@ On Strata 0.1.45, deployed on 2026-10-19:
 
 ## Install and use
 
-[Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) gives the procedure for today's deployment, 0.1.45 with IQ3_S, on a new VM; it has not been run on one. Most of its file steps were rehearsed in a sandbox on this machine on 2026-10-30. Do not run its steps on this machine: it does not cover a partial loss here. To reinstall only the files in `/etc` and `/usr/local/sbin`, run `scripts/install-system-files.sh` (with `--dry-run` first to see what it would install).
+[Rebuilding the deployment from scratch](docs/runbooks/rebuild.md) gives the procedure for today's deployment, 0.1.45 with IQ3_S, on a new VM that replaces this machine; it has not been run on one. Most of its file steps were rehearsed in a sandbox on this machine on 2026-10-30. Do not run its steps on this machine: they would change the files the service runs. To reinstall only the files in `/etc` and `/usr/local/sbin`, run `scripts/install-system-files.sh` (with `--dry-run` first to see what it would install).
 
 ```bash
 scripts/check-deployment.sh        # service status; exits with 1 if it finds a problem

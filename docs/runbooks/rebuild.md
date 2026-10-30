@@ -19,7 +19,7 @@
 
 - setup.py moves model files. Its `data_folder()` (`setup.py:4459-4510` at `477ac13cb`) takes these folders as sources:
   - the data folder that `~/.config/strata/settings.json` names, and the Strata folders remembered there;
-  - every folder whose name starts with `strata` (in any case) and holds a `setup.py`, in the tree's parent and grandparent directories or one level inside such a folder (`other_installs()`, `setup.py:4380-4398`);
+  - every folder whose name starts with `strata` (in any case) and holds a `setup.py`, in the tree's parent and grandparent directories or one level inside such a folder (`other_installs()`, `setup.py:4380-4400`);
   - a `Strata-data` folder inside any of these.
 
   From each one on the same file system it moves `models/`, `packs/*` and `mtp/` into the new data folder, and points that folder's configs there (`setup.py:4490-4502`). On a new VM there is nothing to move. Do not run step 5 where another Strata tree or data folder must stay where it is.

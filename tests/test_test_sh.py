@@ -2465,20 +2465,32 @@ class TestSh(unittest.TestCase):
 
     def test_a_thread_that_a_test_module_starts_as_it_loads(self):
         # fork() copies only the thread that calls it, so a thread that a test module starts at its import and that
-        # still runs when the workers are forked runs in none of them: the run fails and names it.  One that has ended
-        # by then, and one that setUpClass starts, pass.  Before, the test that waited for the thread failed, and
-        # nothing said why
+        # still runs when the workers are forked runs in none of them: the run fails and names it, before the tests
+        # run (one that waits for the thread without a time limit would hang the run).  Also one that _thread starts,
+        # which the threading module does not know, and which has a second to end.  One that has ended by then, and one
+        # that setUpClass starts, pass.  Before, the test that waited for the thread failed, and nothing said why; then
+        # the run failed after the tests, and not for a thread of _thread
         d = self.tree()
         head = "import threading, unittest\ndone = threading.Event()\n"
         body = ("class T(unittest.TestCase):\n    def test_t(self):\n"
                 "        self.assertTrue(done.wait(5), 'the thread never ran')\n")
         start = "threading.Thread(target=lambda: (time.sleep(0.5), done.set()), name='serve', daemon=True).start()\n"
-        (d / "tests" / "test_thread.py").write_text("import time\n" + head + start + body)
-        self.fails(d, "FAIL: a thread started as the tests loaded and still runs, but not in the workers, which are "
-                      "forked after the loading (start it in setUpModule or setUpClass): 'serve'\n")
-        (d / "tests" / "test_thread.py").write_text(
-            head + "s = threading.Thread(target=done.set)\ns.start()\ns.join()\n" + body)
-        self.passes(d)
+        says = ("FAIL: a thread started as the tests loaded and still runs, but not in the workers, which are forked "
+                "after the loading (start it in setUpModule or setUpClass): ")
+        for code, named in ((start, "'serve'"),
+                            ("import _thread\n_thread.start_new_thread(lambda: (time.sleep(3), done.set()), ())\n",
+                             "1 that the threading module does not know")):
+            with self.subTest(named=named):
+                (d / "tests" / "test_thread.py").write_text("import time\n" + head + code + body)
+                r = self.run_sh(d)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+                self.assertIn(says + named + "\n", r.stdout)
+                self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        for code in ("s = threading.Thread(target=done.set)\ns.start()\ns.join()\n",
+                     "import _thread\n_thread.start_new_thread(done.set, ())\ndone.wait()\n"):
+            with self.subTest(code=code):
+                (d / "tests" / "test_thread.py").write_text(head + code + body)
+                self.passes(d)
         (d / "tests" / "test_thread.py").write_text(
             "import time\n" + head + body + "    @classmethod\n    def setUpClass(cls):\n        " + start)
         self.passes(d)

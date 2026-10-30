@@ -43,7 +43,8 @@
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
 # something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
 # (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
-# workers says why), and when a thread that started as the tests loaded still runs as the workers are forked.
+# workers says why), and when a thread that started as the tests loaded still runs as the workers are forked (the
+# tests then do not run).
 # Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
@@ -661,10 +662,32 @@ def forward(signum, frame):
             pass
 
 
-if threading.active_count() > 1:     # fork() copies only the thread that calls it
-    bad.append("a thread started as the tests loaded and still runs, but not in the workers, which are forked after "
-               "the loading (start it in setUpModule or setUpClass): " +
-               ", ".join(repr(t.name) for t in threading.enumerate() if t is not threading.main_thread()))
+# fork() copies only the thread that calls it: a thread that still runs now runs in no worker, and a test that waits
+# for it could wait for ever, so the run ends here, with what the loading found.  The threads are those in
+# /proc/self/task, which also has those that _thread started; one that threading does not know may still be ending
+# after a join, and has up to a second for it
+thread = None
+for wait in range(101):
+    try:
+        others = len(os.listdir("/proc/self/task")) - 1
+    except OSError as e:
+        thread = (f"cannot read /proc/self/task ({e.strerror}): the threads that would not run in the workers cannot "
+                  "be counted")
+        break
+    threads = [repr(t.name) for t in threading.enumerate() if t is not threading.main_thread()]
+    if not others or threads or wait == 100:
+        if others:
+            thread = ("a thread started as the tests loaded and still runs, but not in the workers, which are forked "
+                      "after the loading (start it in setUpModule or setUpClass): " + ", ".join(
+                          threads + [f"{others - len(threads)} that the threading module does not know"] *
+                          (others > len(threads))))
+        break
+    time.sleep(0.01)
+if thread:
+    for b in bad + [thread]:
+        print(f"FAIL: {b}")
+    pathlib.Path(sys.argv[1]).write_text("fail\n")
+    sys.exit(1)
 sys.stdout.flush()
 sys.stderr.flush()
 start = time.perf_counter()

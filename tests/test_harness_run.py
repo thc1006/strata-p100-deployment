@@ -303,6 +303,43 @@ class KillOwn(unittest.TestCase):
                 self.assertIsNone(other.poll(), "a process without the entry got the signal")
 
 
+def sb_pkill(stub: str) -> str:
+    """The lines of sb_pkill() in the stub: from the one that starts "sb_pkill() {" to the first that ends "; }"."""
+    lines = (Path(__file__).resolve().parent / stub).read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("sb_pkill() {"))
+    end = next(i for i in range(start, len(lines)) if lines[i].rstrip().endswith("; }"))
+    return "\n".join(lines[start:end + 1]) + "\n"
+
+
+class SbPkill(unittest.TestCase):
+    def test_it_signals_only_the_sandboxs_processes(self):
+        # the stubs' pkill -f: of processes whose command lines match the pattern, only the one with SB=$SB in its
+        # environment gets the signal, not one without SB, nor one with SB=$SB/x (the service's engine runs as this
+        # user, and may match a pattern).  The harnesses run only in CI and on a stopped service, where no process
+        # outside a sandbox matches
+        texts = {stub: sb_pkill(stub) for stub in ("ab_engine_stubs.sh", "switch_model_stubs.sh")}
+        self.assertEqual(len(set(texts.values())), 1, texts)
+        sb = tempfile.mkdtemp(prefix="sb-pkill.")
+        self.addCleanup(shutil.rmtree, sb, True)
+        base = {k: v for k, v in os.environ.items() if k != "SB"}
+        args = [sys.executable, "-c", "import time; time.sleep(60)", f"{sb}/stray"]
+        procs = {}
+        for name, env in (("SB=$SB", {**base, "SB": sb}), ("no SB", base), ("SB=$SB/x", {**base, "SB": f"{sb}/x"})):
+            procs[name] = p = subprocess.Popen(args, env=env, start_new_session=True)
+            self.addCleanup(lambda p=p: (p.kill(), p.wait()))
+        deadline = time.monotonic() + 20
+        while len(named(f"{sb}/stray")) < 3:
+            self.assertLess(time.monotonic(), deadline, "they did not start")
+            time.sleep(0.02)
+        r = subprocess.run(["bash", "-c", texts["ab_engine_stubs.sh"] + 'sb_pkill TERM "$SB/"'],
+                           env={**base, "SB": sb}, capture_output=True, text=True, timeout=30)
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertEqual(procs["SB=$SB"].wait(timeout=10), -signal.SIGTERM)
+        time.sleep(0.2)
+        self.assertEqual({name: p.poll() for name, p in procs.items()},
+                         {"SB=$SB": -signal.SIGTERM, "no SB": None, "SB=$SB/x": None})
+
+
 class RunGate(unittest.TestCase):
     """run() itself starts a harness that may start fake engines (any *_stubs.sh but those that start none) only when
     asked for and only when not_now() has no reason; the caller cannot say otherwise."""

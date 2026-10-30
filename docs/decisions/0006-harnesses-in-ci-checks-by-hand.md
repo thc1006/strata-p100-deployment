@@ -43,7 +43,7 @@ Chosen option: "The harnesses run in CI, and here only when asked for while the 
 ### Consequences
 
 - Good, because no check that runs here by default starts a fake engine, and `deploy.sh` fails and stops a check of a new commit that starts what the preflight refuses a start for.
-- Bad, because `scripts/test.sh` still takes about 22 minutes here without the harnesses (1303 s, its unit tests 1300 s, on 2026-10-27: `results/test-sh-20261027.txt`); the unit tests of e5d7908 took 585.9 s with them (`results/test-sh-20261020.txt`). `deploy.sh` gave each check 1800 s (`LIMIT`, in git since d5dbb6c of 2026-10-27), and gives it 2700 s since 2026-10-30, when `scripts/test.sh` took 1522 s here alone (`results/test-sh-1bde1d2-20261030.txt`).
+- Bad, because `scripts/test.sh` took about 22 minutes here without the harnesses on 2026-10-27 (1303 s, its unit tests 1300 s: `results/test-sh-20261027.txt`); the unit tests of e5d7908 took 585.9 s with them (`results/test-sh-20261020.txt`). `deploy.sh` gave each check 1800 s (`LIMIT`, in git since d5dbb6c of 2026-10-27), and gives it 2700 s since 2026-10-30, when `scripts/test.sh` took 1522 s here alone (`results/test-sh-1bde1d2-20261030.txt`).
 - Good, because CI runs the harnesses on every pull request and every push to `main`, with Ubuntu 22.04's bash, gcc and procps, as on the machine. Before, they ran only here.
 - Bad, because a harness that passes in CI but fails with the machine's own programs shows only in `scripts/test.sh --harnesses` on a stopped service.
 - Bad, because commits that change the checks need the steps by hand, among them a reading of the change.

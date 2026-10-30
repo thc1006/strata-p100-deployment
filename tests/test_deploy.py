@@ -643,7 +643,7 @@ class DeployTests(unittest.TestCase):
         self.assertNotIn(str(self.live), self.log("ran.log"), "the checks ran from this checkout, not the new commit")
         timeouts = self.log("timeout.log").splitlines()
         self.assertTrue(timeouts[0].startswith(f"-k 10 120 git {GIT_OPTS} fetch "), timeouts)
-        self.assertTrue(timeouts[1].startswith("-k 10 1800 ") and timeouts[1].endswith("/scripts/test.sh"), timeouts)
+        self.assertTrue(timeouts[1].startswith("-k 10 2700 ") and timeouts[1].endswith("/scripts/test.sh"), timeouts)
         r = self.deploy("--apply")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(f"deployed {new[:7]}: change", r.stdout)
@@ -884,7 +884,7 @@ class DeployTests(unittest.TestCase):
                          ["test.sh 1000 19", "check-drift.sh 1000 19", "check-drift.sh 1000 19"])
         checks = self.log("timeout.log").splitlines()[1:]
         self.assertEqual([line.split(" env -i ")[0] for line in checks],
-                         ["-k 10 1800 nice -n 19 choom -n 1000 --"] * 3, checks)
+                         ["-k 10 2700 nice -n 19 choom -n 1000 --"] * 3, checks)
 
     def test_an_interrupt_after_the_fast_forward(self):
         new = self.commit({"docs.md": "a\n"})
@@ -1535,7 +1535,7 @@ class DeployTests(unittest.TestCase):
             with self.subTest(timeout=script):
                 r = self.deploy("--apply", STUB_TIMEOUT_FOR=script)
                 self.assertRefused(r, f"scripts/{script} of", self.base)
-                self.assertIn("failed: it did not finish in 1800 s", r.stderr)
+                self.assertIn("failed: it did not finish in 2700 s", r.stderr)
 
     def test_ctrl_c_stops_it_before_the_merge(self):
         new = self.commit({"SLOW_TEST": "", "docs.md": "a\n"})
@@ -1622,7 +1622,7 @@ class DeployTests(unittest.TestCase):
         # without a Ctrl-C: SLACK s past the time limit, deploy.sh ends the timeout itself, and the check fails as one
         # that did not finish; before, it waited for good.  Here in a copy with a limit of 3 s, a SLACK of 2 s and a
         # GRACE of 2 s
-        base = self.use_copy({"LIMIT=1800 ": "LIMIT=3 ", "SLACK=30 ": "SLACK=2 ", "GRACE=15 ": "GRACE=2 "})
+        base = self.use_copy({"LIMIT=2700 ": "LIMIT=3 ", "SLACK=30 ": "SLACK=2 ", "GRACE=15 ": "GRACE=2 "})
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         t0 = time.monotonic()
@@ -1690,7 +1690,7 @@ class DeployTests(unittest.TestCase):
 
     def test_a_check_killed_at_its_time_limit(self):
         # and at or after it, timeout's -k: here in a copy with a limit of 2 s
-        base = self.use_copy({"LIMIT=1800 ": "LIMIT=2 "})
+        base = self.use_copy({"LIMIT=2700 ": "LIMIT=2 "})
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         r = self.deploy("--apply", STUB_TIMEOUT_FOR="test.sh", STUB_TIMEOUT_RC="137", STUB_TIMEOUT_LATE="1")
@@ -1870,7 +1870,7 @@ class DeployTests(unittest.TestCase):
         # the check after the fast-forward ignores the SIGTERM of its timeout, which so has not ended it SLACK s past
         # its time (here in a copy with a limit of 6 s, a SLACK of 1 s and a GRACE of 2 s): that it did not finish is
         # the outcome then, also when a signal comes as the script ends the check
-        short = {"LIMIT=1800 ": "LIMIT=6 ", "SLACK=30 ": "SLACK=1 ", "GRACE=15 ": "GRACE=2 "}
+        short = {"LIMIT=2700 ": "LIMIT=6 ", "SLACK=30 ": "SLACK=1 ", "GRACE=15 ": "GRACE=2 "}
         r, new = self.interrupt_at(("--apply",), {}, 'end_jobs "$child"', '[ -n "${merged:-}" ]', 1,
                                    self.signal_to("INT", "group"), changes=short,
                                    STUB_DEAF_DRIFT_IN=str(self.live.resolve()))

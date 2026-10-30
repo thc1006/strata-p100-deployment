@@ -2525,6 +2525,38 @@ class TestSh(unittest.TestCase):
             "import time\n" + head + body + "    @classmethod\n    def setUpClass(cls):\n        " + start)
         self.passes(d)
 
+    def test_what_fork_does_not_copy_to_the_workers(self):
+        # what a test module makes at its import and fork() does not copy to the workers as the runner had it ends the
+        # run before the tests, as a thread does.  Each test below is wrong and failed in the runner before the
+        # workers; in a worker it passed: Popen.wait() returned 0 for a child of the runner (also for one that had
+        # ended)
+        d = self.tree()
+        child = ("import subprocess, time, unittest\nP = subprocess.Popen(['sh', '-c', '{0}exit 3'])\n{1}"
+                 "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertEqual(P.wait(), 0)\n")
+        fails = "a process that started as the tests loaded is a child of the runner, which the workers cannot wait for"
+        cases = {
+            child.format("sleep 1; ", ""):
+                fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+\)\n",
+            child.format("", "time.sleep(0.3)\n"):
+                fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+, ended\)\n",
+            # what cannot be read fails the run too: a test module that makes the runner's reads fail
+            "import pathlib, unittest\n_read = pathlib.Path.read_text\ndef read_text(self, *a, **k):\n"
+            "    if self.name == 'children':\n        raise PermissionError(13, 'Permission denied', str(self))\n"
+            "    return _read(self, *a, **k)\npathlib.Path.read_text = read_text\n" + GOOD_TEST:
+                r"cannot read /proc/self/task/\*/children \(Permission denied\): the processes that the workers could "
+                r"not wait for cannot be listed\n"}
+        for code, says in cases.items():
+            with self.subTest(says=says):
+                (d / "tests" / "test_load.py").write_text(code)
+                r = self.run_sh(d)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+                self.assertRegex(r.stdout, "\nFAIL: " + says)
+                self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        # a child that the loading waited for passes
+        (d / "tests" / "test_load.py").write_text(
+            "import subprocess\nR = subprocess.run(['sh', '-c', 'exit 3'])\nassert R.returncode == 3\n" + GOOD_TEST)
+        self.passes(d)
+
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
         # a helper: what a test holds is read after the tests have run, in the worker that ran it
@@ -2874,7 +2906,8 @@ for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
         "test_a_signal_to_the_group_reaches_each_test_once",
         "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
         "test_what_libraries_register_as_the_tests_load", "test_what_the_tests_leave_in_their_tmpdir",
-        "test_a_worker_that_dies_of_sigkill", "test_a_thread_that_a_test_module_starts_as_it_loads"}]:
+        "test_a_worker_that_dies_of_sigkill", "test_a_thread_that_a_test_module_starts_as_it_loads",
+        "test_what_fork_does_not_copy_to_the_workers"}]:
     setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 

@@ -43,8 +43,9 @@
 # another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
 # something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
 # (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
-# workers says why), and when a thread that started as the tests loaded still runs as the workers are forked (the
-# tests then do not run).
+# workers says why), and when the loading left what fork() does not copy to the workers as this process has it (the
+# tests then do not run): a thread that still runs, or a child process (also one that has ended and that no one has
+# waited for).
 # Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
@@ -308,6 +309,7 @@ def unregister(func):
 
 
 atexit.register, atexit.unregister = register, unregister
+
 profile.enable()
 suite = Loader().discover("tests", pattern=PATTERN)
 atexit.register, atexit.unregister = real_register, real_unregister
@@ -435,10 +437,11 @@ if not hasattr(unittest.TestCase, "_callTestMethod"):
 unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has its own, which awaits the test)
 
 # The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
-# that each starts with what the loading ran, but for its threads: fork() copies only the thread that calls it, so the
-# run fails when a thread that started as the tests loaded still runs then.  A worker takes the next unit from a file
-# that all of them read through one open file description (each read moves its offset on), runs it, and writes down what
-# the checks below need; this process then merges that, prints unittest's report and runs the checks.  A unit is a test,
+# that each starts with what the loading ran, but for what fork() does not copy, such as a thread: fork() copies only
+# the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  A
+# worker takes the next unit from a file that all of them read through one open file
+# description (each read moves its offset on), runs it, and writes down what the checks below need; this process then
+# merges that, prints unittest's report and runs the checks.  A unit is a test,
 # or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
 # the loader are cut into their tests, which unittest's fixtures then see in the same order, so a worker sets a class or
 # module up (setUpClass, setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with
@@ -684,8 +687,33 @@ for wait in range(101):
                           (others > len(threads))))
         break
     time.sleep(0.01)
-if thread:
-    for b in bad + [thread]:
+
+
+def child(pid):
+    try:
+        stat = pathlib.Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return f"pid {pid}"
+    end = stat.rfind(")")
+    return f"{stat[stat.find('(') + 1:end]!r} (pid {pid}{', ended' if stat[end + 2:end + 3] == 'Z' else ''})"
+
+
+# fork() does not copy a child process either: the workers cannot wait for it (Popen.wait() then returns 0), also
+# when it has ended and no one has waited for it yet, so the run ends here for it too.  subprocess.run() waits for its
+# own.
+stop = [thread] if thread else []
+try:
+    kids = [p for t in os.listdir("/proc/self/task")
+            for p in pathlib.Path(f"/proc/self/task/{t}/children").read_text().split()]
+except OSError as e:
+    stop.append(f"cannot read /proc/self/task/*/children ({e.strerror}): the processes that the workers could not "
+                "wait for cannot be listed")
+else:
+    if kids:
+        stop.append("a process that started as the tests loaded is a child of the runner, which the workers cannot "
+                    "wait for (start it in setUpModule or setUpClass): " + ", ".join(map(child, kids)))
+if stop:
+    for b in bad + stop:
         print(f"FAIL: {b}")
     pathlib.Path(sys.argv[1]).write_text("fail\n")
     sys.exit(1)

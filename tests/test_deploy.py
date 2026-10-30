@@ -3,6 +3,7 @@ API (curl), systemctl, timeout, tar, scripts/test.sh and scripts/check-drift.sh.
 sudo."""
 from __future__ import annotations
 
+import errno
 import fcntl
 import json
 import os
@@ -79,7 +80,7 @@ echo "test.sh $d" >> "$STUB_DIR/ran.log"
 [ $# = 0 ] || { echo "unexpected arguments: $*"; exit 3; }
 [ ! -e /proc/$$/fd/9 ] || { echo "the deploy lock is open here"; exit 4; }
 ls -l /proc/$$/fd/ | sed 's/^/test.sh /' >> "$STUB_DIR/fds.log"
-env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
+env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|TEST_JOBS_DEAL=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
 env | grep -E '^(LC_|LANG=|LANGUAGE=)' | sed 's/^/test.sh /' >> "$STUB_DIR/locale.log"
 echo "test.sh $(cat /proc/$$/oom_score_adj) $(ps -o ni= -p $$ | tr -d ' ')" >> "$STUB_DIR/oom.log"
 [ -z "${STUB_DURING-}" ] || sh -c "$STUB_DURING"
@@ -165,19 +166,23 @@ if [ -e "$d/LATE_PORT" ]; then
     sh "$(cat "$d/LATE_PORT")" > /dev/null 2>&1 < /dev/null &
 fi
 # SCOPE_ENGINE: what a copy of deploy.sh takes for an engine, started in a scope of its own (systemd-run --user
-# --scope), with the checks' TMPDIR, while the watch looks
+# --scope), with the checks' TMPDIR, while the watch looks.  The scope goes once its process has ended, also when it
+# failed (-G, --collect).  The pattern is in two parts until the exec in the scope: a systemd-run that the watch killed
+# before its scope had started left the scope behind
 if [ -e "$d/SCOPE_ENGINE" ]; then
-  setsid systemd-run --user --scope -q python3 -c 'import time; time.sleep(60)' "$(cat "$d/SCOPE_ENGINE")" \
+  p=$(cat "$d/SCOPE_ENGINE")
+  setsid systemd-run --user --scope -q -G sh -c 'exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
+    "${p%%-engine*}" "-engine${p#*-engine}" \
     > /dev/null 2>&1 < /dev/null &
   n=0
   while [ "$(cat /proc/$!/cgroup 2> /dev/null)" = "$(cat /proc/$$/cgroup)" ] && [ $n -lt 200 ]; do n=$((n + 1)); sleep 0.05; done
   sleep 1
 fi
 # SCOPE_LATE: as LATE_ENGINE, in a scope of its own (systemd-run --user --scope, as AGENTS.md asks every job here to
-# start), with the checks' TMPDIR; test.sh ends once it runs in that scope
+# start), with the checks' TMPDIR; test.sh ends once it runs in that scope (-G as for SCOPE_ENGINE)
 if [ -e "$d/SCOPE_LATE" ]; then
   p=$(cat "$d/SCOPE_LATE")
-  setsid systemd-run --user --scope -q sh -c 'sleep 2; exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
+  setsid systemd-run --user --scope -q -G sh -c 'sleep 2; exec python3 -c "import time; time.sleep(60)" "$1$2"' sh \
     "${p%%-engine*}" "-engine${p#*-engine}" > /dev/null 2>&1 < /dev/null &
   n=0
   while [ "$(cat /proc/$!/cgroup 2> /dev/null)" = "$(cat /proc/$$/cgroup)" ] && [ $n -lt 200 ]; do n=$((n + 1)); sleep 0.05; done
@@ -252,7 +257,7 @@ d=$(cd "$(dirname "$0")/.." && pwd)
 echo "check-drift.sh $d $*" >> "$STUB_DIR/ran.log"
 [ ! -e /proc/$$/fd/9 ] || { echo "the deploy lock is open here"; exit 4; }
 ls -l /proc/$$/fd/ | sed 's/^/check-drift.sh /' >> "$STUB_DIR/fds.log"
-env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
+env | grep -E '^(DRIFT_|HOST_UNITS_|TEST_SHELLCHECK=|STRATA_TEST_|TEST_REPO_ONLY=|TEST_JOBS_DEAL=|STRATA_DIR=|STRATA_PY=|BASH_ENV=|PYTHONPATH=)' >> "$STUB_DIR/hooks.log"
 env | grep -E '^(LC_|LANG=|LANGUAGE=)' | sed 's/^/check-drift.sh /' >> "$STUB_DIR/locale.log"
 echo "check-drift.sh $(cat /proc/$$/oom_score_adj) $(ps -o ni= -p $$ | tr -d ' ')" >> "$STUB_DIR/oom.log"
 [ "$d" != "${STUB_SLOW_DRIFT_IN-}" ] || { echo $$ > "$STUB_DIR/slow.pid"; sleep 30; }
@@ -369,6 +374,7 @@ class DeployTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """One origin, work clone and live clone, copied for each test."""
+        cls.pattern, cls.port = cls.new_fake(), cls.held_port()        # see harmless()
         cls.template = Path(tempfile.mkdtemp(prefix="deploy-template-"))
         cls.addClassCleanup(shutil.rmtree, cls.template)
         env = isolated(cls.template)
@@ -377,7 +383,7 @@ class DeployTests(unittest.TestCase):
             cls.write(t / "stub" / name, text, 0o755)
         run("git", "init", "-q", "--bare", "-b", "main", str(t / "origin.git"), env=env)
         run("git", "init", "-q", "-b", "main", str(t / "work"), env=env)
-        for name, text in {"scripts/deploy.sh": DEPLOY.read_text(), **REPO_FILES}.items():
+        for name, text in {"scripts/deploy.sh": cls.harmless(DEPLOY.read_text()), **REPO_FILES}.items():
             cls.write(t / "work" / name, text, 0o755 if name.endswith(".sh") else 0o644)
         run("git", "-C", str(t / "work"), "add", "-A", env=env)
         run("git", "-C", str(t / "work"), "-c", "user.name=test", "-c", "user.email=", "commit", "-q", "-m", "base",
@@ -393,6 +399,7 @@ class DeployTests(unittest.TestCase):
         self.stub, self.origin, self.work, self.live = (self.root / d for d in ("stub", "origin.git", "work", "live"))
         self.tmpdir = self.root / "tmp"
         self.tmpdir.mkdir()
+        self.home = b"HOME=" + os.fsencode(self.root)         # in the environment of what this test starts: ours()
         self.env = {**isolated(self.root), "GIT_AUTHOR_NAME": "test", "GIT_AUTHOR_EMAIL": "", "GIT_COMMITTER_NAME": "test",
                     "GIT_COMMITTER_EMAIL": "", "STUB_DIR": str(self.stub), "TMPDIR": str(self.tmpdir)}
         self.use_origin_url(URL)
@@ -453,7 +460,9 @@ class DeployTests(unittest.TestCase):
 
     def end(self, p: subprocess.Popen):
         """After the test: SIGKILL to what is left of the deploy.sh it started, its process group (deploy.sh and its
-        watch) and the rest of its session (a check and its timeout), so that none of it outlives the test."""
+        watch) and the rest of its session (a check and its timeout), so that none of it outlives the test.  Of the
+        session only what is ours: once deploy.sh has been reaped and its session has no member left, another process
+        can take that number for a session of its own."""
         if p.poll() is None:
             try:
                 os.killpg(p.pid, signal.SIGKILL)
@@ -461,11 +470,7 @@ class DeployTests(unittest.TestCase):
                 pass
         for _ in range(5):
             left = self.in_session(p.pid)
-            for q in left:
-                try:
-                    os.kill(q, signal.SIGKILL)
-                except OSError:
-                    pass
+            harness_run.kill_own(left, self.home)
             if not left:
                 break
             time.sleep(0.1)
@@ -503,6 +508,33 @@ class DeployTests(unittest.TestCase):
         with socket.socket(family) as s:
             s.bind((host, 0))
             return s.getsockname()[1]
+
+    @classmethod
+    def held_port(cls) -> int:
+        """A port that no other process can bind until the class's tests have ended, such as a fake server of a test in
+        another worker of scripts/test.sh --jobs: bound here on IPv4 and, where there is IPv6, on IPv6, without
+        SO_REUSEADDR.  Not listening, so that the watch of a copy of deploy.sh does not see it."""
+        for _ in range(20):
+            s4 = socket.socket()
+            s4.bind(("0.0.0.0", 0))
+            port = s4.getsockname()[1]
+            s6 = None
+            try:
+                s6 = socket.socket(socket.AF_INET6)
+                s6.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 1)
+                s6.bind(("::", port))
+            except OSError as e:            # (no IPv6 here, or the port is taken there)
+                if s6 is not None:
+                    s6.close()
+                    s6 = None
+                if e.errno == errno.EADDRINUSE:
+                    s4.close()
+                    continue
+            cls.addClassCleanup(s4.close)
+            if s6 is not None:
+                cls.addClassCleanup(s6.close)
+            return port
+        raise OSError(errno.EADDRINUSE, "no port free on both IPv4 and IPv6")
 
     def watchers(self, parent: int) -> list[int]:
         """The watches (watch) of the deploy.sh with this pid."""
@@ -545,13 +577,31 @@ class DeployTests(unittest.TestCase):
             time.sleep(0.02)
         return q
 
-    def use_copy(self, changes: dict[str, str]) -> str:
+    WATCH = ('rb"engine-cuda12/strata --serve"', "PORT = 8080 ")    # the preflight's pattern and port in deploy.sh
+
+    @classmethod
+    def harmless(cls, text: str, pattern: str | None = None, port: int | None = None) -> str:
+        """deploy.sh with a harmless pattern and port in its watch instead of the preflight's (WATCH, each of which must
+        occur once in text): those given, or the class's (cls.pattern, cls.port).  Every test but two runs such a
+        copy.  With scripts/test.sh --jobs, a harness in another worker starts fake engines with the preflight's
+        pattern, which the watch of a check here would see.  The watch's own tests give a pattern and a port of their
+        own (deploy_with_a_harmless_watch), and test_the_watch_looks_for_what_the_preflight_refuses_a_start_for ties
+        WATCH to the preflight."""
+        for old in cls.WATCH:
+            if text.count(old) != 1:
+                raise AssertionError(f"scripts/deploy.sh has {old!r} {text.count(old)} times, not once")
+        return text.replace(cls.WATCH[0], f'rb"{pattern or cls.pattern}"').replace(
+            cls.WATCH[1], f"PORT = {port or cls.port} ")
+
+    def use_copy(self, changes: dict[str, str], real: bool = False, watch: tuple[str, int] | None = None) -> str:
         """Make this checkout's deploy.sh a copy with these changes (old text, which must occur once: new text), as
-        the commit origin/main and this checkout are at; that commit."""
+        the commit origin/main and this checkout are at; that commit.  Unless real, its watch is made harmless(), with
+        the pattern and port of watch when given."""
         text = DEPLOY.read_text()
         for old, new in changes.items():
             self.assertEqual(text.count(old), 1, old)
             text = text.replace(old, new)
+        text = text if real else self.harmless(text, *(watch or ()))
         base = self.commit({"scripts/deploy.sh": text}, parent=self.base)
         self.git(self.live, "fetch", "-q", "origin")
         self.git(self.live, "reset", "-q", "--hard", "origin/main")
@@ -593,7 +643,7 @@ class DeployTests(unittest.TestCase):
         self.assertNotIn(str(self.live), self.log("ran.log"), "the checks ran from this checkout, not the new commit")
         timeouts = self.log("timeout.log").splitlines()
         self.assertTrue(timeouts[0].startswith(f"-k 10 120 git {GIT_OPTS} fetch "), timeouts)
-        self.assertTrue(timeouts[1].startswith("-k 10 1800 ") and timeouts[1].endswith("/scripts/test.sh"), timeouts)
+        self.assertTrue(timeouts[1].startswith("-k 10 2700 ") and timeouts[1].endswith("/scripts/test.sh"), timeouts)
         r = self.deploy("--apply")
         self.assertEqual(r.returncode, 0, r.stderr)
         self.assertIn(f"deployed {new[:7]}: change", r.stdout)
@@ -770,14 +820,19 @@ class DeployTests(unittest.TestCase):
                               "(exit 4): what it started may still run", self.base)
 
     def test_a_check_that_starts_what_the_preflight_takes_for_an_engine(self):
-        # while it lives, a start of strata-q3 is refused: it runs only as a harness test does (decision 0006)
+        # while it lives, a start of strata-q3 is refused: it runs only as a harness test does (decision 0006), with
+        # deploy.sh as it is, and while no harness starts fake engines (harness_run.alone)
         harness_run.gate(self, ("setsid",))
+        base = self.use_copy({}, real=True)
         new = self.commit({"docs.md": "a\n", "ENGINE_TEST": ""})
         self.runs(new)
-        r = self.deploy("--apply")
+        with harness_run.alone():
+            r = self.deploy("--apply")
         self.assertRefused(r, f"scripts/test.sh of {new[:7]} failed: strata-preflight.sh would refuse a start of "
-                              "strata-q3 while it ran: an engine (killed): python3 -c import time; time.sleep(60) ", self.base)
-        self.assertIn("engine-cuda12/strata --serve", r.stderr)
+                              "strata-q3 while it ran: an engine (killed): python3 -c import time; time.sleep(60) ", base)
+        # the stand-in under the checks' TMPDIR, whose command line has the preflight's pattern after that path, and no
+        # other (deploy.sh shows the first 120 characters of a command line, which may end before the pattern)
+        self.assertIn(f"time.sleep(60) {self.tmpdir}/", r.stderr)
         self.assertEqual([q for q in os.listdir("/proc") if q.isdigit() and b"strata --serve" in self.cmdline(q)
                           and str(self.tmpdir).encode() in self.cmdline(q)], [])
 
@@ -787,7 +842,8 @@ class DeployTests(unittest.TestCase):
         hooks = {"DRIFT_SYSROOT": "/x", "DRIFT_OWNER": "1:1", "DRIFT_ENGINE_RE": "x", "DRIFT_URL": "http://x",
                  "DRIFT_TEST_SPEC": "/x", "HOST_UNITS_CONF": "/x", "HOST_UNITS_RUN_USER": "/x", "TEST_SHELLCHECK": "x",
                  "STRATA_DIR": "/x", "STRATA_TEST_HARNESSES": "1", "STRATA_TEST_NO_SERVICE": "1", "TEST_REPO_ONLY": "1",
-                 "STRATA_PY": "/x", "BASH_ENV": "/x", "PYTHONPATH": "/x"}
+                 "TEST_JOBS_DEAL": "1", "STRATA_TEST_ENGINES_LOCK": "/x", "STRATA_PY": "/x", "BASH_ENV": "/x",
+                 "PYTHONPATH": "/x"}
         r = self.deploy("--apply", **hooks)
         self.assertEqual((r.returncode, self.head()), (0, new), r.stderr)
         self.assertEqual(self.log("ran.log").count("check-drift.sh"), 2)
@@ -828,7 +884,7 @@ class DeployTests(unittest.TestCase):
                          ["test.sh 1000 19", "check-drift.sh 1000 19", "check-drift.sh 1000 19"])
         checks = self.log("timeout.log").splitlines()[1:]
         self.assertEqual([line.split(" env -i ")[0] for line in checks],
-                         ["-k 10 1800 nice -n 19 choom -n 1000 --"] * 3, checks)
+                         ["-k 10 2700 nice -n 19 choom -n 1000 --"] * 3, checks)
 
     def test_an_interrupt_after_the_fast_forward(self):
         new = self.commit({"docs.md": "a\n"})
@@ -938,13 +994,13 @@ class DeployTests(unittest.TestCase):
         as deploy() has it."""
         port = self.free_port() if port is None else port
         scan = '    for p in filter(str.isdigit, os.listdir("/proc")):\n        if int(p) != me and engine.search('
-        base = self.use_copy({'rb"engine-cuda12/strata --serve"': f'rb"{self.fake}"', "PORT = 8080 ": f"PORT = {port} ",
-                              **({"def owner(inode):\n": "def owner(inode):\n    return None\n"} if unreadable else {}),
+        base = self.use_copy({**({"def owner(inode):\n": "def owner(inode):\n    return None\n"} if unreadable else {}),
                               **({scan: '    listed = list(filter(str.isdigit, os.listdir("/proc")))\n    time.sleep(1)\n'
                                         '    for p in listed:\n        if int(p) != me and engine.search('} if slow else {}),
                               **({"    try:\n        return diagnosed()\n    except OSError:\n        pass\n":
                                   "    return diagnosed()\n"} if sockets == "diag" else {}),
-                              **({"socket.SOCK_RAW, 4)": "socket.SOCK_RAW, 31)"} if sockets == "proc" else {})})
+                              **({"socket.SOCK_RAW, 4)": "socket.SOCK_RAW, 31)"} if sockets == "proc" else {})},
+                             watch=(self.fake, port))
         new = self.commit({"docs.md": str(files), **files})
         self.runs(new)
         return self.deploy(person=person), base
@@ -1044,11 +1100,11 @@ class DeployTests(unittest.TestCase):
         port = self.free_port()
         code = "import socket, sys, time; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); s.listen(); " \
                "open(sys.argv[2], 'w').close(); time.sleep(60)"
-        ready = self.root / "listener.ready"
-        person = lambda t: self.outside(sys.executable, "-c", code, str(port), str(ready), ready=ready)
+        ready, listener = self.root / "listener.ready", []
+        person = lambda t: listener.append(self.outside(sys.executable, "-c", code, str(port), str(ready), ready=ready))
         r, base = self.deploy_with_a_harmless_watch({"PERSON": ""}, port, unreadable=True, person=person)
         self.refused_by_the_watch(r, base, "a listener on :8080, of a process this user cannot read")
-        self.assertEqual(len(self.with_argument(str(port))), 1, "the listener was killed, or never started")
+        self.assertTrue(self.alive(listener[0].pid), "the listener was killed")
 
     def test_what_the_check_leaves_to_start_later_is_swept(self):
         # a process the check leaves in a session of its own, naming nothing of the directory, that becomes an engine
@@ -1072,21 +1128,14 @@ class DeployTests(unittest.TestCase):
         # what the check starts in a scope of its own with systemd-run --user --scope, as AGENTS.md asks every job here
         # to start: in another cgroup, with the checks' TMPDIR.  The watch kills it when it is an engine while the
         # check runs, and the sweep after the check when it becomes one only after the watch's last look; before, both
-        # looked only in deploy.sh's cgroup, and it outlived deploy.sh.  Only where systemd is PID 1: systemd-run
-        # --scope gives systemd its pid, which in a namespace of pids is another's
-        try:
-            init = Path("/proc/1/comm").read_text().strip()
-        except OSError:
-            init = ""
-        if init != "systemd" or not shutil.which("systemd-run") or subprocess.run(
-                ["systemd-run", "--user", "--scope", "-q", "true"], stdin=subprocess.DEVNULL,
-                capture_output=True).returncode != 0:
-            self.skipTest("machine: no systemd-run --user here")
+        # looked only in deploy.sh's cgroup, and it outlived deploy.sh
+        self.needs_user_scopes()
         for name in ("SCOPE_ENGINE", "SCOPE_LATE"):
             with self.subTest(name=name):
                 self.fake = self.new_fake()
                 nonce = self.fake.split()[0].rpartition("-")[2]
                 self.addCleanup(self.kill, lambda nonce=nonce: self.named(nonce.encode()))
+                self.addCleanup(self.drop_scopes, nonce)
                 r, base = self.deploy_with_a_harmless_watch({name: self.fake})
                 if name == "SCOPE_ENGINE":
                     self.refused_by_the_watch(r, base, "an engine (killed): ")
@@ -1096,6 +1145,129 @@ class DeployTests(unittest.TestCase):
                     self.assertRegex(r.stdout, r"note   killed what a check left behind: \S*sh -c sleep 2; exec python3 -c ")
                     time.sleep(3)                       # it would have become one 2 s after it started
                 self.assertEqual(self.named(nonce.encode()), [], "it outlived deploy.sh")
+                deadline = time.monotonic() + 10    # the manager collects a scope just after its process has ended
+                while self.scopes(nonce) and time.monotonic() < deadline:
+                    time.sleep(0.1)
+                self.assertEqual(self.scopes(nonce), [], "its scope is left")
+
+    def needs_user_scopes(self):
+        """Only where systemd is PID 1: systemd-run --scope gives systemd its pid, which in a namespace of pids is
+        another's."""
+        try:
+            init = Path("/proc/1/comm").read_text().strip()
+        except OSError:
+            init = ""
+        if init != "systemd" or not shutil.which("systemd-run") or subprocess.run(
+                ["systemd-run", "--user", "--scope", "-q", "-G", "true"], stdin=subprocess.DEVNULL,
+                capture_output=True).returncode != 0:
+            self.skipTest("machine: no systemd-run --user here")
+
+    def test_the_class_port_stays_taken(self):
+        # the port of the class's copies (harmless) cannot be bound by another process while the class's tests run, on
+        # IPv4 nor on IPv6, and the watch does not see it
+        for family, host in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET, "0.0.0.0"), (socket.AF_INET6, "::1"),
+                             (socket.AF_INET6, "::")):
+            with self.subTest(host=host):
+                try:
+                    s = socket.socket(family)
+                except OSError:
+                    continue                        # (no IPv6 here)
+                with s:
+                    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                    with self.assertRaises(OSError) as e:
+                        s.bind((host, self.port))
+                    self.assertIn(e.exception.errno, (errno.EADDRINUSE, errno.EADDRNOTAVAIL))
+        new = self.commit({"docs.md": "a\n"})
+        self.runs(new)
+        self.assertEqual(self.deploy().returncode, 0)
+
+    def test_the_watch_skips_what_runs_in_the_services_cgroup(self):
+        # an engine or a listener on :8080 in strata-q3's cgroup (SERVICE) is the service's, and fails no check.  Here
+        # with a person's process in a scope of its own (systemd-run --user --scope) that has a harmless pattern and
+        # listens on a harmless port, and copies whose SERVICE is that scope's cgroup or the service's.  On this
+        # machine while strata-q3 serves, also with deploy.sh as it is, whose watch then sees the service's engine and
+        # its listener on :8080 (as the copies of every test here did before 2026-10-30)
+        self.needs_user_scopes()
+        nonce = self.fake.split()[0].rpartition("-")[2]
+        port, ready = self.free_port(), self.root / "service.ready"
+        self.addCleanup(self.drop_scopes, nonce)
+        q = self.outside("systemd-run", "--user", "--scope", "-q", "-G", "python3", "-c",
+                         "import socket, sys, time; s = socket.socket(); s.bind(('127.0.0.1', int(sys.argv[1]))); "
+                         "s.listen(); open(sys.argv[2], 'w').close(); time.sleep(60)", str(port), str(ready), self.fake,
+                         ready=ready)
+        cgroup = Path(f"/proc/{q.pid}/cgroup").read_text().split("\n")[0].partition("::")[2]
+        self.assertRegex(cgroup, r"\.scope$")
+        other, service = self.new_fake(), 'SERVICE = "/system.slice/strata-q3.service"'
+        for changes, says in (({}, "an engine: "), ({f'rb"{self.fake}"': f'rb"{other}"'}, "a listener on :8080: "),
+                              ({service: f'SERVICE = "{cgroup}"'}, None)):
+            with self.subTest(changes=changes):
+                text = self.harmless(DEPLOY.read_text(), self.fake, port)
+                for old, new in changes.items():
+                    self.assertEqual(text.count(old), 1, old)
+                    text = text.replace(old, new)
+                base = self.commit({"scripts/deploy.sh": text}, parent=self.base)
+                self.git(self.live, "fetch", "-q", "origin")
+                self.git(self.live, "reset", "-q", "--hard", "origin/main")
+                new = self.commit({"docs.md": str(changes)})
+                self.runs(new)
+                r = self.deploy()
+                if says:
+                    self.refused_by_the_watch(r, base, says)
+                    self.assertIn("python3 -c import socket, sys, time; s = socket.socket();", r.stderr)
+                else:
+                    self.assertEqual((r.returncode, self.head("main")), (0, base), r.stdout + r.stderr)
+                self.assertIsNone(q.poll(), "the service's stand-in was killed")
+        if self.serving():
+            with self.subTest("strata-q3 as it serves"):
+                base = self.use_copy({}, real=True)
+                new = self.commit({"docs.md": "b\n"})
+                self.runs(new)
+                with harness_run.alone():           # no fake engine of a harness in another worker meanwhile
+                    r = self.deploy()
+                self.assertEqual((r.returncode, self.head("main")), (0, base), r.stdout + r.stderr)
+
+    @staticmethod
+    def serving() -> bool:
+        """Whether strata-q3 runs here with an engine (the preflight's pattern) in its cgroup and listens on :8080."""
+        engine = False
+        for q in filter(str.isdigit, os.listdir("/proc")):
+            try:
+                cgroup = Path(f"/proc/{q}/cgroup").read_text().split("\n")[0].partition("::")[2]
+                if cgroup == "/system.slice/strata-q3.service" and \
+                        b"engine-cuda12/strata --serve" in Path(f"/proc/{q}/cmdline").read_bytes().replace(b"\0", b" "):
+                    engine = True
+                    break
+            except OSError:
+                pass
+        try:
+            r = subprocess.run(["ss", "-ltnH", "sport = :8080"], capture_output=True, text=True, timeout=10)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return engine and r.returncode == 0 and "LISTEN" in r.stdout
+
+    @staticmethod
+    def scopes(text: str) -> list[str]:
+        """The user's scopes, in any state, whose description (systemd-run's: the command line) holds text."""
+        r = subprocess.run(["systemctl", "--user", "list-units", "--all", "--plain", "--no-legend", "--type=scope"],
+                           stdin=subprocess.DEVNULL, capture_output=True, text=True, check=True)
+        return [line.split()[0] for line in r.stdout.splitlines() if text in line]
+
+    def drop_scopes(self, text: str):
+        """Stop those scopes and forget the failed ones, as after a test that did not get as far as its end; not a scope
+        with a process in it that is not ours, or whose processes cannot be read (a stop signals each of them)."""
+        for unit in self.scopes(text):
+            r = subprocess.run(["systemctl", "--user", "show", "-p", "ControlGroup", "--value", unit],
+                               stdin=subprocess.DEVNULL, capture_output=True, text=True)
+            cgroup = r.stdout.strip()
+            try:
+                procs = [int(q) for q in Path(f"/sys/fs/cgroup{cgroup}/cgroup.procs").read_text().split()] \
+                    if cgroup else []
+            except OSError:
+                procs = None
+            if r.returncode != 0 or procs is None or not all(map(self.ours, procs)):
+                continue
+            for verb in ("stop", "reset-failed"):
+                subprocess.run(["systemctl", "--user", verb, unit], stdin=subprocess.DEVNULL, capture_output=True)
 
     def test_the_sweep_kills_the_process_group_of_what_it_finds(self):
         # the leader has the checks' TMPDIR; its child dropped it and names nothing of the directory
@@ -1182,6 +1354,17 @@ class DeployTests(unittest.TestCase):
         deploy = DEPLOY.read_text()
         self.assertIn(f'engine = re.compile(rb"{pattern}")', deploy)
         self.assertIn(f"PORT = {port} ", deploy)
+        # harmless() replaces both, and refuses a deploy.sh that has either not once: its copies would otherwise watch
+        # for the preflight's pattern and port, and see the fake engines of a harness in another worker
+        self.assertEqual(self.WATCH, (f'rb"{pattern}"', f"PORT = {port} "))
+        copy = self.harmless(deploy)
+        self.assertEqual([copy.count(w) for w in self.WATCH], [0, 0])
+        self.assertIn(f'engine = re.compile(rb"{self.pattern}")', copy)
+        self.assertIn(f"PORT = {self.port} ", copy)
+        for w in self.WATCH:
+            for text in (deploy.replace(w, ""), deploy.replace(w, w + "\n" + w)):
+                with self.subTest(watch=w, times=text.count(w)), self.assertRaisesRegex(AssertionError, "not once"):
+                    self.harmless(text)
 
     @staticmethod
     def cmdline(pid: str) -> bytes:
@@ -1190,18 +1373,23 @@ class DeployTests(unittest.TestCase):
         except OSError:
             return b""
 
-    def with_argument(self, arg: str) -> list[int]:
-        """The processes that have arg as one of their arguments."""
-        return [int(q) for q in os.listdir("/proc") if q.isdigit() and arg.encode() in self.cmdline(q).split(b"\0")]
+    def ours(self, pid: int) -> bool:
+        """Whether this test started the process: its environment has this test's HOME (self.root), which deploy.sh
+        passes on to the checks and which the stubs keep.  The service's engine, a person's processes and those of the
+        other tests have another, and a process whose environment cannot be read is not taken for this test's."""
+        return harness_run.environment_has(pid, self.home)
 
-    @staticmethod
-    def kill(pids):
-        """For a clean-up: SIGKILL to the processes that pids() gives then."""
-        for q in pids():
-            try:
-                os.kill(q, signal.SIGKILL)
-            except OSError:
-                pass
+    def with_argument(self, arg: str) -> list[int]:
+        """The processes of this test (ours) that have arg as one of their arguments.  arg is a port number, which the
+        command line of another process of this user can have too: here one of the arguments of the service's engine
+        is a number in the range that bind(0) takes ports from."""
+        return [int(q) for q in os.listdir("/proc")
+                if q.isdigit() and arg.encode() in self.cmdline(q).split(b"\0") and self.ours(int(q))]
+
+    def kill(self, pids):
+        """For a clean-up: SIGKILL to those of the processes that pids() gives then that this test started (ours), and
+        to no other, whatever their command line holds."""
+        harness_run.kill_own(pids(), self.home)
 
     @staticmethod
     def alive(pid: int) -> bool:
@@ -1210,6 +1398,48 @@ class DeployTests(unittest.TestCase):
             return Path(f"/proc/{pid}/stat").read_text().rpartition(")")[2].split()[0] != "Z"
         except (OSError, IndexError):
             return False
+
+    def test_the_clean_ups_signal_only_what_the_test_started(self):
+        # a clean-up finds the processes to kill by their command line: the port's number as an argument, or the
+        # test's engine pattern.  The service's engine runs as this user, and one of its arguments is a number in the
+        # range that bind(0) takes ports from.  A process of this user that the test did not start survives the
+        # clean-up with either, also when the clean-up names its pid; one with this test's HOME, as what deploy.sh
+        # runs has, is killed.  Before, the clean-ups killed every process of this user with the port's number as an
+        # argument
+        port = self.free_port()
+        args = (sys.executable, "-c", "import time; time.sleep(60)", str(port), self.fake)
+        others = [subprocess.Popen(a, stdin=subprocess.DEVNULL, start_new_session=True)
+                  for a in (args[:4], args[:3] + args[4:], args)]
+        mine = subprocess.Popen(args, env=self.env, stdin=subprocess.DEVNULL, start_new_session=True)
+        for q in (*others, mine):
+            self.addCleanup(lambda q=q: (q.kill(), q.wait()))
+        deadline = time.monotonic() + 20
+        while not all(str(port).encode() in self.cmdline(str(q.pid)) or self.fake.encode() in self.cmdline(str(q.pid))
+                      for q in (*others, mine)):
+            self.assertLess(time.monotonic(), deadline, "they did not start")
+            time.sleep(0.02)
+        self.assertEqual(self.with_argument(str(port)), [mine.pid])
+        self.kill(lambda: self.named(self.fake.encode()) + self.with_argument(str(port)))
+        self.kill(lambda: [q.pid for q in others])
+        self.assertEqual(mine.wait(timeout=10), -signal.SIGKILL)
+        time.sleep(0.2)
+        self.assertEqual([q.poll() for q in others], [None] * 3, "a process that the test did not start was killed")
+
+    def test_a_scope_with_a_process_that_is_not_the_tests_is_not_stopped(self):
+        # drop_scopes stops the scopes whose description holds a nonce of the test; not one with a process in it that
+        # the test did not start: a stop signals every process of the scope
+        self.needs_user_scopes()
+        nonce = self.fake.split()[0].rpartition("-")[2]
+        ready = self.root / "scope.ready"
+        q = self.outside("systemd-run", "--user", "--scope", "-q", "-G", sys.executable, "-c",
+                         "import sys, time; open(sys.argv[1], 'w').close(); time.sleep(60)", str(ready), self.fake,
+                         ready=ready)
+        self.addCleanup(self.drop_scopes, nonce)
+        self.assertEqual(len(self.scopes(nonce)), 1)
+        self.drop_scopes(nonce)
+        time.sleep(0.2)
+        self.assertIsNone(q.poll(), "the scope of a process that the test did not start was stopped")
+        self.assertEqual(len(self.scopes(nonce)), 1)
 
     def test_refuses_local_changes(self):
         self.runs(self.commit({"docs.md": "a\n"}))
@@ -1305,16 +1535,13 @@ class DeployTests(unittest.TestCase):
             with self.subTest(timeout=script):
                 r = self.deploy("--apply", STUB_TIMEOUT_FOR=script)
                 self.assertRefused(r, f"scripts/{script} of", self.base)
-                self.assertIn("failed: it did not finish in 1800 s", r.stderr)
+                self.assertIn("failed: it did not finish in 2700 s", r.stderr)
 
     def test_ctrl_c_stops_it_before_the_merge(self):
         new = self.commit({"SLOW_TEST": "", "docs.md": "a\n"})
         self.runs(new)
         p = self.start("--apply")
-        deadline = time.monotonic() + 20
-        while not (self.stub / "slow.pid").exists() and time.monotonic() < deadline:
-            time.sleep(0.05)
-        slow = int((self.stub / "slow.pid").read_text())
+        slow = self.slow_pid(p)
         os.killpg(p.pid, signal.SIGINT)                 # what a Ctrl-C on the terminal sends
         stdout, stderr = p.communicate(timeout=15)
         self.assertEqual(p.returncode, 1, stdout + stderr)
@@ -1366,6 +1593,15 @@ class DeployTests(unittest.TestCase):
             self.assertTrue(p.poll() is None and time.monotonic() < deadline, f"no {path.name}")
             time.sleep(0.02)
 
+    def slow_pid(self, p: subprocess.Popen) -> int:
+        """The pid that a slow check of the stub writes to slow.pid, once the line is whole: echo creates the file
+        before it writes to it."""
+        path, deadline = self.stub / "slow.pid", time.monotonic() + 20
+        while not (path.exists() and path.read_text().endswith("\n")):
+            self.assertTrue(p.poll() is None and time.monotonic() < deadline, "no slow.pid")
+            time.sleep(0.02)
+        return int(path.read_text())
+
     def test_a_ctrl_c_ends_it_when_a_check_has_stopped_its_timeout(self):
         # the check stops its timeout (SIGSTOP) and ends: a Ctrl-C ends deploy.sh within seconds, and the timeout too
         # (SIGTERM, then SIGCONT); before, stop() waited for the stopped timeout for good, deaf to further signals
@@ -1386,7 +1622,7 @@ class DeployTests(unittest.TestCase):
         # without a Ctrl-C: SLACK s past the time limit, deploy.sh ends the timeout itself, and the check fails as one
         # that did not finish; before, it waited for good.  Here in a copy with a limit of 3 s, a SLACK of 2 s and a
         # GRACE of 2 s
-        base = self.use_copy({"LIMIT=1800 ": "LIMIT=3 ", "SLACK=30 ": "SLACK=2 ", "GRACE=15 ": "GRACE=2 "})
+        base = self.use_copy({"LIMIT=2700 ": "LIMIT=3 ", "SLACK=30 ": "SLACK=2 ", "GRACE=15 ": "GRACE=2 "})
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         t0 = time.monotonic()
@@ -1454,7 +1690,7 @@ class DeployTests(unittest.TestCase):
 
     def test_a_check_killed_at_its_time_limit(self):
         # and at or after it, timeout's -k: here in a copy with a limit of 2 s
-        base = self.use_copy({"LIMIT=1800 ": "LIMIT=2 "})
+        base = self.use_copy({"LIMIT=2700 ": "LIMIT=2 "})
         new = self.commit({"docs.md": "a\n"})
         self.runs(new)
         r = self.deploy("--apply", STUB_TIMEOUT_FOR="test.sh", STUB_TIMEOUT_RC="137", STUB_TIMEOUT_LATE="1")
@@ -1634,7 +1870,7 @@ class DeployTests(unittest.TestCase):
         # the check after the fast-forward ignores the SIGTERM of its timeout, which so has not ended it SLACK s past
         # its time (here in a copy with a limit of 6 s, a SLACK of 1 s and a GRACE of 2 s): that it did not finish is
         # the outcome then, also when a signal comes as the script ends the check
-        short = {"LIMIT=1800 ": "LIMIT=6 ", "SLACK=30 ": "SLACK=1 ", "GRACE=15 ": "GRACE=2 "}
+        short = {"LIMIT=2700 ": "LIMIT=6 ", "SLACK=30 ": "SLACK=1 ", "GRACE=15 ": "GRACE=2 "}
         r, new = self.interrupt_at(("--apply",), {}, 'end_jobs "$child"', '[ -n "${merged:-}" ]', 1,
                                    self.signal_to("INT", "group"), changes=short,
                                    STUB_DEAF_DRIFT_IN=str(self.live.resolve()))
@@ -1650,8 +1886,7 @@ class DeployTests(unittest.TestCase):
         new = self.commit({"docs.md": "a\n", "SLOW_DRIFT": ""})
         self.runs(new)
         p = self.start()
-        self.wait_for(self.stub / "slow.pid", p)
-        slow = int((self.stub / "slow.pid").read_text())
+        slow = self.slow_pid(p)
         os.killpg(p.pid, signal.SIGINT)
         stdout, stderr = p.communicate(timeout=30)
         self.assertEqual(p.returncode, 1, stdout + stderr)
@@ -1765,8 +2000,7 @@ class DeployTests(unittest.TestCase):
                 new = self.commit({"SLOW_TEST": "", "docs.md": f"{sig} {to}"}, parent=self.base)
                 self.runs(new)
                 p = self.start("--apply")
-                self.wait_for(self.stub / "slow.pid", p)
-                slow = int((self.stub / "slow.pid").read_text())
+                slow = self.slow_pid(p)
                 sent = getattr(signal, f"SIG{sig}")
                 (os.killpg if to == "group" else os.kill)(p.pid, sent)
                 stdout, stderr = p.communicate(timeout=30)

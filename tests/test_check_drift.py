@@ -753,8 +753,9 @@ class Sandbox:
                              start_new_session=True, pass_fds=() if foreign else (srv.fileno(),))
 
         def end():
-            with contextlib.suppress(ProcessLookupError):        # a test may have ended it
-                os.killpg(p.pid, signal.SIGKILL)
+            if p.returncode is None:     # not reaped (a test may have ended it and waited): the group's number is its own
+                with contextlib.suppress(ProcessLookupError):
+                    os.killpg(p.pid, signal.SIGKILL)
             p.wait()
         self.t.addCleanup(end)
         self.srv, self.proc = srv, p

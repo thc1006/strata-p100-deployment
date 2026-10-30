@@ -18,9 +18,14 @@ from pathlib import Path
 import shutil
 import signal
 import subprocess
+import sys
 import tempfile
+import time
 import unittest
 import unittest.mock
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import harness_run  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 LIVE = "/home/thc1006/dev/p100-q3-deployment"
@@ -57,12 +62,21 @@ class TestSh(unittest.TestCase):
     def unit(d: Path, name: str, text: str) -> None:
         (d / "systemd" / name).write_text("[Unit]\nDescription=test\n\n" + text)
 
+    JOBS: tuple[str, ...] = ()      # what TestShJobs adds to the arguments of each run, and to its environment
+    DEAL: dict[str, str] = {}
+
+    def environment(self, d: Path) -> dict:
+        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY",
+                                                              "TEST_JOBS_DEAL")}
+        e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
+        return {**e, **self.DEAL}
+
     def run_sh(self, d: Path, *args: str, env: dict | None = None, timeout: int = 120) -> subprocess.CompletedProcess:
         """The copy of scripts/test.sh in d, run in a session of its own: one that does not end in time is killed with
         what it started (the runner's Python too)."""
-        e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
-        e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
-        with subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args], cwd=d, env={**e, **(env or {})},
+        e = self.environment(d)
+        with subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args, *self.JOBS], cwd=d,
+                              env={**e, **(env or {})},
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="backslashreplace",
                               start_new_session=True) as p:
             try:
@@ -72,6 +86,40 @@ class TestSh(unittest.TestCase):
                 p.communicate()
                 raise
         return subprocess.CompletedProcess(p.args, p.returncode, out, err)
+
+    def start_sh(self, d: Path, *args: str) -> tuple[subprocess.Popen, Path]:
+        """As run_sh, but in the background, with its output (stdout and stderr) in a file, which a process that it
+        leaves behind does not keep open as it would a pipe; killed with its process group after the test."""
+        out = d.parent / "out"
+        with open(out, "w") as f:
+            p = subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), *args, *self.JOBS], cwd=d,
+                                 env=self.environment(d), stdin=subprocess.DEVNULL, stdout=f, stderr=subprocess.STDOUT,
+                                 start_new_session=True)
+        self.addCleanup(lambda: (p.poll() is None and os.killpg(p.pid, signal.SIGKILL), p.wait()))
+        return p, out
+
+    def own(self, d: Path) -> bytes:
+        """What the processes of a run on the tree d have in their environment and no other process has: the PATH of
+        environment(d), which starts with the tree's bin directory (for harness_run.kill_own)."""
+        return b"PATH=" + os.fsencode(self.environment(d)["PATH"])
+
+    @staticmethod
+    def with_text(text: str) -> list[int]:
+        """The processes whose command line holds text."""
+        found = []
+        for q in filter(str.isdigit, os.listdir("/proc")):
+            try:
+                if text.encode() in Path(f"/proc/{q}/cmdline").read_bytes().replace(b"\0", b" "):
+                    found.append(int(q))
+            except OSError:
+                pass
+        return found
+
+    def wait_for(self, what, seconds: float = 30):
+        deadline = time.monotonic() + seconds
+        while not what():
+            self.assertLess(time.monotonic(), deadline, "it did not come")
+            time.sleep(0.05)
 
     def passes(self, d: Path, *args: str, env: dict | None = None) -> None:
         r = self.run_sh(d, *args, env=env)
@@ -235,7 +283,10 @@ class TestSh(unittest.TestCase):
         (d / "tests" / "test_exit.py").write_text(
             "import os, unittest\nclass E(unittest.TestCase):\n    def test_a(self):\n        os._exit(0)\n"
             "    def test_b(self):\n        self.fail()\n")
-        self.fails(d, "the unit tests did not finish (no verdict)")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker \d of \d ended with 0, "
+                                   r"without its record")
 
     def test_a_test_module_without_a_test(self):
         d = self.tree()
@@ -2316,6 +2367,642 @@ class TestSh(unittest.TestCase):
     def test_usage(self):
         r = self.run_sh(self.tree(), "--repo")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+    def test_jobs(self):
+        # --jobs N, N from 1 to 16 as the next argument; the run then uses N workers
+        d = self.tree()
+        for args in (["--jobs"], ["--jobs", "0"], ["--jobs", "17"], ["--jobs", "02"], ["--jobs", "x"], ["--jobs=2"],
+                     ["--jobs", "-1"], ["--jobs", "2", "3"], ["--jobs", "--repo-only"]):
+            with self.subTest(args=args):
+                r = self.run_sh(d, *args)
+                self.assertEqual((r.returncode, r.stdout), (2, ""), r.stderr)
+                self.assertIn("usage: scripts/test.sh", r.stderr)
+        for jobs in ("1", "16"):
+            with self.subTest(jobs=jobs):
+                self.passes(d, "--jobs", jobs, "--repo-only")
+
+    def test_workers_run_each_test_once(self):
+        # each loaded test runs once, in one of the workers, after its module's and its class's fixtures, which a
+        # worker sets up for the tests it takes; with --jobs 1 one worker runs them all
+        d = self.tree()
+        log = d.parent / "log"
+        text = ("import os, time, unittest\n"
+                f"def note(what):\n    with open({str(log)!r}, 'a') as f:\n        f.write(f'{{what}} {{os.getpid()}}\\n')\n"
+                "def setUpModule():\n    note('module.' + __name__)\n"
+                "class A(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n        note('class.' + cls.__module__)\n")
+        text += "".join(f"    def test_{i}(self):\n        time.sleep(0.2)\n        note(self.id())\n" for i in range(6))
+        for m in "pqr":
+            (d / "tests" / f"test_{m}.py").write_text(text)
+        expected = sorted(f"test_{m}.A.test_{i}" for m in "pqr" for i in range(6))
+        for jobs in ("1", "3"):
+            with self.subTest(jobs=jobs):
+                log.unlink(missing_ok=True)
+                r = self.run_sh(d, "--jobs", jobs)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (0, ["all checks passed"]), r.stdout + r.stderr)
+                self.assertIn("\nRan 19 tests in ", r.stdout)
+                lines = [line.split() for line in log.read_text().splitlines()]
+                self.assertEqual(sorted(what for what, _ in lines if what.startswith("test_")), expected)
+                workers = {pid for what, pid in lines}
+                if jobs == "1":
+                    self.assertEqual(len(workers), 1)
+                    self.assertEqual(sorted(what for what, _ in lines if not what.startswith("test_")),
+                                     ["class.test_p", "class.test_q", "class.test_r",
+                                      "module.test_p", "module.test_q", "module.test_r"])
+                else:
+                    self.assertGreater(len(workers), 1, lines)
+                    self.assertLessEqual(len(workers), 3, lines)
+                seen = set()                # a worker's tests of a module come after its setUpModule and setUpClass
+                for what, pid in lines:
+                    if what.startswith("test_"):
+                        self.assertLessEqual({("module", what.split(".")[0], pid), ("class", what.split(".")[0], pid)},
+                                             seen, what)
+                    else:
+                        seen.add((*what.split("."), pid))
+
+    def test_what_the_tests_leave_in_their_tmpdir(self):
+        # the tests get a TMPDIR of their own, which fails the run when something is left in it, also by a test that
+        # passed; what a test removes again passes
+        d = self.tree()
+        text = ("import os, shutil, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+                "        d = tempfile.mkdtemp(prefix='left-')\n        self.assertNotEqual(tempfile.gettempdir(), '/tmp')\n")
+        (d / "tests" / "test_tmp.py").write_text(text + "        shutil.rmtree(d)\n")
+        self.passes(d)
+        (d / "tests" / "test_tmp.py").write_text(text)
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: the tests left this in their TMPDIR: left-\w+ \n")
+        # a NamedTemporaryFile that a test keeps in an attribute of its own is removed as the worker lets go of the
+        # test, as unittest's suite does once the test has run, and collects it (the test refers to itself).  Before,
+        # the worker never finalized it
+        (d / "tests" / "test_tmp.py").write_text(
+            "import tempfile, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n"
+            "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n        self.me = self\n    def test_t(self):\n"
+            "        self.f.write(b'x')\n    def test_u(self):\n        self.f.write(b'y')\n")
+        self.passes(d)
+        # also that of a skipped test, of a failed or skipped subtest and of a test that fails or errs, which the
+        # result's lists refer to: the worker clears them once it has written its record.  Before, their files were
+        # left
+        ntf = ("import tempfile, unittest\nclass T(unittest.TestCase):\n    def setUp(self):\n"
+               "        self.f = tempfile.NamedTemporaryFile(prefix='ntf-')\n    def test_ok(self):\n"
+               "        self.f.write(b'x')\n    def test_s(self):\n        self.skipTest('machine: not here')\n")
+        (d / "tests" / "test_tmp.py").write_text(ntf)
+        self.passes(d, "--repo-only")
+        (d / "tests" / "test_tmp.py").write_text(
+            ntf + "    def test_f(self):\n        self.fail('no')\n    def test_e(self):\n        raise OSError('no')\n"
+                  "    def test_sub(self):\n        with self.subTest(i=0):\n            self.fail('no')\n"
+                  "        with self.subTest(i=1):\n            self.skipTest('machine: not here')\n")
+        r = self.run_sh(d, "--repo-only")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("FAILED (failures=2, errors=1, skipped=2)", r.stdout)
+        self.assertNotIn("TMPDIR", r.stdout)
+        # a test that removes the TMPDIR itself: the check cannot read it, and the run fails
+        (d / "tests" / "test_tmp.py").write_text(
+            "import shutil, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        shutil.rmtree(tempfile.gettempdir())\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: cannot read the tests' TMPDIR\n")
+
+    def test_what_the_tests_leave_without_write_permission_is_removed(self):
+        # a directory that a test leaves in its TMPDIR without write permission (0500), or without any (0000), with a
+        # file in it: the run fails for it, and the script's temporary directory goes all the same.  Before, rm could
+        # not remove the file, and the whole of it stayed in TMPDIR
+        d = self.tree()
+        outer = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: (subprocess.run(["chmod", "-R", "u+rwX", "--", str(outer)]),
+                                 shutil.rmtree(outer, True)))
+        (d / "tests" / "test_tmp.py").write_text(
+            "import os, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        for mode in (0o500, 0o000):\n            d = tempfile.mkdtemp(prefix=f'ro{mode:o}-')\n"
+            "            open(os.path.join(d, 'f'), 'w').close()\n            os.chmod(d, mode)\n")
+        r = self.run_sh(d, env={"TMPDIR": str(outer)})
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the tests left this in their TMPDIR: ro0-\w+ ro500-\w+ \n")
+        self.assertNotIn("Permission denied", r.stderr)
+        self.assertEqual(os.listdir(outer), [], "the script left its temporary directory")
+
+    def test_a_thread_that_a_test_module_starts_as_it_loads(self):
+        # fork() copies only the thread that calls it, so a thread that a test module starts at its import and that
+        # still runs when the workers are forked runs in none of them: the run fails and names it, before the tests
+        # run (one that waits for the thread without a time limit would hang the run).  Also one that _thread starts,
+        # which the threading module does not know, and which has a second to end.  One that has ended by then, and one
+        # that setUpClass starts, pass.  Before, the test that waited for the thread failed, and nothing said why; then
+        # the run failed after the tests, and not for a thread of _thread
+        d = self.tree()
+        head = "import threading, unittest\ndone = threading.Event()\n"
+        body = ("class T(unittest.TestCase):\n    def test_t(self):\n"
+                "        self.assertTrue(done.wait(5), 'the thread never ran')\n")
+        start = "threading.Thread(target=lambda: (time.sleep(0.5), done.set()), name='serve', daemon=True).start()\n"
+        says = ("FAIL: a thread started as the tests loaded and still runs, but not in the workers, which are forked "
+                "after the loading (start it in setUpModule or setUpClass): ")
+        for code, named in ((start, "'serve'"),
+                            ("import _thread\n_thread.start_new_thread(lambda: (time.sleep(3), done.set()), ())\n",
+                             "1 that the threading module does not know")):
+            with self.subTest(named=named):
+                (d / "tests" / "test_thread.py").write_text("import time\n" + head + code + body)
+                r = self.run_sh(d)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+                self.assertIn(says + named + "\n", r.stdout)
+                self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        # threads that cannot be counted fail the run too: a test module that makes the runner's os.listdir (the
+        # runner shares the os module) fail for /proc/self/task
+        with self.subTest(named="cannot read"):
+            (d / "tests" / "test_thread.py").write_text(
+                head + "import os\n_listdir = os.listdir\ndef listdir(path='.'):\n"
+                "    if path == '/proc/self/task':\n        raise PermissionError(13, 'Permission denied', path)\n"
+                "    return _listdir(path)\nos.listdir = listdir\n" + body.replace("done.wait(5)", "True"))
+            r = self.run_sh(d)
+            self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+            self.assertIn("FAIL: cannot read /proc/self/task (Permission denied): the threads that would not run in "
+                          "the workers cannot be counted\n", r.stdout)
+            self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        for code in ("s = threading.Thread(target=done.set)\ns.start()\ns.join()\n",
+                     "import _thread\n_thread.start_new_thread(done.set, ())\ndone.wait()\n"):
+            with self.subTest(code=code):
+                (d / "tests" / "test_thread.py").write_text(head + code + body)
+                self.passes(d)
+        (d / "tests" / "test_thread.py").write_text(
+            "import time\n" + head + body + "    @classmethod\n    def setUpClass(cls):\n        " + start)
+        self.passes(d)
+
+    def test_what_fork_does_not_copy_to_the_workers(self):
+        # what a test module makes at its import and fork() does not copy to the workers as the runner had it ends the
+        # run before the tests, as a thread does.  Each test below is wrong and failed in the runner before the
+        # workers; in a worker it passed: Popen.wait() returned 0 for a child of the runner (also for one that had
+        # ended), the runner kept a file open when the test closed it, so that its flock stayed, a lock of
+        # fcntl.lockf (on the runner's stderr) stayed the runner's, a timer and a pending signal went off in the
+        # runner only, and a function given to os.register_at_fork ran as the worker was forked
+        d = self.tree()
+        child = ("import subprocess, time, unittest\nP = subprocess.Popen(['sh', '-c', '{0}exit 3'])\n{1}"
+                 "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertEqual(P.wait(), 0)\n")
+        lock = ("import fcntl, os, tempfile, unittest\n{0}fcntl.{1}(fd, fcntl.LOCK_EX)\n"
+                "class T(unittest.TestCase):\n    def test_t(self):\n{2}        g = os.open(path, os.O_WRONLY)\n"
+                "        with self.assertRaises(BlockingIOError):\n"
+                "            fcntl.{1}(g, fcntl.LOCK_EX | fcntl.LOCK_NB)\n        os.close(g)\n{3}")
+        fails = "a process that started as the tests loaded is a child of the runner, which the workers cannot wait for"
+        cases = {
+            child.format("sleep 1; ", ""):
+                fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+\)\n",
+            child.format("", "time.sleep(0.3)\n"):
+                fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+, ended\)\n",
+            lock.format("fd, path = tempfile.mkstemp()\n", "flock", "        os.close(fd)\n",
+                        "        os.unlink(path)\n"):
+                r"a file, pipe or socket that the tests opened as they loaded is open in the runner too, which keeps "
+                r"it open when a test closes it \(open it in setUpModule or setUpClass\): 3 \(/\S+/tmp\w+\)\n",
+            lock.format("fd, path = 2, '/proc/self/fd/2'\n", "lockf", "", ""):     # (stderr, a pipe)
+                r"a lock of fcntl.lockf that the tests took as they loaded stays the runner's, not the workers' "
+                r"\(take it in setUpModule or setUpClass\)\n",
+            "import signal, time, unittest\nlate = []\nsignal.signal(signal.SIGALRM, lambda *a: late.append(1))\n"
+            "signal.setitimer(signal.ITIMER_REAL, 0.5)\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        time.sleep(1)\n        self.assertEqual(late, [])\n":
+                r"a timer that the tests set as they loaded \(signal.alarm, signal.setitimer\) goes off in the "
+                r"runner, not in the workers \(set it in setUpModule or setUpClass\): ITIMER_REAL\n",
+            "import os, signal, unittest\ngot = []\nsignal.signal(signal.SIGUSR1, lambda *a: got.append(1))\n"
+            "signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})\nos.kill(os.getpid(), signal.SIGUSR1)\n"
+            "class T(unittest.TestCase):\n    def test_t(self):\n"
+            "        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGUSR1})\n        self.assertEqual(got, [])\n":
+                r"a signal that the tests sent to themselves as they loaded is still pending, and the workers do not "
+                r"get it \(send it in setUpModule or setUpClass\): SIGUSR1\n",
+            "import os, unittest\nforked = []\nos.register_at_fork(after_in_child=lambda: forked.append(1))\n"
+            "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertTrue(forked)\n":
+                r"a function that the tests registered with os.register_at_fork as they loaded would run as the "
+                r"workers are forked \(register it in setUpModule or setUpClass\): \S+/tests/test_load.py:3\n",
+            # what cannot be read fails the run too: a test module that makes the runner's reads fail
+            "import pathlib, unittest\n_read = pathlib.Path.read_text\ndef read_text(self, *a, **k):\n"
+            "    if self.name == 'children':\n        raise PermissionError(13, 'Permission denied', str(self))\n"
+            "    return _read(self, *a, **k)\npathlib.Path.read_text = read_text\n" + GOOD_TEST:
+                r"cannot read /proc/self/task/\*/children \(Permission denied\): the processes that the workers could "
+                r"not wait for cannot be listed\n",
+            "import pathlib, unittest\n_read = pathlib.Path.read_text\ndef read_text(self, *a, **k):\n"
+            "    if str(self) == '/proc/locks':\n        raise PermissionError(13, 'Permission denied', str(self))\n"
+            "    return _read(self, *a, **k)\npathlib.Path.read_text = read_text\n" + GOOD_TEST:
+                r"cannot read /proc/locks \(Permission denied\): the files that the tests opened as they loaded, and "
+                r"their locks, cannot be listed\n"}
+        for code, says in cases.items():
+            with self.subTest(says=says):
+                (d / "tests" / "test_load.py").write_text(code)
+                r = self.run_sh(d)
+                self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+                self.assertRegex(r.stdout, "\nFAIL: " + says)
+                self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        # what the loading waited for, closed, cancelled or did not send passes.  The random module seeds itself again
+        # in a forked process, and when the loading seeded it (random.seed, random.setstate) a worker gives it back
+        # its state: a wrong test of a seeded draw fails, a right one passes
+        draw = ("import random, unittest\n{}\nclass R(unittest.TestCase):\n    def test_r(self):\n"
+                "        self.assert{}(random.random(), random.Random(0).random())\n")
+        (d / "tests" / "test_load.py").write_text(draw.format("random.seed(0)", "NotEqual"))
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("\nFAILED (failures=1)\n", r.stdout)
+        for code in ("import subprocess\nR = subprocess.run(['sh', '-c', 'exit 3'])\nassert R.returncode == 3\n"
+                     + GOOD_TEST, "open(__file__).close()\n" + GOOD_TEST,
+                     "import signal\nsignal.signal(signal.SIGALRM, lambda *a: None)\nsignal.alarm(30)\n"
+                     "signal.alarm(0)\n" + GOOD_TEST,
+                     "import signal\nsignal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})\n" + GOOD_TEST,
+                     "import logging, concurrent.futures\n" + draw.format("random.seed(0)", "Equal"),
+                     draw.format("from random import seed\nseed(a=0)", "Equal"),
+                     draw.format("random.setstate(random.Random(0).getstate())", "Equal")):
+            with self.subTest(code=code):
+                (d / "tests" / "test_load.py").write_text(code)
+                self.passes(d)
+
+    def test_workers_draw_their_own_random_numbers(self):
+        # two tests in two workers at the same time draw different random numbers, also when the loading seeded the
+        # module from os.urandom (random.seed()).  When each worker gave the module back the state it had after the
+        # loading, both drew the same numbers (two tests that bound a port picked so failed: Address already in use)
+        d = self.tree()
+        test = ("import os, pathlib, random, time, unittest\n{0}class T(unittest.TestCase):\n"
+                "    def test_t(self):\n        mine, other = pathlib.Path({1!r}), pathlib.Path({2!r})\n"
+                "        pathlib.Path(str(mine) + '.part').write_text(str(random.getrandbits(64)))\n"
+                "        os.replace(str(mine) + '.part', mine)\n"
+                "        deadline = time.monotonic() + 30\n        while not other.exists():\n"
+                "            self.assertLess(time.monotonic(), deadline, 'the other test did not run beside it')\n"
+                "            time.sleep(0.01)\n"
+                "        self.assertNotEqual(mine.read_text(), other.read_text())\n")
+        a, b = str(d.parent / "a"), str(d.parent / "b")
+        for seed in ("", "random.seed()\n"):
+            with self.subTest(seed=seed):
+                for f in (a, b):
+                    Path(f).unlink(missing_ok=True)
+                (d / "tests" / "test_a.py").write_text(test.format(seed, a, b))
+                (d / "tests" / "test_b.py").write_text(test.format(seed, b, a))
+                self.passes(d, "--repo-only", "--jobs", "2")
+
+    def test_the_runner_dumps_no_core_of_a_workers_signal(self):
+        # the runner dies of the signal that ended a worker, but without a core dump when that signal dumps core: the
+        # worker wrote its own.  Before, a worker's SIGSEGV made the runner dump core too, and apport wrote a second
+        # crash report.  The test module sees, in the runner, whether the runner may dump core as it sends itself the
+        # signal (when it may, it sends SIGKILL instead); the worker makes itself non-dumpable before its SIGSEGV, so
+        # that nothing here writes a core or a crash report
+        d = self.tree()
+        seen = d.parent / "dumpable"
+        (d / "tests" / "test_s.py").write_text(
+            "import ctypes, os, pathlib, signal, unittest\nRUNNER, KILL = os.getpid(), os.kill\n"
+            "def kill(pid, sig):\n    if os.getpid() == RUNNER and sig == signal.SIGSEGV:\n"
+            "        dumpable = ctypes.CDLL(None).prctl(3)\n"              # PR_GET_DUMPABLE
+            f"        pathlib.Path({str(seen)!r}).write_text(str(dumpable))\n"
+            "        if dumpable:\n            sig = signal.SIGKILL\n"
+            "    KILL(pid, sig)\nos.kill = kill\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+            "        ctypes.CDLL(None).prctl(4, 0)\n        KILL(os.getpid(), signal.SIGSEGV)\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker 1 of 1 ended with -11, "
+                                   r"without its record\n")
+        self.assertEqual(seen.read_text(), "0")
+        self.assertRegex(r.stderr, r"Segmentation fault +TMPDIR=")
+
+    def test_what_a_test_holds_once_the_tests_have_run(self):
+        # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
+        # a helper: what a test holds is read after the tests have run, in the worker that ran it
+        d = self.tree()
+        (d / "tests" / "test_v.py").write_text(
+            "import unittest\ndef test_free():\n    pass\nclass T(unittest.TestCase):\n    def test_a(self):\n"
+            "        T.test_b.__defaults__ = (globals()['test_' + 'free'],)\n    def test_b(self, h=None):\n"
+            "        pass\n")
+        self.passes(d)
+
+    def test_a_unit_that_no_worker_runs(self):
+        # a setUpClass that takes the next unit from the queue and then skips its class: that unit never starts, and
+        # the skip of its class excuses it, so only the count of the units that the workers took fails the run
+        d = self.tree()
+        (d / "tests" / "test_a.py").write_text(
+            "import os, unittest\nclass A(unittest.TestCase):\n    @classmethod\n    def setUpClass(cls):\n"
+            "        for fd in os.listdir('/proc/self/fd'):\n            try:\n"
+            "                if os.readlink(f'/proc/self/fd/{fd}').endswith('verdict.units'):\n"
+            "                    os.read(int(fd), 4)\n            except OSError:\n                pass\n"
+            "        raise unittest.SkipTest('machine: not here')\n"
+            "    def test_0(self):\n        pass\n    def test_1(self):\n        self.fail('never runs')\n")
+        r = self.run_sh(d, "--repo-only")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertEqual([line for line in r.stdout.splitlines() if line.startswith("FAIL:")],
+                         ["FAIL: the workers did not run each unit once: 2 runs of 2 of 3 units"])
+
+    def test_workers_take_the_units_in_turn_with_the_test_hook(self):
+        # TEST_JOBS_DEAL=1: worker k takes the units k, k + N, k + 2 N ... (TestShJobs uses it)
+        d = self.tree()
+        log = d.parent / "log"
+        (d / "tests" / "test_good.py").write_text("import os, unittest\nclass T(unittest.TestCase):\n" + "".join(
+            f"    def test_{i}(self):\n        with open({str(log)!r}, 'a') as f:\n"
+            f"            f.write(f'{i} {{os.getpid()}}\\n')\n" for i in range(7)))
+        self.passes(d, "--jobs", "3", env={"TEST_JOBS_DEAL": "1"})
+        pid = dict(line.split() for line in log.read_text().splitlines())
+        self.assertEqual(len(pid), 7)
+        self.assertEqual(len(set(pid.values())), 3)
+        for i in range(7):
+            self.assertEqual(pid[str(i)], pid[str(i % 3)], (i, pid))
+
+    def test_tests_that_turn_the_profiler_off_in_every_worker(self):
+        # what ran of such a test is not known, in whichever worker it ran: each of three workers runs some of these
+        d = self.tree()
+        (d / "tests" / "test_off.py").write_text("import sys, time, unittest\nclass T(unittest.TestCase):\n" + "".join(
+            f"    def test_{i}(self):\n        time.sleep(0.2)\n        sys.setprofile(None)\n" for i in range(9)))
+        for jobs in ("1", "3"):
+            with self.subTest(jobs=jobs):
+                self.passes(d, "--jobs", jobs)
+
+    def test_a_signal_to_the_runner_ends_its_workers(self):
+        # the workers run in scripts/test.sh's process group, the runner meanwhile in one of its own: a signal to the
+        # runner alone goes on to them, once, and the end of the runner (SIGKILL) gives each a SIGKILL; either way the
+        # run leaves no verdict.  The runner then ends as the workers did (of the signal), and scripts/test.sh, which
+        # did not get the signal, goes on, as it did when the tests ran in the runner
+        for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP, signal.SIGKILL):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                pids = d.parent / "pids"
+                (d / "tests" / "test_long.py").write_text(
+                    "import os, time, unittest\nclass L(unittest.TestCase):\n" + "".join(
+                        f"    def test_{i}(self):\n        with open({str(pids)!r}, 'a') as f:\n"
+                        "            f.write(f'{os.getpid()} {os.getppid()}\\n')\n        time.sleep(60)\n"
+                        for i in range(2)))
+                e = {k: v for k, v in os.environ.items() if k not in ("STRATA_TEST_HARNESSES", "TEST_REPO_ONLY")}
+                e["PATH"] = f"{d.parent / 'bin'}:{e['PATH']}"
+                p = subprocess.Popen(["bash", str(d / "scripts" / "test.sh"), "--jobs", "2"], cwd=d, env=e,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
+                self.addCleanup(lambda p=p: (p.poll() is None and os.killpg(p.pid, signal.SIGKILL), p.communicate()))
+                for _ in range(300):
+                    lines = pids.read_text().splitlines() if pids.exists() else []
+                    if len(lines) == 2:
+                        break
+                    time.sleep(0.1)
+                workers = [int(line.split()[0]) for line in lines]
+                runners = {int(line.split()[1]) for line in lines}
+                self.assertEqual((len(workers), len(runners)), (2, 1), lines)
+                runner = runners.pop()
+                self.assertEqual([os.getpgid(w) for w in workers], [p.pid, p.pid])
+                self.assertEqual(os.getpgid(runner), runner)
+                os.kill(runner, sig)
+                out, _ = p.communicate(timeout=60)
+                self.assertEqual((p.returncode, out.splitlines()[-1:]), (1, ["FAILED"]), out)
+                if sig != signal.SIGKILL:
+                    self.assertIn(f"FAIL: the unit tests did not finish (no verdict): stopped by {sig.name}", out)
+                    self.assertIn(f"FAIL: the unit tests did not finish (no verdict): worker 1 of 2 ended with "
+                                  f"-{sig.value}, without its record", out)
+                self.assertIn("\n== shell syntax", out)
+                for w in workers:
+                    for _ in range(100):
+                        if not os.path.exists(f"/proc/{w}"):
+                            break
+                        time.sleep(0.1)
+                    self.assertFalse(os.path.exists(f"/proc/{w}"), f"worker {w} outlived the run")
+
+    def test_a_worker_that_dies_of_sigkill(self):
+        # as when the OOM killer takes a worker: the run has no verdict, the runner then dies of SIGKILL too, and bash
+        # goes on with the other steps, as it did when the OOM killer took the process of the tests.  Before, the
+        # runner failed with a traceback, as Python cannot set the action of SIGKILL
+        d = self.tree()
+        (d / "tests" / "test_k.py").write_text(
+            "import os, signal, unittest\nclass K(unittest.TestCase):\n    def test_k(self):\n"
+            "        os.kill(os.getpid(), signal.SIGKILL)\n")
+        r = self.run_sh(d, "--jobs", "2")
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker \d of \d ended with -9, "
+                                   r"without its record\n")
+        self.assertNotIn("Traceback", r.stdout + r.stderr)
+        self.assertIn("\n== shell syntax", r.stdout)
+        self.assertRegex(r.stderr, r"Killed +TMPDIR=")
+
+    def test_a_signal_to_the_group_reaches_what_the_tests_started(self):
+        # a Ctrl-C, a hang-up or a kill -- -PGID reaches scripts/test.sh's whole process group: the runner, or its
+        # workers, and what the tests started in it, which the signal ends.  Before, the workers ran in groups of their
+        # own, and a test's child outlived the run
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                tag = f"sleep 296.{os.getpid()}{sig.value}{time.monotonic_ns() % 10**6}"
+                (d / "tests" / "test_sl.py").write_text(
+                    "import subprocess, unittest\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+                    f"        subprocess.run(['bash', '-c', {tag + '; true'!r}])\n")
+                self.addCleanup(lambda tag=tag, d=d: harness_run.kill_own(self.with_text(tag), self.own(d)))
+                p, out = self.start_sh(d)
+                self.wait_for(lambda: self.with_text(tag))
+                time.sleep(0.3)
+                os.killpg(p.pid, sig)
+                p.wait(timeout=60)
+                time.sleep(0.5)
+                self.assertEqual(self.with_text(tag), [], "a process of the test outlived the run")
+
+    def test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests(self):
+        # scripts/test.sh ends of the signal and runs none of its other steps, as when the tests ran in the runner,
+        # which then died of it: bash stops after a Ctrl-C only when its command died of SIGINT.  Before, the runner
+        # ended with exit 1 after a Ctrl-C, and bash went on with the other steps
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            with self.subTest(signal=sig.name):
+                d = self.tree()
+                started = d.parent / "started"
+                (d / "tests" / "test_sl.py").write_text(
+                    "import time, unittest\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+                    f"        open({str(started)!r}, 'w').close()\n        time.sleep(60)\n")
+                p, out = self.start_sh(d)
+                self.wait_for(started.exists)
+                time.sleep(0.3)
+                os.killpg(p.pid, sig)
+                self.assertEqual(p.wait(timeout=60), -sig, out.read_text())
+                self.assertNotIn("\n== shell syntax", out.read_text())
+
+    def test_a_signal_to_the_group_reaches_each_test_once(self):
+        # a test that handles SIGINT itself gets a Ctrl-C to the group once, and the run goes on to its verdict, as
+        # when the tests ran in the runner: the runner, which passes on what is sent to it alone, is not in the group.
+        # (The signal reaches every worker, and one whose test does not handle it ends: here it comes once the other
+        # workers have ended)
+        d = self.tree()
+        got, started = d.parent / "got", d.parent / "started"
+        (d / "tests" / "test_c.py").write_text(
+            "import os, signal, time, unittest\nclass C(unittest.TestCase):\n    def test_c(self):\n"
+            f"        signal.signal(signal.SIGINT, lambda *a: open({str(got)!r}, 'a').write('x'))\n"
+            f"        open({str(started)!r}, 'w').write(str(os.getppid()))\n        time.sleep(5)\n")
+        p, out = self.start_sh(d)
+        self.wait_for(lambda: started.exists() and started.read_text())
+        runner = started.read_text()
+
+        def children():
+            found = []
+            for q in filter(str.isdigit, os.listdir("/proc")):
+                try:
+                    if Path(f"/proc/{q}/stat").read_text().rpartition(")")[2].split()[1] == runner:
+                        found.append(q)
+                except OSError:
+                    pass
+            return found
+        self.wait_for(lambda: len(children()) == 1)
+        os.killpg(p.pid, signal.SIGINT)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(got.read_text(), "x")
+
+    def test_a_ctrl_c_as_the_runner_reads_the_records(self):
+        # the runner is back in scripts/test.sh's process group before it reads the workers' records, so that a Ctrl-C
+        # then ends the run.  Here the record is a FIFO, which a helper opens once the runner reads it: it notes the
+        # runner's process group and sends SIGINT to scripts/test.sh's.  Before, the runner read the records out of
+        # the group, and the run went on to "all checks passed"
+        d = self.tree()
+        seen = d.parent / "seen"
+        (d.parent / "helper.py").write_text(
+            "import errno, os, signal, sys, time\nfifo, data, runner, group, seen = sys.argv[1:]\n"
+            "deadline = time.monotonic() + 30\nwhile True:\n    try:\n"
+            "        fd = os.open(fifo, os.O_WRONLY | os.O_NONBLOCK)\n        break\n    except OSError as e:\n"
+            "        if e.errno != errno.ENXIO or time.monotonic() > deadline:\n            raise\n"
+            "        time.sleep(0.01)\nopen(seen, 'w').write(str(os.getpgid(int(runner))))\n"
+            "os.killpg(int(group), signal.SIGINT)\ntime.sleep(0.5)\nos.write(fd, open(data, 'rb').read())\n")
+        (d / "tests" / "test_r.py").write_text(
+            "import atexit, os, subprocess, sys, unittest\ndef swap():\n    rec = sys.argv[1] + '.0'\n"
+            "    os.rename(rec, rec + '.saved')\n    os.mkfifo(rec)\n"
+            f"    subprocess.Popen([sys.executable, {str(d.parent / 'helper.py')!r}, rec, rec + '.saved', "
+            f"str(os.getppid()), str(os.getpgrp()), {str(seen)!r}], start_new_session=True, "
+            "stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)\n"
+            "class R(unittest.TestCase):\n    def test_r(self):\n        atexit.register(swap)\n")
+        p, out = self.start_sh(d)
+        self.assertEqual(p.wait(timeout=60), -signal.SIGINT, out.read_text())
+        self.assertEqual(seen.read_text(), str(p.pid))
+        self.assertNotIn("\n== shell syntax", out.read_text())
+
+    def test_a_stop_of_the_group_stops_the_tests(self):
+        # SIGSTOP to scripts/test.sh's process group (as a Ctrl-Z stops the job at a terminal) stops the tests, and
+        # SIGCONT lets them go on.  Before, the workers ran on in groups of their own
+        d = self.tree()
+        tick = d.parent / "tick"
+        (d / "tests" / "test_t.py").write_text(
+            "import time, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n        for _ in range(40):\n"
+            f"            with open({str(tick)!r}, 'a') as f:\n                f.write('x')\n            time.sleep(0.1)\n")
+        p, out = self.start_sh(d)
+        self.wait_for(tick.exists)
+        time.sleep(0.3)
+        os.killpg(p.pid, signal.SIGSTOP)
+        try:
+            time.sleep(0.3)
+            before = tick.stat().st_size
+            time.sleep(1.5)
+            self.assertEqual(tick.stat().st_size, before, "the test went on while its group was stopped")
+        finally:
+            os.killpg(p.pid, signal.SIGCONT)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(tick.stat().st_size, 40)
+
+    def test_what_python_does_as_the_tests_end(self):
+        # as a process ends: it waits for its threads, then runs the atexit handlers, the finalizers of weakref (as
+        # tempfile.TemporaryDirectory's cleanup) among them.  Those registered at the loading of the tests run once,
+        # at the end of the run, and not while another worker still runs tests.  Before, a worker ended with os._exit
+        # and none of those of its tests ran
+        d = self.tree()
+        o = d.parent / "o"
+        o.mkdir()
+        (d / "tests" / "test_end.py").write_text(f"""import atexit, os, shutil, tempfile, threading, time, unittest
+OUT = {str(o)!r}
+def note(what):
+    with open(os.path.join(OUT, 'log'), 'a') as f:
+        f.write(what + '\\n')
+atexit.register(note, 'loading')
+D = tempfile.TemporaryDirectory(dir=OUT)
+keep = []
+class A(unittest.TestCase):
+    def test_0(self):
+        d = tempfile.mkdtemp(dir=OUT)
+        atexit.register(shutil.rmtree, d)
+        keep.append(tempfile.TemporaryDirectory(dir=OUT))
+        threading.Thread(target=lambda: (time.sleep(1), note('thread'))).start()
+    def test_1(self):
+        time.sleep(2)
+        self.assertTrue(os.path.isdir(D.name))
+""")
+        self.passes(d)
+        self.assertEqual(sorted(os.listdir(o)), ["log"])
+        self.assertEqual(sorted((o / "log").read_text().splitlines()), ["loading", "thread"])
+
+    def test_what_libraries_register_as_the_tests_load(self):
+        # an atexit handler that a library registers as a test module imports it runs in each worker too:
+        # multiprocessing.util's, which ends the daemonic children of the process.  One that a test module registers as it
+        # loads runs once, at the end of the run, also when its function is a library's (shutil.rmtree), and not while
+        # another worker still runs tests.  Before, a worker ran none of the loading's handlers, and a daemonic child
+        # outlived the run
+        d = self.tree()
+        o, pids = d.parent / "o", d.parent / "pids"
+        o.mkdir()
+        self.addCleanup(self.end_children, pids, self.own(d))
+        (d / "tests" / "test_mp.py").write_text(
+            "import atexit, multiprocessing, multiprocessing.util, os, shutil, tempfile, time, unittest\n"
+            f"E = tempfile.mkdtemp(dir={str(o)!r})\natexit.register(shutil.rmtree, E)\n"
+            "class M(unittest.TestCase):\n    def test_0(self):\n"
+            "        c = multiprocessing.Process(target=time.sleep, args=(60,), daemon=True)\n        c.start()\n"
+            f"        with open({str(pids)!r}, 'a') as f:\n            f.write(f'{{c.pid}}\\n')\n"
+            "    def test_1(self):\n        time.sleep(2)\n        self.assertTrue(os.path.isdir(E))\n")
+        p, out = self.start_sh(d)
+        self.assertEqual(p.wait(timeout=60), 0, out.read_text())
+        self.assertEqual(os.listdir(o), [])
+        children = pids.read_text().split()
+        self.assertEqual(len(children), 1)
+        for _ in range(50):
+            if not os.path.exists(f"/proc/{children[0]}"):
+                break
+            time.sleep(0.1)
+        self.assertFalse(os.path.exists(f"/proc/{children[0]}"), "the daemonic child outlived the run")
+        # a handler registered before the tests load (here by a sitecustomize module) is one that the runner did not
+        # see: a worker would drop it, so the run fails
+        site = d.parent / "site"
+        site.mkdir()
+        (site / "sitecustomize.py").write_text("import atexit\natexit.register(print, end='')\n")
+        (d / "tests" / "test_mp.py").unlink()
+        self.fails(d, "FAIL: atexit has handlers that the runner did not see registered as the tests loaded: a worker "
+                      "would not run them", env={"PYTHONPATH": str(site)})
+
+    @staticmethod
+    def end_children(pids: Path, own: bytes) -> None:
+        """SIGKILL to each process named in pids that runs a copy of the runner (its command line names the verdict) of
+        this run (own in its environment: one that took a pid of the file after its process ended is not)."""
+        found = []
+        for q in pids.read_text().split() if pids.exists() else ():
+            try:
+                if b"verdict" in Path(f"/proc/{q}/cmdline").read_bytes():
+                    found.append(int(q))
+            except OSError:
+                pass
+        harness_run.kill_own(found, own)
+
+    def test_a_signal_that_the_loading_holds(self):
+        # a test module that blocks a signal at its import and sends it to itself: it stays pending as it did in the
+        # runner, also in the workers, which start without it; a test that unblocks it then gets it, and the run ends
+        # (SIGTERM) as it ended in the runner.  Before, the workers unblocked SIGINT, SIGTERM and SIGHUP
+        head = ("import os, signal, time, unittest\nsignal.pthread_sigmask(signal.SIG_BLOCK, {{signal.{0}}})\n"
+                "os.kill(os.getpid(), signal.{0})\nclass H(unittest.TestCase):\n    def test_h(self):\n")
+        d = self.tree()
+        (d / "tests" / "test_held.py").write_text(head.format("SIGINT") + "        time.sleep(0.5)\n")
+        self.passes(d)
+        (d / "tests" / "test_held.py").write_text(
+            head.format("SIGTERM") + "        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGTERM})\n"
+                                     "        time.sleep(5)\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("\n== shell syntax", r.stdout)
+        self.assertNotIn("\nOK", r.stdout)
+
+
+class TestShJobs(TestSh):
+    """The cases of TestSh about the unit-test step, again with --jobs 3: what one worker sees (a test that fails,
+    never runs, returns a value, is skipped for another reason ...) fails the run as it does with one, also when the
+    code that makes something a helper ran in another worker.  The workers take the units in turn (TEST_JOBS_DEAL), so
+    that two tests next to each other in the order run in different workers on every run."""
+    JOBS = ("--jobs", "3")
+    DEAL = {"TEST_JOBS_DEAL": "1"}
+
+
+for _name in [n for n in vars(TestSh) if n.startswith("test_") and n not in {
+        "test_a_tree_without_a_fault_passes", "test_no_test_ran", "test_a_test_file_discovery_does_not_load",
+        "test_tests_that_cannot_run", "test_no_test_ran_when_classes_or_modules_are_skipped", "test_a_failing_test",
+        "test_a_test_that_expects_to_fail", "test_a_test_that_ends_the_run", "test_a_test_module_without_a_test",
+        "test_every_test_skipped", "test_skips", "test_tests_whose_body_never_runs",
+        "test_forms_round_4_mutation_testing_found_untested",
+        "test_tests_behind_decorators_without_wraps_and_helpers_named_test", "test_files_that_are_not_regular",
+        "test_modules_and_tests_the_runner_once_refused", "test_forms_round_6_mutation_testing_found_untested",
+        "test_helpers_skipped_modules_and_tests_without_a_name", "test_forms_round_7_mutation_testing_found_untested",
+        "test_helpers_are_read_by_code_that_may_run", "test_forms_round_8_mutation_testing_found_untested",
+        "test_a_helper_that_a_skipped_tests_method_reads_through_self",
+        "test_forms_round_9_mutation_testing_found_untested",
+        "test_helpers_through_methods_of_related_classes_and_more_forms",
+        "test_forms_round_10_mutation_testing_found_untested", "test_a_signal_to_the_group_reaches_what_the_tests_started",
+        "test_a_signal_to_the_group_ends_the_run_as_it_ended_the_tests", "test_a_stop_of_the_group_stops_the_tests",
+        "test_a_signal_to_the_group_reaches_each_test_once",
+        "test_what_python_does_as_the_tests_end", "test_a_signal_that_the_loading_holds",
+        "test_what_libraries_register_as_the_tests_load", "test_what_the_tests_leave_in_their_tmpdir",
+        "test_a_worker_that_dies_of_sigkill", "test_a_thread_that_a_test_module_starts_as_it_loads",
+        "test_what_fork_does_not_copy_to_the_workers"}]:
+    setattr(TestShJobs, _name, None)          # not loaded: the other steps do not depend on --jobs
 
 
 if __name__ == "__main__":

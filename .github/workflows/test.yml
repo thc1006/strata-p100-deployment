@@ -1,6 +1,8 @@
-# The repository's checks on GitHub: scripts/test.sh --repo-only --harnesses, on every push to main and every pull
-# request.  The stub harnesses that start fake engines run here, not on the machine: while one runs there, a start of
-# strata-q3 is refused.  STRATA_TEST_NO_SERVICE=1 tells them that no strata-q3 runs on this host (decision 0006).
+# The repository's checks on GitHub: scripts/test.sh --repo-only --harnesses --jobs 6, on every push to main and every
+# pull request.  The unit tests run in six workers (their times with one, four and six: results/ci-jobs-20261030.txt).
+# The stub harnesses that start fake engines run here, not on the machine: while one runs there, a start of strata-q3
+# is refused.
+# STRATA_TEST_NO_SERVICE=1 tells them that no strata-q3 runs on this host (decision 0006).
 # scripts/deploy.sh deploys a commit of main only after the run of this file for its push passed: keep the file name.
 name: test
 
@@ -32,7 +34,7 @@ jobs:
       # which can refuse anonymous pulls from the runners' shared addresses.  The repository is mounted read-only, apt
       # reads the main component (the harnesses need gcc, libc6-dev, procps, iproute2 and curl) and universe (only
       # shellcheck), and the checks run as nobody, as on the machine.
-      - name: scripts/test.sh --repo-only --harnesses on Ubuntu 22.04
+      - name: scripts/test.sh --repo-only --harnesses --jobs 6 on Ubuntu 22.04
         env:
           BASE: https://cdimage.ubuntu.com/ubuntu-base/releases/22.04/release/ubuntu-base-22.04.5-base-amd64.tar.gz
           BASE_SHA256: 242cd8898b33ea806ef5f13b1076ed7c76f9f989d18384452f7166692438ff1a
@@ -42,8 +44,9 @@ jobs:
             DEBIAN_FRONTEND=noninteractive apt-get -qq -o Acquire::Retries=3 install --no-install-recommends \
               git python3 systemd gcc libc6-dev procps iproute2 curl shellcheck > /dev/null
             HOME=/tmp STRATA_TEST_NO_SERVICE=1 setpriv --reuid=65534 --regid=65534 --clear-groups \
-              scripts/test.sh --repo-only --harnesses
+              scripts/test.sh --repo-only --harnesses --jobs 6
         run: |
+          echo "CPUs (nproc): $(nproc)"
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/base.tar.gz" "$BASE"
           echo "$BASE_SHA256  $RUNNER_TEMP/base.tar.gz" | sha256sum -c --quiet -
           docker import "$RUNNER_TEMP/base.tar.gz" ubuntu-base:22.04.5 > /dev/null

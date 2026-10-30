@@ -9,8 +9,12 @@
 #   scripts/test.sh --harnesses  with them; here only while strata-q3 is stopped and no experiment runs (otherwise
 #                                tests/harness_run.py fails them)
 #   scripts/test.sh --repo-only  no file outside the repo: the units' programs outside it are not checked, and the tests
-#                                that need this machine's files are skipped.  CI runs `--repo-only --harnesses`
-#                                (.github/workflows/test.yml), and shellcheck must be installed then.
+#                                that need this machine's files are skipped.  CI runs `--repo-only --harnesses
+#                                --jobs 6` (.github/workflows/test.yml), and shellcheck must be installed then.
+#   scripts/test.sh --jobs N     the unit tests in N worker processes, N from 1 to 16 (1 without it, as here, where the
+#                                service runs beside them); the checks below see the tests of all of them.  With
+#                                --harnesses here, keep 1: a test of tests/harness_run.py runs a stand-in for an
+#                                experiment driver, and a harness in another worker then refuses to run
 # A run fails when a test fails or does not finish, when no test ran (every test was skipped, by itself or with its
 # class or module; a test whose subtests were skipped ran), when a .py file under tests/ is not a test module the runner
 # loads (tests/test_*.py) or a helper of theirs, is no regular file, or loads no test (a test counts for the module that
@@ -36,33 +40,47 @@
 # None) fails; a test behind a decorator without functools.wraps runs when its function ran, or when its test was
 # skipped or never started and the decorator holds the function, in its closure or as an argument's default), when a
 # test returns something (a coroutine it returns never runs), when a test expects to fail, or when a test is skipped for
-# another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only).  Code review has to see
-# what runs but checks nothing, as a test that returns early from its own body.
+# another reason than those two ("harness:" without --harnesses, "machine:" with --repo-only), and when the tests leave
+# something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
+# (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
+# workers says why), and when the loading left what fork() does not copy to the workers as this process has it (the
+# tests then do not run): a thread that still runs, a child process (also one that has ended and that no one has waited
+# for), an open file, pipe or socket, a lock of fcntl.lockf, a timer, a pending signal, or a function that code outside
+# the standard library gave os.register_at_fork.
+# Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
-# Usage: scripts/test.sh [--repo-only] [--harnesses]
+# Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
 set -u -o pipefail
 D=$(cd "$(dirname "$0")/.." && pwd)
 cd "$D" || exit 1
 LIVE=/home/thc1006/dev/p100-q3-deployment     # the checkout the units name: in their copies here, the tested tree
-REPO_ONLY=0; HARNESSES=0
-for a in "$@"; do
-  case $a in
+REPO_ONLY=0; HARNESSES=0; JOBS=1
+usage() { echo "usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]  (N: 1 to 16)" >&2; exit 2; }
+while [ $# -gt 0 ]; do
+  case $1 in
     --repo-only) REPO_ONLY=1 ;;
     --harnesses) HARNESSES=1 ;;
-    *) echo "usage: scripts/test.sh [--repo-only] [--harnesses]" >&2; exit 2 ;;
+    --jobs) [ $# -ge 2 ] && [[ $2 =~ ^([1-9]|1[0-6])$ ]] || usage; JOBS=$2; shift ;;
+    *) usage ;;
   esac
+  shift
 done
 fail=0
 step() { printf '\n== %s\n' "$1"; }
 tmp=$(mktemp -d) || { echo "cannot create a temporary directory"; exit 1; }
-trap 'rm -rf -- "$tmp"' EXIT
+# (a directory that a test left without write permission is made writable first, so that rm can empty it)
+trap 'chmod -R u+rwX -- "$tmp" 2> /dev/null; rm -rf -- "$tmp"' EXIT
 # its path without symlinks and "..": systemd-analyze names the files in it so, and the step that runs it looks for that
 tmp=$(cd -- "$tmp" && pwd -P) || { echo "cannot enter the temporary directory"; exit 1; }
 
 step "unit tests (tests/)"
-# the runner writes its verdict last: a test that ends the process (os._exit) leaves none
-TEST_REPO_ONLY=$REPO_ONLY STRATA_TEST_HARNESSES=$HARNESSES python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, cProfile, functools, inspect, os, pathlib, stat, symtable, sys, types, unittest
+# the runner writes its verdict last: a test that ends the process (os._exit) leaves none.  The tests get a TMPDIR of
+# their own, which must be empty when they have ended, and the lock of tests/harness_run.py is next to it
+mkdir "$tmp/tests" || { echo "cannot create the tests' temporary directory"; exit 1; }
+TMPDIR=$tmp/tests STRATA_TEST_ENGINES_LOCK=$tmp/engines.lock TEST_REPO_ONLY=$REPO_ONLY \
+  STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
+import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, posix, random, signal, stat, \
+    symtable, sys, sysconfig, threading, time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -272,8 +290,84 @@ class Loader(unittest.TestLoader):
         return suite
 
 
+TESTS = os.path.realpath("tests") + os.sep
+exits, seen = [], 0     # what atexit.register got while the tests loaded, in order: (function, arguments, keywords,
+                        # whether code in tests/ called it); and how many calls (atexit counts unregistered ones too)
+real_register, real_unregister = atexit.register, atexit.unregister
+
+
+def register(func, *args, **kwargs):
+    global seen
+    real_register(func, *args, **kwargs)
+    seen += 1
+    exits.append((func, args, kwargs, os.path.realpath(sys._getframe(1).f_code.co_filename).startswith(TESTS)))
+    return func
+
+
+def unregister(func):
+    real_unregister(func)
+    exits[:] = [e for e in exits if not e[0] == func]
+
+
+atexit.register, atexit.unregister = register, unregister
+
+
+def descriptors():
+    """This process's open file descriptors, each with the file it refers to (device, inode)."""
+    found = {}
+    for n in os.listdir("/proc/self/fd"):
+        try:
+            st = os.fstat(int(n))
+        except OSError:                 # (that of the listing, closed by now)
+            continue
+        found[int(n)] = (st.st_dev, st.st_ino)
+    return found
+
+
+OWN_FDS = descriptors()                 # this process's own, before the tests load
+STDLIB = tuple(os.path.realpath(sysconfig.get_path(k)) + os.sep for k in ("stdlib", "platstdlib"))
+SITE = tuple(os.path.realpath(sysconfig.get_path(k)) + os.sep for k in ("purelib", "platlib"))
+forkers = []            # where code outside the standard library called os.register_at_fork before the workers
+real_at_fork = os.register_at_fork
+
+
+@functools.wraps(real_at_fork)
+def at_fork(**kwargs):
+    real_at_fork(**kwargs)
+    caller = sys._getframe(1)
+    name = caller.f_code.co_filename
+    path = STDLIB[0] if name.startswith("<frozen ") else os.path.realpath(name)
+    if not path.startswith(STDLIB) or path.startswith(SITE):
+        forkers.append(f"{name}:{caller.f_lineno}")
+
+
+os.register_at_fork = posix.register_at_fork = at_fork
+seeded = False          # whether the loading gave the random module a seed or a state, which the workers then get back
+real_seed, real_setstate = random.seed, random.setstate
+
+
+@functools.wraps(real_seed)
+def seed(*args, **kwargs):
+    global seeded
+    real_seed(*args, **kwargs)
+    seeded = (args[0] if args else kwargs.get("a")) is not None     # (no seed: one from os.urandom)
+
+
+@functools.wraps(real_setstate)
+def setstate(state):
+    global seeded
+    real_setstate(state)
+    seeded = True
+
+
+random.seed, random.setstate = seed, setstate
 profile.enable()
 suite = Loader().discover("tests", pattern=PATTERN)
+atexit.register, atexit.unregister = real_register, real_unregister
+random.seed, random.setstate = real_seed, real_setstate
+if atexit._ncallbacks() != seen:
+    bad.append("atexit has handlers that the runner did not see registered as the tests loaded: a worker would not run "
+               "them")
 
 
 def unwrapped(fn):
@@ -376,8 +470,10 @@ class Result(unittest.TextTestResult):
             return tid(test)
 
 
-returned, unknown = {}, set()   # test id: the type of what the test returned (a test returns None); the tests that
-                                # turned the profiler off (sys.setprofile, a profiler of their own): what ran is not known
+returned, unknown = {}, set()   # test id: (the unit it ran in, the type of what the test returned) (a test returns
+                                # None); the tests that turned the profiler off (sys.setprofile, a profiler of their
+                                # own): what ran is not known
+now = -1                        # the unit (below) that runs
 
 
 def call(self, method):
@@ -385,24 +481,472 @@ def call(self, method):
     if sys.getprofile() is not profile:
         unknown.add(tid(self))
     if value is not None:
-        returned[tid(self)] = type(value).__name__
+        returned[tid(self)] = (now, type(value).__name__)
 
 
 if not hasattr(unittest.TestCase, "_callTestMethod"):
     bad.append("this Python's unittest has no TestCase._callTestMethod, through which the runner sees what a test returns")
 unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has its own, which awaits the test)
-result = unittest.TextTestRunner(stream=sys.stdout, verbosity=1, resultclass=Result).run(suite)
+
+# The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
+# that each starts with what the loading ran, but for what fork() does not copy, such as a thread: fork() copies only
+# the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  The
+# random module seeds itself again in a forked process, so that two workers do not draw the same numbers; when the
+# loading seeded it (random.seed with a seed, random.setstate), a worker gives it back the state it had at the fork.  A
+# random.Random that the loading made draws the same numbers in each worker.  What still differs in a worker, among
+# other things, is its pid and parent pid, its CPU time and other resource use (time.process_time, resource.getrusage),
+# which start again at zero, and a mapping that the loading marked mmap.MADV_DONTFORK, which a worker does not have: a
+# test that reads it ends its worker with SIGSEGV, and the run fails.  A worker takes the next unit from a file that all
+# of them read through one open file description (each read moves its offset on), runs it, and writes down what the
+# checks below need; this process then merges that, prints unittest's report and runs the checks.  A unit is a test,
+# or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
+# the loader are cut into their tests, which unittest's fixtures then see in the same order, so a worker sets a class or
+# module up (setUpClass, setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with
+# TEST_JOBS_DEAL=1, worker k takes the units k, k + JOBS, k + 2 JOBS ... instead.)
+# Signals reach the tests as when they ran in this process: the workers stay in the process group of scripts/test.sh,
+# so that a signal to that group (a Ctrl-C, a hang-up, kill -- -PGID, deploy.sh's timeout) reaches them and what their
+# tests start, and a Ctrl-Z stops them.  While they run, this process is in a group of its own, which such a signal does
+# not reach; one sent to it alone (SIGINT, SIGTERM, SIGHUP) goes on to each worker.  So no worker gets a signal twice.
+# Until this process has left the group the workers hold these signals, and one that it got by then goes on to each
+# worker that does not hold it.  This process is back in the group before it reads the workers' records.
+# A worker ends as Python ends, but without the interpreter's teardown, which would also finalize what the loading
+# made.  It drops its references to the tests it ran, as unittest's suites do, also those of the result's lists (to a
+# skipped or failed test), and collects them, so that what only they hold is finalized; what a global still holds (a
+# NamedTemporaryFile in a module's list or a class's attribute) is not, and the TMPDIR check fails on its file (close it
+# in a clean-up).  Then it runs the atexit handlers that its tests registered, and those that a library
+# registered as the tests loaded (logging's, multiprocessing's, which ends its daemonic children); those that code in
+# tests/ registered as they loaded run here, once.  After a KeyboardInterrupt it ends of SIGINT.  When a worker ends
+# without its record (a test that ends the process, a signal) the run has no verdict, and when one died of a signal
+# this process then dies of the same signal, also of SIGKILL (the OOM killer's), as the process of the tests did before,
+# so that after a Ctrl-C bash stops too.  A worker gets SIGKILL when this process ends before it (PR_SET_PDEATHSIG).
+jobs = int(os.environ["TEST_JOBS"])
+units, spans = [], []           # spans: (first, end) of each unit's tests in bodies
+
+
+def cut(s):
+    for t in s:
+        if type(t) is unittest.TestSuite:
+            cut(t)
+        else:
+            first = spans[-1][1] if spans else 0
+            units.append(t)
+            spans.append((first, first + (len(list(tests_of(t))) if isinstance(t, unittest.TestSuite) else 1)))
+
+
+cut(suite)
+if [tid(t) for u in units for t in (tests_of(u) if isinstance(u, unittest.TestSuite) else [u])] != \
+        [tid(t) for t, _, _ in bodies]:
+    bad.append("the units the workers take are not the loaded tests, in their order")
+LISTS = ("errors", "failures", "skipped", "expectedFailures", "unexpectedSuccesses")
+QUEUES = [f"{sys.argv[1]}.units.{k}" for k in range(jobs)] if os.environ.get("TEST_JOBS_DEAL") == "1" else \
+    [sys.argv[1] + ".units"]
+for n, path in enumerate(QUEUES):
+    pathlib.Path(path).write_bytes(b"".join(i.to_bytes(4, "big") for i in range(n, len(units), len(QUEUES))))
+queues = [os.open(path, os.O_RDONLY) for path in QUEUES]
+runner = unittest.TextTestRunner(stream=sys.stdout, verbosity=1, resultclass=Result)
+SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+parent = os.getpid()
+
+
+def no_more_units():
+    for q in queues:
+        os.lseek(q, 0, os.SEEK_END)
+
+
+class Queue(unittest.TestSuite):
+    """A worker's units, as it takes them; marks: (unit, the length of each of the result's lists) as each starts."""
+    def __init__(self, result, queue):
+        super().__init__()
+        self.result, self.queue, self.took, self.marks = result, queue, [], []
+
+    def __iter__(self):
+        global now
+        while True:
+            b = os.read(self.queue, 4)
+            if len(b) != 4:
+                return
+            now = int.from_bytes(b, "big")
+            self.took.append(now)
+            self.marks.append((now, {name: len(getattr(self.result, name)) for name in LISTS}))
+            yield units[now]
+
+    def _removeTestAtIndex(self, index):
+        pass
+
+
+def record(k, result, q):
+    """What the checks need of worker k's run, written to <verdict>.<k>."""
+    ran = {e.code for e in profile.getstats()} | profile.entered
+    ran = {c for c in ran if hasattr(c, "co_filename")}
+    lists = {}
+    for name in LISTS:
+        out, m = [], -1
+        for j, e in enumerate(getattr(result, name)):
+            while m + 1 < len(q.marks) and q.marks[m + 1][1][name] <= j:
+                m += 1
+            t, text = (e, "") if name == "unexpectedSuccesses" else e
+            desc = result.getDescription(t) if name in ("errors", "failures") else ""
+            out.append([q.marks[m][0] if m >= 0 else -1, tid(t), isinstance(t, unittest.TestCase), desc, text])
+        lists[name] = out
+    own = []
+    for u in q.took:
+        for i in range(*spans[u]):
+            t, _, fn = bodies[i]
+            f = test_function(t)
+            own.append([i, [where(c) for g in (fn, unwrapped(fn)) for c in inner(g)], [at(c) for c in inner(fn)],
+                        where(f) if f is not None else None])
+    pathlib.Path(f"{sys.argv[1]}.{k}").write_text(json.dumps({
+        "took": q.took, "run": result.testsRun, "started": sorted(result.started), "lists": lists,
+        "returned": [[u, t, kind] for t, (u, kind) in returned.items()], "unknown": sorted(unknown),
+        "ran": [where(c) for c in ran], "own": own,
+        "body_ran": [i for i, (_, code, _) in enumerate(bodies) if code is not None and code in ran]}))
+
+
+def finish():
+    """What Python does as it ends, before the end itself: it waits for the threads, runs the atexit handlers and
+    flushes the streams."""
+    for end in (threading._shutdown, atexit._run_exitfuncs):
+        try:
+            end()
+        except BaseException:
+            traceback.print_exc()
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.flush()
+        except BaseException:
+            pass
+
+
+def let_go(took, result):
+    """Drop the references to the tests that this worker ran, as unittest's suites drop each test once it has run, and
+    those of the result's lists (to a skipped or failed test, a subtest), and collect them: what only a test holds (a
+    NamedTemporaryFile in an attribute of its own) is finalized here."""
+    for name in LISTS:
+        getattr(result, name).clear()
+    gone = {id(units[u]) for u in took}
+
+    def walk(s):
+        for j, t in enumerate(s._tests):
+            if id(t) in gone:
+                s._tests[j] = None
+            elif type(t) is unittest.TestSuite:
+                walk(t)
+    walk(suite)
+    for u in took:
+        units[u] = None
+        for i in range(*spans[u]):
+            bodies[i] = None
+    globals()["t"] = None                       # (the last test of the loop over the loaded ones)
+    gc.collect()
+
+
+def die(signum):
+    """End of signum, as its default action does, but without a core dump (the runner dies of a worker's signal, and
+    that worker wrote its own)."""
+    ctypes.CDLL(None).prctl(4, 0)                           # PR_SET_DUMPABLE 0
+    if signum not in (signal.SIGKILL, signal.SIGSTOP):      # (whose action cannot be changed)
+        signal.signal(signum, signal.SIG_DFL)
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, {signum})
+    os.kill(os.getpid(), signum)
+
+
+def work(k, saved, mask, gate, report):
+    """Worker k: it runs the units it takes and records its run; it ends as Python ends, but with os._exit, so that
+    nothing of this process's exit (the loading's atexit handlers and finalizers, buffers, the verdict) happens twice."""
+    status, interrupted = 1, False
+    try:
+        try:
+            if seeded:
+                random.setstate(RANDOM_STATE)       # (see the comment on the workers)
+            atexit._clear()                     # what the tests registered as they loaded runs in this process's
+            for f in list(weakref.finalize._registry):              # parent, and so do the loading's finalizers;
+                f.atexit = False
+            for func, args, kwargs, ours in exits:  # what a library registered (logging's, multiprocessing's, that
+                if not ours:                        # of weakref.finalize, for this process's own) runs here too
+                    atexit.register(func, *args, **kwargs)
+            for s, handler in saved.items():
+                if handler is not None:         # (None: a handler that Python did not set, which stays)
+                    signal.signal(s, handler)
+            if ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGKILL) != 0:       # PR_SET_PDEATHSIG
+                raise OSError(ctypes.get_errno(), "prctl(PR_SET_PDEATHSIG) failed")
+            if os.getppid() != parent:
+                raise RuntimeError("the runner ended while the worker started")
+            while os.read(gate, 1):             # until the runner has left the group (the end of the pipe)
+                pass
+            os.write(report, f"{k} {' '.join(str(int(s)) for s in signal.sigpending())}\n".encode())
+            os.close(report)
+            signal.pthread_sigmask(signal.SIG_SETMASK, mask)          # what it holds acts now
+            result = runner._makeResult()
+            unittest.registerResult(result)
+            result.failfast, result.buffer, result.tb_locals = runner.failfast, runner.buffer, runner.tb_locals
+            q = Queue(result, queues[k % len(queues)])
+            with warnings.catch_warnings():             # as TextTestRunner.run()
+                if runner.warnings:
+                    warnings.simplefilter(runner.warnings)
+                    if runner.warnings in ("default", "always"):
+                        warnings.filterwarnings("module", category=DeprecationWarning,
+                                                message=r"Please use assert\w+ instead.")
+                result.startTestRun()
+                try:
+                    q(result)
+                finally:
+                    result.stopTestRun()
+            profile.disable()
+            record(k, result, q)
+            let_go(q.took, result)
+            status = 0
+        except KeyboardInterrupt:
+            traceback.print_exc()
+            interrupted = True
+        except BaseException:
+            traceback.print_exc()
+        finish()
+        if interrupted:
+            die(signal.SIGINT)
+    finally:
+        os._exit(status)
+
+
+saved = {s: signal.getsignal(s) for s in SIGNALS}
+home = os.getpgrp()             # scripts/test.sh's group
+alive, came = {}, []            # pid: worker; the signals that went on to the workers
+
+
+def forward(signum, frame):
+    """A signal sent to this process alone, while it is out of the group: to each worker; when none runs any more, it
+    acts as it would have without the workers."""
+    if not alive:
+        signal.signal(signum, saved[signum])
+        signal.raise_signal(signum)
+        return
+    came.append(signum)
+    for pid in list(alive):
+        try:
+            os.kill(pid, signum)
+        except OSError:
+            pass
+
+
+# fork() copies only the thread that calls it: a thread that still runs now runs in no worker, and a test that waits
+# for it could wait for ever, so the run ends here, with what the loading found.  The threads are those in
+# /proc/self/task, which also has those that _thread started; one that threading does not know may still be ending
+# after a join, and has up to a second for it
+thread = None
+for wait in range(101):
+    try:
+        others = len(os.listdir("/proc/self/task")) - 1
+    except OSError as e:
+        thread = (f"cannot read /proc/self/task ({e.strerror}): the threads that would not run in the workers cannot "
+                  "be counted")
+        break
+    threads = [repr(t.name) for t in threading.enumerate() if t is not threading.main_thread()]
+    if not others or threads or wait == 100:
+        if others:
+            thread = ("a thread started as the tests loaded and still runs, but not in the workers, which are forked "
+                      "after the loading (start it in setUpModule or setUpClass): " + ", ".join(
+                          threads + [f"{others - len(threads)} that the threading module does not know"] *
+                          (others > len(threads))))
+        break
+    time.sleep(0.01)
+
+
+def child(pid):
+    try:
+        stat = pathlib.Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return f"pid {pid}"
+    end = stat.rfind(")")
+    return f"{stat[stat.find('(') + 1:end]!r} (pid {pid}{', ended' if stat[end + 2:end + 3] == 'Z' else ''})"
+
+
+# fork() does not copy these either as this process has them, and the run ends here for each, as for a thread:
+# - a child process: the workers cannot wait for it (Popen.wait() then returns 0), also when it has ended and no one
+#   has waited for it yet.  subprocess.run() waits for its own.
+# - a file, pipe or socket: this process keeps it open when a test closes it, so that closing it does not release a
+#   lock on it, give a pipe's reader the end of the data or close a connection.  (The units' queues are this
+#   process's own.)
+# - a lock of fcntl.lockf (a POSIX record lock): it stays this process's.
+# - a timer (signal.alarm, signal.setitimer), and a pending signal, but SIGINT, SIGTERM and SIGHUP, which go on to the
+#   workers (see above).
+# - a function that code outside the standard library gave os.register_at_fork: it would run as the workers are
+#   forked.
+stop = [thread] if thread else []
+try:
+    kids = [p for t in os.listdir("/proc/self/task")
+            for p in pathlib.Path(f"/proc/self/task/{t}/children").read_text().split()]
+except OSError as e:
+    stop.append(f"cannot read /proc/self/task/*/children ({e.strerror}): the processes that the workers could not "
+                "wait for cannot be listed")
+else:
+    if kids:
+        stop.append("a process that started as the tests loaded is a child of the runner, which the workers cannot "
+                    "wait for (start it in setUpModule or setUpClass): " + ", ".join(map(child, kids)))
+try:
+    opened = sorted(n for n, f in descriptors().items() if OWN_FDS.get(n) != f and n not in queues)
+    names = [f"{n} ({os.readlink(f'/proc/self/fd/{n}')})" for n in opened]
+    locks = [line.split() for line in pathlib.Path("/proc/locks").read_text().splitlines()]
+except OSError as e:
+    stop.append(f"cannot read {e.filename} ({e.strerror}): the files that the tests opened as they loaded, and their "
+                "locks, cannot be listed")
+else:
+    if opened:
+        stop.append("a file, pipe or socket that the tests opened as they loaded is open in the runner too, which "
+                    "keeps it open when a test closes it (open it in setUpModule or setUpClass): " + ", ".join(names))
+    if any(lock[1:2] == ["POSIX"] and lock[4:5] == [str(parent)] for lock in locks):
+        stop.append("a lock of fcntl.lockf that the tests took as they loaded stays the runner's, not the workers' "
+                    "(take it in setUpModule or setUpClass)")
+timers = [n for n in ("ITIMER_REAL", "ITIMER_VIRTUAL", "ITIMER_PROF") if signal.getitimer(getattr(signal, n))[0]]
+if timers:
+    stop.append("a timer that the tests set as they loaded (signal.alarm, signal.setitimer) goes off in the runner, "
+                "not in the workers (set it in setUpModule or setUpClass): " + ", ".join(timers))
+held = sorted(signal.sigpending() - set(SIGNALS))
+if held:
+    stop.append("a signal that the tests sent to themselves as they loaded is still pending, and the workers do not "
+                "get it (send it in setUpModule or setUpClass): " + ", ".join(getattr(s, "name", str(s)) for s in held))
+os.register_at_fork = posix.register_at_fork = real_at_fork
+if forkers:
+    stop.append("a function that the tests registered with os.register_at_fork as they loaded would run as the "
+                "workers are forked (register it in setUpModule or setUpClass): " + ", ".join(forkers))
+if stop:
+    for b in bad + stop:
+        print(f"FAIL: {b}")
+    pathlib.Path(sys.argv[1]).write_text("fail\n")
+    sys.exit(1)
+RANDOM_STATE = random.getstate()
+sys.stdout.flush()
+sys.stderr.flush()
+start = time.perf_counter()
+mask = signal.pthread_sigmask(signal.SIG_BLOCK, SIGNALS)
+gate, gate_w = os.pipe()
+report_r, report = os.pipe()
+for k in range(jobs):
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.close(gate_w)
+            os.close(report_r)
+            work(k, saved, mask, gate, report)
+        finally:
+            os._exit(1)
+    alive[pid] = k
+os.close(gate)
+os.close(report)
+os.setpgid(0, 0)                # out of the group: what is sent to the group now reaches the workers only
+os.close(gate_w)
+pending = {}                    # worker: the signals it holds, once this process is out of the group
+with os.fdopen(report_r, "rb") as f:
+    for line in f:
+        k, *signums = line.split()
+        pending[int(k)] = {int(s) for s in signums}
+mine = []                       # what this process got until it left the group, to this process or to the group
+while (info := signal.sigtimedwait(SIGNALS, 0)) is not None:
+    mine.append(info.si_signo)
+for s in mine:
+    if saved[s] is not signal.SIG_IGN:
+        came.append(s)
+        for pid, k in alive.items():
+            if s not in pending.get(k, ()):
+                try:
+                    os.kill(pid, s)
+                except OSError:
+                    pass
+for s, handler in saved.items():
+    if handler is not signal.SIG_IGN and handler is not None:   # what is ignored stays so, in the workers too
+        signal.signal(s, forward)
+signal.pthread_sigmask(signal.SIG_SETMASK, mask)
 profile.disable()
-ran = {e.code for e in profile.getstats()} | profile.entered
-ran = {c for c in ran if hasattr(c, "co_filename")}
+ended = []                      # (worker, its exit status), as they end
+while alive:
+    try:
+        pid, status = os.wait()
+    except ChildProcessError:
+        break
+    k = alive.pop(pid, None)
+    if k is None:
+        continue
+    ended.append((k, status))
+    if status != 0 or not os.path.exists(f"{sys.argv[1]}.{k}"):
+        no_more_units()
+taken = time.perf_counter() - start
+for s, handler in saved.items():                # a signal from now on acts as it did before the workers
+    if handler is not None:
+        signal.signal(s, handler)
+try:
+    os.setpgid(0, home)                         # back, before this process reads the records and writes again
+except OSError:                                 # (the group has ended: scripts/test.sh and the workers)
+    pass
+records, lost, died = {}, [], []
+for k, status in ended:
+    try:
+        records[k] = json.loads(pathlib.Path(f"{sys.argv[1]}.{k}").read_text())
+    except (OSError, ValueError):
+        pass
+    if status != 0 or k not in records:
+        lost.append(f"worker {k + 1} of {jobs} ended with {os.waitstatus_to_exitcode(status)}" +
+                    ("" if k in records else ", without its record"))
+        if os.WIFSIGNALED(status):
+            died.append(os.WTERMSIG(status))
+if lost:
+    try:
+        sys.stdout.flush()
+        for why in [f"stopped by {signal.Signals(s).name}" for s in dict.fromkeys(came)] + lost:
+            print(f"FAIL: the unit tests did not finish (no verdict): {why}")
+        sys.stdout.flush()
+    except OSError:                             # (a terminal that has hung up)
+        pass
+    if died:
+        if died[0] == signal.SIGINT:            # as Python ends at a KeyboardInterrupt
+            finish()
+        die(died[0])
+    sys.exit(1)                                 # no verdict
+took = sorted(u for r in records.values() for u in r["took"])
+if took != list(range(len(units))):
+    bad.append(f"the workers did not run each unit once: {len(took)} runs of {len(set(took))} of {len(units)} units")
+# the result of the run: each list in the order of the units (one worker's entries for a unit, in their order)
+lists = {name: sorted((e for k in sorted(records) for e in records[k]["lists"][name]), key=lambda e: e[0])
+         for name in LISTS}
+started = {t for r in records.values() for t in r["started"]}
+unknown = {t for r in records.values() for t in r["unknown"]}
+returned = {t: kind for _, t, kind in sorted((e for k in sorted(records) for e in records[k]["returned"]),
+                                             key=lambda e: e[0])}
+ran = {tuple(w) for r in records.values() for w in r["ran"]}      # where() of the code that ran
+body_ran = {i for r in records.values() for i in r["body_ran"]}
+view = {i: (h, a, f) for r in records.values() for i, h, a, f in r["own"]}   # as the worker that ran its test saw it
+for i, (t, _, fn) in enumerate(bodies):         # (a test that no worker ran, when the check above fails)
+    if i not in view:
+        f = test_function(t)
+        view[i] = ([where(c) for g in (fn, unwrapped(fn)) for c in inner(g)], [at(c) for c in inner(fn)],
+                   where(f) if f is not None else None)
+out = unittest.runner._WritelnDecorator(sys.stdout)       # unittest's report, as TextTestRunner.run() prints it
+out.writeln()
+for flavour, name in (("ERROR", "errors"), ("FAIL", "failures")):
+    for _, _, _, desc, text in lists[name]:
+        out.writeln(unittest.TextTestResult.separator1)
+        out.writeln(f"{flavour}: {desc}")
+        out.writeln(unittest.TextTestResult.separator2)
+        out.writeln(text)
+out.writeln(unittest.TextTestResult.separator2)
+run = sum(r["run"] for r in records.values())
+out.writeln("Ran %d test%s in %.3fs" % (run, run != 1 and "s" or "", taken))
+out.writeln()
+success = not (lists["failures"] or lists["errors"] or lists["unexpectedSuccesses"])
+infos = [] if success else [f"{what}={len(lists[name])}" for what, name in (("failures", "failures"),
+                                                                             ("errors", "errors")) if lists[name]]
+infos += [f"{what}={len(lists[name])}" for what, name in (("skipped", "skipped"), ("expected failures",
+          "expectedFailures"), ("unexpected successes", "unexpectedSuccesses")) if lists[name]]
+out.write("OK" if success else "FAILED")
+out.writeln(f" ({', '.join(infos)})" if infos else "")
+out.flush()
 # where the code of the defs that ran is: not a module's, a lambda's or a comprehension's (<module>, <lambda> ...),
 # which may be on the line where a def starts (line 1, a decorator)
-ran_at = {at(c) for c in ran if not c.co_name.startswith("<")}
+ran_at = {(p, line) for p, line, name in ran if not name.startswith("<")}
 # a helper: a function that code that may run reads, transitively: code that ran, the function of a loaded test (also
 # one that was skipped), and a function that a loaded test holds (in its closure or as a default), and what those read
-holds = {where(c) for t, _, fn in bodies for f in (fn, unwrapped(fn)) for c in inner(f)}
-tests = {where(c) for c in map(test_function, (t for t, _, _ in bodies)) if c is not None}     # FunctionTestCases'
-reach = {where(c) for c in ran} | holds | tests | {where(c) for c in (code for _, code, _ in bodies) if c is not None}
+holds = {tuple(w) for h, _, _ in view.values() for w in h}
+tests = {tuple(f) for _, _, f in view.values() if f is not None}     # FunctionTestCases'
+reach = ran | holds | tests | {where(c) for c in (code for _, code, _ in bodies) if c is not None}
+
+
 def lineage(rp, c):
     """The class c of the module rp and the classes of the module it derives from (by their names)."""
     out, todo = set(), [c]
@@ -445,13 +989,15 @@ for rp, group in fns.items():
         names |= fn.reads
     helps[rp] = names
 # a test runs when it starts, and its body runs then, unless it was skipped or failed first; a class or module whose
-# setUpClass or setUpModule raised (skipped or an error) starts none of its tests
-held = {tid(t) for t, _ in result.skipped + result.errors if not isinstance(t, unittest.TestCase)}
-done = {tid(t) for t, _ in result.skipped + result.errors + result.failures + result.expectedFailures} | unknown
+# setUpClass or setUpModule raised (skipped or an error) starts none of its tests (lists: [unit, id, whether it is a
+# TestCase, description, text]; what is not a TestCase stands for a setUpClass or setUpModule)
+held = {t for _, t, case, _, _ in lists["skipped"] + lists["errors"] if not case}
+done = {e[1] for name in ("skipped", "errors", "failures", "expectedFailures") for e in lists[name]} | unknown
 # a test function runs when a loaded test calls it or when it ran (behind a decorator without functools.wraps, a helper
 # named test...); one that a decorator without functools.wraps holds counts as called when its test did not run its body
 known = runs | ran_at
-spared = known | {at(c) for t, _, fn in bodies if tid(t) not in result.started or tid(t) in done for c in inner(fn)}
+spared = known | {tuple(a) for i, (t, _, _) in enumerate(bodies) if tid(t) not in started or tid(t) in done
+                  for a in view[i][1]}
 bad += [f"{p}:{line}: {c}.{f} never runs: no loaded test calls it (its class is no TestCase the runner loads nor a base "
         "of one, the name is bound to something else later, or a decorator replaced it)"
         for p, c, f, line, first in defined
@@ -461,32 +1007,37 @@ for p, name, line, first in free:      # (in a module that turned the profiler o
     if p.stem not in whole and (rp, first) not in known and (rp, first, name) not in holds | tests and \
             name not in helps.get(rp, ()) and not (p.stem in dark and name in named.get(rp, ())):
         bad.append(f"{p}:{line}: {name} is not in a TestCase, so it never runs")
-for t, code, _ in bodies:
+for i, (t, code, _) in enumerate(bodies):
     k = type(t)
-    if tid(t) not in result.started:
+    if tid(t) not in started:
         if not {f"setUpClass ({k.__module__}.{k.__qualname__})", f"setUpModule ({k.__module__})"} & held:
             bad.append(f"{tid(t)} never started (its class overrides run(), or something else kept the runner from it)")
-    elif code is not None and code not in ran and tid(t) not in done:
+    elif code is not None and i not in body_ran and tid(t) not in done:
         bad.append(f"{tid(t)} started, but its body never ran (a decorator that returns without calling it?)")
 bad += [f"{t} returns a value ({kind}), which the runner drops: a test returns None (a coroutine it returns never runs)"
         for t, kind in returned.items()]
 allowed = (() if harnesses else ("harness:",)) + (("machine:",) if repo_only else ())
 for prefix in ("harness:", "machine:"):
-    n = sum(1 for _, why in result.skipped if why.startswith(prefix))
+    n = sum(1 for e in lists["skipped"] if e[4].startswith(prefix))
     if n:
         print(f"skipped ({prefix[:-1]}): {n}")
-bad += [f"{tid(t)} was skipped: {why}" for t, why in result.skipped if not why.startswith(allowed)]
-bad += [f"{tid(t)} expects to fail (expectedFailure): its failure passes the run" for t, _ in result.expectedFailures]
+bad += [f"{t} was skipped: {why}" for _, t, _, _, why in lists["skipped"] if not why.startswith(allowed)]
+bad += [f"{e[1]} expects to fail (expectedFailure): its failure passes the run" for e in lists["expectedFailures"]]
 # a test ran when it started and was not skipped as a whole (a subtest's skip has an id of its own)
-if not result.started - {tid(t) for t, _ in result.skipped}:
-    bad.append("no test ran" + (" (every one was skipped)" if result.skipped else ""))
+if not started - {e[1] for e in lists["skipped"]}:
+    bad.append("no test ran" + (" (every one was skipped)" if lists["skipped"] else ""))
 for b in bad:
     print(f"FAIL: {b}")
-ok = result.wasSuccessful() and not bad
+ok = success and not bad
 pathlib.Path(sys.argv[1]).write_text("pass\n" if ok else "fail\n")
 sys.exit(0 if ok else 1)
 EOF
 [ "$(cat "$tmp/verdict" 2>/dev/null)" = pass ] || { [ $fail = 1 ] || echo "FAIL: the unit tests did not finish (no verdict)"; fail=1; }
+if ! left=$(ls -A -b -- "$tmp/tests"); then
+  echo "FAIL: cannot read the tests' TMPDIR"; fail=1
+elif [ -n "$left" ]; then
+  echo "FAIL: the tests left this in their TMPDIR: $(head -n 20 <<< "$left" | tr '\n' ' ')"; fail=1
+fi
 
 step "shell syntax (bash -n; it does not parse \$( ) and \$(( )) bodies, so the tests run the scripts)"
 sh_files=(); for f in scripts/*.sh bench/*.sh tests/*.sh; do   # not a glob that matches nothing; not a FIFO or a

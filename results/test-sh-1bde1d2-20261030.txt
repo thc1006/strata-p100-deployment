@@ -1,0 +1,64 @@
+# scripts/test.sh on <host> (Ubuntu 22.04.5 LTS, Python 3.10.12, bash 5.1.16), 2026-10-30, from 06:59:34 to 07:24:57
+# (UTC+8), the start and end of its scope in the user journal.
+# Commit 1bde1d2 of branch ci-speed-20261030, without --jobs (one worker), while strata-q3 served, in a scope of the
+# user's service manager with oom_score_adj 500, under bash's time:
+#   systemd-run --user --scope ... -- choom -n 500 -- bash -c 'time scripts/test.sh'
+# No other scripts/test.sh ran meanwhile: the user journal shows no other scope started in that time but those that
+# its own tests start.  Its output as it was captured, whole.
+
+
+== unit tests (tests/)
+s............s..............................................................................................................................................s......................................................................................{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-30 07:12:03", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0, "
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-30 07:12:03", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "error": "stream ended without finish_reason/usage (cut off)", "ttft_s": 0.0, "ttft_content_s"
+{"tag": "c", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill", "screen": "2026-10-19c", "at": "2026-10-30 07:12:03", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0,
+engine_screen: requests sent: 3
+engine_screen: 1 failed records (prefill)
+.{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-30 07:12:05", "phase": "admit", "round": 0, "joiner_ttft_s": 0.0, "longest_gap_s": 0.6, "decoder_chunks_during": 84, "makespan_s": 1.62, "decoders_first_token_vs_join_
+{"tag": "z", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "admit", "screen": "2026-10-19c", "at": "2026-10-30 07:12:07", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.6, "decoder_chunks_during": 84, "makespan_s": 1.62, "decoders_first_token_vs_join_
+engine_screen: requests sent: 8
+.{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:07", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_toke
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:07", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 4003, "cached": 0, "completion_toke
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:07", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_to
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:07", "phase": "decode", "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1502, "cached": 0, "completion_tokens": 9, "ttft_s
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:08", "phase": "four", "round": 0, "wall_s": 0.95, "total_tok_s": 33.74, "error": null}
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:09", "phase": "four", "round": 1, "wall_s": 0.95, "total_tok_s": 33.74, "error": null}
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:11", "phase": "admit", "round": 0, "joiner_ttft_s": 0.01, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "d
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "turns", "i": 0, "first_sha": "bc8345ee899cc13d", "second_sha": "8fb3fe4542bc0653", "second_cached": 0, "second_prompt
+{"tag": "a", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "turns", "i": 1, "first_sha": "0b2c4ae7a7be2b60", "second_sha": "d52cafab8e5ff60a", "second_cached": 0, "second_prompt
+engine_screen: requests sent: 24
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "prefill", "size": 1200, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1223, "cached": 0, "completion_toke
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "prefill", "size": 4000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 4003, "cached": 0, "completion_toke
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "prefill", "size": 16000, "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 16162, "cached": 0, "completion_to
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:13", "phase": "decode", "i": 0, "status": 200, "finish": "stop", "prompt_tokens": 1502, "cached": 0, "completion_tokens": 9, "ttft_s
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:14", "phase": "four", "round": 0, "wall_s": 0.95, "total_tok_s": 33.76, "error": null}
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:15", "phase": "four", "round": 1, "wall_s": 0.95, "total_tok_s": 33.74, "error": null}
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:17", "phase": "admit", "round": 0, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:18", "phase": "admit", "round": 1, "joiner_ttft_s": 0.0, "longest_gap_s": 0.03, "decoder_chunks_during": 60, "makespan_s": 1.62, "de
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:18", "phase": "turns", "i": 0, "first_sha": "bc8345ee899cc13d", "second_sha": "8fb3fe4542bc0653", "second_cached": 0, "second_prompt
+{"tag": "b", "seed": "engine-screen-1", "corpus_sha": "4bfdf4eb453093ff", "phases": "prefill,decode,four,admit,turns", "screen": "2026-10-19c", "at": "2026-10-30 07:12:19", "phase": "turns", "i": 1, "first_sha": "0b2c4ae7a7be2b60", "second_sha": "d52cafab8e5ff60a", "second_cached": 0, "second_prompt
+engine_screen: requests sent: 24
+...{"corpus_sha": "4bfdf4eb453093ff", "status": 200, "finish": "stop", "prompt_tokens": 1997, "cached": 0, "completion_tokens": 9, "ttft_s": 0.0, "ttft_content_s": 0.0, "client_decode_tok_s": 188.33, "total_s": 0.04, "engine_prompt_tok_s": 419.97, "engine_decode_tok_s": 30.0}
+..........................................................................................................s...........................................................................................................................................
+----------------------------------------------------------------------
+Ran 494 tests in 1519.491s
+
+OK (skipped=4)
+skipped (harness): 4
+
+== shell syntax (bash -n; it does not parse $( ) and $(( )) bodies, so the tests run the scripts)
+checked 25 files
+shellcheck is not installed here: CI runs it
+
+== Python (compiled, as the interpreter would: the repo's files and the Python its shell scripts run)
+compiled 110 pieces of Python
+
+== systemd units: their programs (every Exec line of every unit and drop-in), then systemd-analyze verify
+read 5 Exec lines in 4 units and 1 drop-ins
+systemd-analyze verify: no findings for systemd/*
+
+all checks passed
+
+real	25m22.225s
+user	14m17.336s
+sys	15m22.447s

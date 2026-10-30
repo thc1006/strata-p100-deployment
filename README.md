@@ -44,7 +44,7 @@ On Strata 0.1.45, deployed on 2026-10-19:
 | `results/` | Raw test results ([index](results/README.md)) |
 | `examples/requests/` | Example API requests |
 | `docs/` | Documentation, listed below |
-| `.github/workflows/` | CI: `test.yml` runs `scripts/test.sh --repo-only --harnesses` |
+| `.github/workflows/` | CI: `test.yml` runs `scripts/test.sh --repo-only --harnesses --jobs 6` |
 
 ## Install and use
 

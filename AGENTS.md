@@ -13,8 +13,9 @@ at the next start of the service. Other people use the service.
   `systemd-analyze verify` and a check that every program the units run exists. It ends with `all checks passed`.
   `--repo-only` skips what needs this machine. `--harnesses` also runs the stub harnesses that start fake engines
   (`tests/ab_engine_stubs.sh`, `ab_model_run_stubs.sh`, `switch_model_stubs.sh`): the fake engines have the command
-  line the preflight looks for, so on this machine they run only while the service is stopped. CI
-  (`.github/workflows/test.yml`) runs `--repo-only --harnesses`.
+  line the preflight looks for, so on this machine they run only while the service is stopped. `--jobs N` runs the
+  unit tests in N worker processes; without it, in one. On this machine run it without `--jobs`, as `scripts/deploy.sh`
+  does: the service runs beside the tests. CI (`.github/workflows/test.yml`) runs `--repo-only --harnesses --jobs 6`.
 - `python3 -B -m unittest discover -s tests -k <name>`: run one test, for example `-k test_value_bounds`.
 - `scripts/check-drift.sh`: read-only comparison of the machine, and of the running service, with the repository. It
   ends with `no drift`. Uncommitted changes in the checkout the service runs are drift: run it after a commit.

@@ -230,10 +230,13 @@ check_refusal() {  # check_refusal <tag> <want rc> <text> [env...]
   if [ $rc = "$want" ] && grep -q -- "$text" "$SB/$tag.out" && ! [ -e "$R/$tag-arm.txt" ]; then pass "refuses: $text"
   else fail "refusal '$text': exit $rc, $(cat "$SB/$tag.out")"; fi
 }
-reset; echo 120 > "$SB/ready_s"; check_refusal t-settle 1 "became ready 120 s ago" SETTLE_S=300
-# 60 s, not more: the stub computes the unit's start from the monotonic clock, which a runner fresh from its boot has
-# run for only minutes
-reset; echo 60 > "$SB/ready_s"; check_refusal t-young 1 "is younger than the service's ready time"
+# the stub computes the unit's start from the monotonic clock, which counts from the boot: on a runner fresh from its
+# boot (CI's, whose harnesses scripts/test.sh --jobs starts at once) wait until it has run for that long.  The engine
+# must be younger than 55 s for t-young, so t-young comes first: its wait ends 62 s after the boot, which ages it by
+# less than that when it started 7 s or more after the boot
+booted_for() { python3 -c 'import sys, time; time.sleep(max(0, int(sys.argv[1]) + 2 - time.clock_gettime(time.CLOCK_MONOTONIC)))' "$1"; }
+reset; echo 60 > "$SB/ready_s"; booted_for 60; check_refusal t-young 1 "is younger than the service's ready time"
+reset; echo 120 > "$SB/ready_s"; booted_for 120; check_refusal t-settle 1 "became ready 120 s ago" SETTLE_S=300
 reset; echo '{"live": {"state": "decoding", "running": 1, "queued": 0}, "totals": {"requests": 142}}' > "$SB/metrics"
 check_refusal t-busy 1 "the service is not idle"
 reset; echo '{"live": {"state": "idle", "running": 0, "queued": 0}}' > "$SB/metrics"; check_refusal t-nototal 1 "the service is not idle"

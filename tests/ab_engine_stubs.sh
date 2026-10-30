@@ -10,8 +10,13 @@ export SB; SB=$(mktemp -d "${TMPDIR:-/tmp}/abeng.XXXXXX")
 fails=0
 pass() { echo "PASS $*"; }
 fail() { echo "FAIL $*"; fails=$((fails + 1)); }
+# pkill -f, but only to the sandbox's own processes, those with SB=$SB in their environment: another process of this
+# user, the service's engine among them, may match the pattern too.  $1: the signal, $2: the pattern
+sb_pkill() { local p; for p in $(pgrep -f -- "$2"); do
+               tr '\0' '\n' < "/proc/$p/environ" 2> /dev/null | grep -qxF -- "SB=$SB" && kill "-$1" "$p" 2> /dev/null
+             done; return 0; }
 killall_sb() { for f in "$SB"/units/*.pid; do [ -e "$f" ] && kill -- -"$(cat "$f")" 2>/dev/null; done; rm -f "$SB"/units/*.pid
-               pkill -f "^$SB/stray/engine-cuda12/strata" 2>/dev/null; pkill -f "$SB/bin/nvidia-smi dmon" 2>/dev/null; }
+               sb_pkill TERM "^$SB/stray/engine-cuda12/strata"; sb_pkill TERM "$SB/bin/nvidia-smi dmon"; }
 cleanup() { killall_sb; rm -rf "$SB"; }
 trap cleanup EXIT
 [ -n "${KEEP_SB:-}" ] && trap killall_sb EXIT
@@ -398,7 +403,7 @@ env PATH="$SB/bin:$PATH" AB_ENGINE_PORT="$PORT" AB_ENGINE_PY=python3 AB_ENGINE_P
 wpid=$!
 for _ in $(seq 900); do grep -q '"tag": "c0-21"' "$R/engine-screen.jsonl" 2>/dev/null && break; sleep 0.1; done
 kill -9 "$wpid"; wait "$wpid" 2>/dev/null
-pkill -f "^python3 $SB/repo/bench/engine_screen.py" 2>/dev/null           # its screen, orphaned
+sb_pkill TERM "^python3 $SB/repo/bench/engine_screen.py"                # its screen, orphaned
 for _ in $(seq 150); do PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service && break; sleep 0.2; done
 PATH="$SB/bin:$PATH" systemctl is-active -q strata-q3.service && ! PATH="$SB/bin:$PATH" systemctl is-active -q strata-ab-engine &&
   grep -q "rescue fired" "$SB/actions" && pass "a killed driver is rescued by the timer" || fail "rescue: $(tail -3 "$SB/actions")"
@@ -467,7 +472,7 @@ up
 # results/ab_engine-combo-20261019.log)
 n0=$(grep -c '^systemd-run strata-ab-engine' "$SB/actions" 2>/dev/null)
 ( for _ in $(seq 300); do [ "$(grep -c '^systemd-run strata-ab-engine' "$SB/actions")" -gt "${n0:-0}" ] && break; sleep 0.1; done
-  sleep 2; pkill -TERM -f "^bash $SB/repo/bench/ab_engine[.]sh" ) &      # the test unit started, still loading
+  sleep 2; sb_pkill TERM "^bash $SB/repo/bench/ab_engine[.]sh" ) &       # the test unit started, still loading
 t0=$(date +%s)
 FAKE_LOAD_S=30 drive loading "$SB/arms.json" c0-27:C0; rc=$?
 took=$(( $(date +%s) - t0 )); wait

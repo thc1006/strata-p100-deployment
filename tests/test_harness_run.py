@@ -4,6 +4,7 @@ an interrupt leaves.  None of these harnesses starts a fake engine, and Run's an
 *_stubs.sh, so they run anywhere; RunGate's are, and do nothing but write a file."""
 from __future__ import annotations
 
+import contextlib
 import os
 from pathlib import Path
 import shutil
@@ -11,6 +12,7 @@ import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -53,6 +55,18 @@ os.execvp(sys.executable, [sys.executable, "-c", 'import sys, time; open(sys.arg
 
 def named(text: str) -> list[int]:
     return [pid for pid, cmd in H._cmdlines() if any(text.encode() in part for part in cmd)]
+
+
+OWNER = "HARNESS_TEST_OWNER"
+
+
+def owned(test: unittest.TestCase, marker: str) -> None:
+    """What the test starts from now on has OWNER=marker in its environment; after the test, what names marker and has
+    that is killed (H.kill_own), and no other process that names it."""
+    test.addCleanup(lambda: H.kill_own(named(marker), f"{OWNER}={marker}".encode()))
+    patch = mock.patch.dict(os.environ, {OWNER: marker})
+    patch.start()
+    test.addCleanup(patch.stop)
 
 
 class Run(unittest.TestCase):
@@ -122,7 +136,7 @@ class Run(unittest.TestCase):
         for delay in ("0", "0.3"):
             with self.subTest(delay=delay):
                 marker = f"harness-left-{os.getpid()}-respawn-{delay}"
-                self.addCleanup(lambda marker=marker: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+                owned(self, marker)
                 d = Path(tempfile.mkdtemp())
                 self.addCleanup(shutil.rmtree, d, True)
                 (d / "respawn.py").write_text(RESPAWN)
@@ -142,7 +156,7 @@ class Run(unittest.TestCase):
         # what the harness leaves (beyond the sweep) execs into one that names its directory as the sweep sleeps after
         # its first pass, which so finds nothing: the second look finds it
         marker = f"harness-left-{os.getpid()}-late"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         (d / "late.py").write_text(LATE)
@@ -176,7 +190,7 @@ class Run(unittest.TestCase):
         # one that starts another each time one is killed, 40 in all: the sweep kills one a pass, and gives up after
         # its 20 passes instead of going on for as long as they come
         marker = f"harness-left-{os.getpid()}-many"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         (d / "respawn.py").write_text(RESPAWN)
@@ -234,7 +248,7 @@ class Run(unittest.TestCase):
         (base / "real").mkdir()
         (base / "link").symlink_to(base / "real")
         marker = f"harness-left-{os.getpid()}-link"
-        self.addCleanup(lambda: [os.kill(q, signal.SIGKILL) for q in named(marker)])
+        owned(self, marker)
         d = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, d, True)
         leave = ('setsid python3 -c \'import sys, time; open(sys.argv[3], "w").close(); time.sleep(60)\' '
@@ -260,6 +274,70 @@ class Run(unittest.TestCase):
         self.assertIsNone(r["status"])
         self.assertLess(time.monotonic() - t0, 30)
         self.assertEqual(named(r["dir"]), [])
+
+
+class KillOwn(unittest.TestCase):
+    def test_it_signals_only_the_processes_with_the_entry(self):
+        # of processes with the same command line, only the one with the entry in its environment gets the signal,
+        # also where no pidfd can be opened; one that has ended is passed over
+        for pidfd in (True, False):
+            with self.subTest(pidfd=pidfd):
+                marker = f"kill-own-{os.getpid()}-{pidfd}"
+                args = [sys.executable, "-c", "import time; time.sleep(60)", marker]
+                other = subprocess.Popen(args, start_new_session=True)
+                mine = subprocess.Popen(args, env={**os.environ, OWNER: marker}, start_new_session=True)
+                gone = subprocess.Popen(["true"], env={**os.environ, OWNER: marker})
+                gone.wait()
+                for q in (other, mine):
+                    self.addCleanup(lambda q=q: (q.kill(), q.wait()))
+                deadline = time.monotonic() + 20
+                while len(named(marker)) < 2:
+                    self.assertLess(time.monotonic(), deadline, "they did not start")
+                    time.sleep(0.02)
+                with contextlib.nullcontext() if pidfd else \
+                        mock.patch.object(H.os, "pidfd_open", side_effect=OSError(38, "Function not implemented")):
+                    done = H.kill_own([other.pid, mine.pid, gone.pid], f"{OWNER}={marker}".encode())
+                self.assertEqual(done, [mine.pid])
+                self.assertEqual(mine.wait(timeout=10), -signal.SIGKILL)
+                time.sleep(0.2)
+                self.assertIsNone(other.poll(), "a process without the entry got the signal")
+
+
+def sb_pkill(stub: str) -> str:
+    """The lines of sb_pkill() in the stub: from the one that starts "sb_pkill() {" to the first that ends "; }"."""
+    lines = (Path(__file__).resolve().parent / stub).read_text().splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith("sb_pkill() {"))
+    end = next(i for i in range(start, len(lines)) if lines[i].rstrip().endswith("; }"))
+    return "\n".join(lines[start:end + 1]) + "\n"
+
+
+class SbPkill(unittest.TestCase):
+    def test_it_signals_only_the_sandboxs_processes(self):
+        # the stubs' pkill -f: of processes whose command lines match the pattern, only the one with SB=$SB in its
+        # environment gets the signal, not one without SB, nor one with SB=$SB/x (the service's engine runs as this
+        # user, and may match a pattern).  The harnesses run only in CI and on a stopped service, where no process
+        # outside a sandbox matches
+        texts = {stub: sb_pkill(stub) for stub in ("ab_engine_stubs.sh", "switch_model_stubs.sh")}
+        self.assertEqual(len(set(texts.values())), 1, texts)
+        sb = tempfile.mkdtemp(prefix="sb-pkill.")
+        self.addCleanup(shutil.rmtree, sb, True)
+        base = {k: v for k, v in os.environ.items() if k != "SB"}
+        args = [sys.executable, "-c", "import time; time.sleep(60)", f"{sb}/stray"]
+        procs = {}
+        for name, env in (("SB=$SB", {**base, "SB": sb}), ("no SB", base), ("SB=$SB/x", {**base, "SB": f"{sb}/x"})):
+            procs[name] = p = subprocess.Popen(args, env=env, start_new_session=True)
+            self.addCleanup(lambda p=p: (p.kill(), p.wait()))
+        deadline = time.monotonic() + 20
+        while len(named(f"{sb}/stray")) < 3:
+            self.assertLess(time.monotonic(), deadline, "they did not start")
+            time.sleep(0.02)
+        r = subprocess.run(["bash", "-c", texts["ab_engine_stubs.sh"] + 'sb_pkill TERM "$SB/"'],
+                           env={**base, "SB": sb}, capture_output=True, text=True, timeout=30)
+        self.assertEqual((r.returncode, r.stderr), (0, ""))
+        self.assertEqual(procs["SB=$SB"].wait(timeout=10), -signal.SIGTERM)
+        time.sleep(0.2)
+        self.assertEqual({name: p.poll() for name, p in procs.items()},
+                         {"SB=$SB": -signal.SIGTERM, "no SB": None, "SB=$SB/x": None})
 
 
 class RunGate(unittest.TestCase):
@@ -369,6 +447,74 @@ class RunGate(unittest.TestCase):
                         self.fail(f"gated: {e}")
                 self.assertTrue((self.d / f"started-{name}").exists())
         self.assertEqual(sorted(H.NO_ENGINES), ["run_robustness_stubs.sh"])
+
+
+class Lock(unittest.TestCase):
+    """A harness that starts fake engines holds the lock shared while it runs, so such harnesses run side by side;
+    alone() holds it alone, so that with scripts/test.sh --jobs a test whose check watches for the engine's pattern
+    runs beside none of them.  A harness that starts no fake engine takes no lock.  The lock is the test's own here."""
+
+    def setUp(self):
+        self.d = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.d, True)
+        self.lock = self.d / "lock"
+        for patcher in (mock.patch.object(H, "lock_path", lambda: str(self.lock)),
+                        mock.patch.object(H, "not_now", lambda: None), mock.patch.dict(os.environ, {H.ASK: "1"})):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def harness(self, name: str, text: str) -> Path:
+        script = self.d / name
+        script.write_text(text)
+        return script
+
+    def test_what_a_harness_holds(self):
+        # what flock(1) can take of the lock while the harness runs: not the lock alone when it starts fake engines
+        probe = (f"flock -n -x {self.lock} true && echo alone || echo not-alone\n"
+                 f"flock -n -s {self.lock} true && echo shared || echo not-shared\n")
+        for name, expected in (("ab_engine_stubs.sh", "not-alone\nshared\n"), ("x.sh", "alone\nshared\n"),
+                               ("run_robustness_stubs.sh", "alone\nshared\n")):
+            with self.subTest(harness=name):
+                r = H.run(self.harness(name, probe), self.d, 30)
+                self.assertEqual((r["status"], r["out"]), (0, expected), r["err"])
+
+    def test_alone_waits_for_a_harness_and_a_harness_for_alone(self):
+        go, ran = self.d / "go", self.d / "ran"
+        script = self.harness("ab_engine_stubs.sh", f'touch {ran}\nfor _ in $(seq 100); do [ -e {go} ] && exit 0; '
+                                                    f'sleep 0.1; done; exit 1\n')
+        with H.alone():                     # a harness waits for alone() ...
+            t = threading.Thread(target=H.run, args=(script, self.d, 30))
+            t.start()
+            time.sleep(0.5)
+            self.assertFalse(ran.exists(), "the harness ran beside alone()")
+        for _ in range(100):
+            if ran.exists():
+                break
+            time.sleep(0.05)
+        self.assertTrue(ran.exists(), "the harness did not run once alone() ended")
+        held = []                           # ... and alone() for a harness that runs
+        def take():
+            with H.alone():
+                held.append(1)
+        u = threading.Thread(target=take)
+        u.start()
+        time.sleep(0.5)
+        self.assertEqual(held, [], "alone() did not wait for the harness")
+        go.touch()
+        t.join(30)
+        u.join(30)
+        self.assertEqual((t.is_alive(), u.is_alive(), len(held)), (False, False, 1))
+
+
+class LockPath(unittest.TestCase):
+    def test_scripts_test_sh_s_or_one_of_this_users(self):
+        # the one that scripts/test.sh gives its workers; without it, one in the temporary directory that only this
+        # user's runs share, so that another user's file of that name does not stop them
+        with mock.patch.dict(os.environ, {H.LOCK: "/run/x/engines.lock"}):
+            self.assertEqual(H.lock_path(), "/run/x/engines.lock")
+        with mock.patch.dict(os.environ, {H.LOCK: ""}):
+            self.assertEqual(H.lock_path(),
+                             os.path.join(tempfile.gettempdir(), f"strata-test-engines-{os.getuid()}.lock"))
 
 
 class NotNow(unittest.TestCase):

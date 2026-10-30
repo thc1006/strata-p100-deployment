@@ -50,8 +50,7 @@ PARK_SLOTS, PARK_MIN_TOKENS = 8, 1024
 # the engine stops parking when MemAvailable would fall below this (default 2560 MiB).  6 GiB: the box runs only this
 # service (the maintainer's decision of 2026-10-18; it was 8 GiB, the original guide's headroom for other users)
 PARK_MIN_FREE_MIB = 6144
-# RAM beside the locked PLE table: 22.4-23.1 GiB was available after IQ3_S's load (results/ab2-iq3s-*-switch.txt,
-# results/ab3-iq3s-*-switch.txt)
+# RAM beside the locked PLE table: 22.4-22.7 GiB was available after IQ3_S's load (results/ab3-iq3s-*-switch.txt)
 PARK_MIB_MAX = 12288
 CUTS = {"equal": [12, 24, 36], "last-light": [13, 26, 38], "iq3_s-light": [13, 25, 38]}
 # IQ3_XXS: measured (4-user decode 85.9 -> 100.6 tok/s, results/R1b-noplepf-perf.log -> results/R2-lastlight-perf.log);

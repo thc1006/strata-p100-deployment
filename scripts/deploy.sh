@@ -55,9 +55,10 @@ MANUAL=(systemd/ config/ scripts/strata-health.sh scripts/install-system-files.s
 # or BASH_ENV and PYTHONPATH must not change what they look at or run
 KEEP=(PATH HOME LANG LANGUAGE USER LOGNAME XDG_RUNTIME_DIR TERM)
 AT_START=(scripts/strata-preflight.sh scripts/strata-wait-ready.sh tools/)
-LIMIT=1800                                        # seconds for each check of the new commit: a bound for one that
-                                                  # hangs, well above what scripts/test.sh takes here
-                                                  # (results/test-sh-20261027.txt)
+LIMIT=2700                                        # seconds for each check of the new commit: a bound for one that
+                                                  # hangs, well above what scripts/test.sh takes here, as the checks
+                                                  # run at nice 19 (1522 s alone at 1bde1d2 without nice, while
+                                                  # strata-q3 served: results/test-sh-1bde1d2-20261030.txt)
 SLACK=30                                          # seconds past the limit of a check or of the fetch after which this
                                                   # script ends it itself: its timeout (-k 10) has ended it by then,
                                                   # unless the timeout was stopped (SIGSTOP), say by the check
@@ -600,7 +601,7 @@ EOF
   [ $rc = 0 ] || refuse "git merge --ff-only $short failed"
   merged=$short
   echo "deployed $short: $(git log -1 --format=%s | printable)"
-  # a restart with IQ3_S took 550-560 s (results/ab2-iq3s-*-switch.txt, results/ab3-iq3s-*-switch.txt)
+  # a restart with IQ3_S took 550-556 s (results/ab3-iq3s-*-switch.txt)
   [ -z "$changed" ] || echo "to run them now: sudo systemctl restart strata-q3 (ready after about 9 minutes)"
   final=1                                         # this check decides the outcome
   if ! check_of_target scripts/check-drift.sh "no drift" "$tmp/drift.log"; then

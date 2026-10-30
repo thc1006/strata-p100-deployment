@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ExecStartPost of strata-q3.service: the unit becomes "active" only once the model is loaded (about 9 minutes after a
-# start here with IQ3_S: 538-548 s in results/ab2-iq3s-*-switch.txt and results/ab3-iq3s-*-switch.txt), not when
-# server.py starts.  Fails when the server process dies during the load.
+# start here with IQ3_S: 538-544 s in results/ab3-iq3s-*-switch.txt), not when server.py starts.  Fails when the server
+# process dies during the load.
 set -u
 URL=${STRATA_URL:-http://127.0.0.1:8080}
 uptime_s() { local u; read -r u _ < /proc/uptime; echo "${u%.*}"; }   # monotonic: NTP may step the clock at boot

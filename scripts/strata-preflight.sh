@@ -12,10 +12,9 @@ set -u
 D=$(cd "$(dirname "$0")/.." && pwd)
 STRATA=${STRATA_DIR:-/home/thc1006/dev/strata}
 CFG=$STRATA/strata-iq3_xxs.json
-# what a start needs usable: what IQ3_S's starts took of the 58 GiB they saw (35.6 GiB at most: 22.4-23.1 GiB
-# were available after them, results/ab2-iq3s-*-switch.txt and results/ab3-iq3s-*-switch.txt), plus the 6 GiB
-# floor of decision 0004.  36 GiB, the gate before 2026-10-22, was set for IQ3_XXS, which takes about 31 GiB
-# (results/deploy-0.1.45-20261019.txt).
+# what a start needs usable: what IQ3_S's starts took of the 58 GiB they saw (35.6 GiB at most: 22.4-22.7 GiB
+# were available after them, results/ab3-iq3s-*-switch.txt), plus the 6 GiB floor of decision 0004.  36 GiB, the
+# gate until cc4f7bf (2026-10-27), was set for IQ3_XXS, which takes about 31 GiB (results/deploy-0.1.45-20261019.txt).
 MIN_AVAIL_GIB=${STRATA_MIN_AVAIL_GIB:-42}
 MEM_WAIT_S=${STRATA_MEM_WAIT_S:-1500}
 say() { echo "strata-preflight: $*"; }

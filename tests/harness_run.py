@@ -251,7 +251,9 @@ def gate(test: unittest.TestCase, tools: tuple[str, ...]) -> None:
 
 def lock_path() -> str:
     """The lock that a harness that starts fake engines holds shared while it runs, and that alone() holds alone: the
-    one that scripts/test.sh gives its workers, or one of this user's in the shared temporary directory."""
+    one that scripts/test.sh gives its workers, or one of this user's in the shared temporary directory.  That one
+    (when the tests run without scripts/test.sh, as with python3 -m unittest) stays there after the tests: removing a
+    lock file that another run still holds open would let a third run lock a new file beside it."""
     return os.environ.get(LOCK) or os.path.join(tempfile.gettempdir(), f"strata-test-engines-{os.getuid()}.lock")
 
 

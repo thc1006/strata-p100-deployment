@@ -2627,6 +2627,30 @@ class TestSh(unittest.TestCase):
                 (d / "tests" / "test_b.py").write_text(test.format(seed, b, a))
                 self.passes(d, "--repo-only", "--jobs", "2")
 
+    def test_the_runner_dumps_no_core_of_a_workers_signal(self):
+        # the runner dies of the signal that ended a worker, but without a core dump when that signal dumps core: the
+        # worker wrote its own.  Before, a worker's SIGSEGV made the runner dump core too, and apport wrote a second
+        # crash report.  The test module sees, in the runner, whether the runner may dump core as it sends itself the
+        # signal (when it may, it sends SIGKILL instead); the worker makes itself non-dumpable before its SIGSEGV, so
+        # that nothing here writes a core or a crash report
+        d = self.tree()
+        seen = d.parent / "dumpable"
+        (d / "tests" / "test_s.py").write_text(
+            "import ctypes, os, pathlib, signal, unittest\nRUNNER, KILL = os.getpid(), os.kill\n"
+            "def kill(pid, sig):\n    if os.getpid() == RUNNER and sig == signal.SIGSEGV:\n"
+            "        dumpable = ctypes.CDLL(None).prctl(3)\n"              # PR_GET_DUMPABLE
+            f"        pathlib.Path({str(seen)!r}).write_text(str(dumpable))\n"
+            "        if dumpable:\n            sig = signal.SIGKILL\n"
+            "    KILL(pid, sig)\nos.kill = kill\nclass S(unittest.TestCase):\n    def test_s(self):\n"
+            "        ctypes.CDLL(None).prctl(4, 0)\n        KILL(os.getpid(), signal.SIGSEGV)\n")
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the unit tests did not finish \(no verdict\): worker 1 of 1 ended with -11, "
+                                   r"without its record\n")
+        self.assertEqual(seen.read_text(), "0")
+        self.assertRegex(r.stderr, r"Segmentation fault +TMPDIR=")
+        self.assertNotIn("core dumped", r.stderr)
+
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function
         # a helper: what a test holds is read after the tests have run, in the worker that ran it

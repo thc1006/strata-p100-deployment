@@ -641,7 +641,9 @@ def let_go(took, result):
 
 
 def die(signum):
-    """End of signum, as its default action does."""
+    """End of signum, as its default action does, but without a core dump (the runner dies of a worker's signal, and
+    that worker wrote its own)."""
+    ctypes.CDLL(None).prctl(4, 0)                           # PR_SET_DUMPABLE 0
     if signum not in (signal.SIGKILL, signal.SIGSTOP):      # (whose action cannot be changed)
         signal.signal(signum, signal.SIG_DFL)
     signal.pthread_sigmask(signal.SIG_UNBLOCK, {signum})

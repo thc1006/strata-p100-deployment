@@ -194,7 +194,7 @@ Not rehearsed (sudo, `/etc`). The script, without `--enable`, installed `strata-
 ```bash
 scripts/host-units.sh apply
 ```
-It sets the units and then checks them. The list is this machine's: its states before the change, with GNOME's `gdm` and Docker running, are in `results/host-units-before-20261018.txt`. For a `disabled` unit that the VM does not have, the check prints `DRIFT  system <unit> is unreadable / inactive, want disabled and not running`, and so does `check-drift.sh` in step 15; a `masked` unit that it does not have passes, because `mask` makes its link anyway. Not rehearsed. On this machine `check-drift.sh` checks the units (the same run as in step 12).
+It sets the units and then checks them. The list is this machine's: its states before the change, with GNOME's `gdm` and Docker running, are in `results/host-units-before-20261018.txt`. A `disabled` unit of the list that the VM does not have passes as `not installed`, since it cannot start; `mask` makes a `masked` unit's link whether the unit exists or not. Not rehearsed. On this machine `check-drift.sh` checks the units (the same run as in step 12).
 
 ### 14. Start
 
@@ -213,7 +213,7 @@ Not rehearsed (GPUs). The start of 0.1.45 on 2026-10-19 is in `results/deploy-0.
 nice -n 19 ionice -c3 scripts/check-drift.sh --full      # 11 min 24 s on 2026-10-27 (results/check-drift-full-20261027.txt)
 scripts/check-deployment.sh
 ```
-Expected: drift on the two engine binaries and on the missing units of step 13 only, and `no problems found` from `check-deployment.sh`.
+Expected: drift on the two engine binaries only, and `no problems found` from `check-deployment.sh`.
 
 Then screen the rebuilt engine on the GPUs. The arm R1 of `bench/arms-rebuild.json` is the deployed configuration (K1 of `bench/arms-iq3s.json`) run from the rebuilt engine in `~/dev/strata-0.1.45`; the baseline is K1's four runs of 2026-10-29 with the deployed binary (`cf-k1-1` to `cf-k1-4`, [Engine experiments](../engine-experiments.md)). `bench/ab_engine.sh` stops the service before the first run and starts it again after the last. Each run takes about 26 minutes and the restart after the last about 9 more, so the service is down for about an hour (`results/ab_engine-confirm-20261029.log`: cf-k1-1 15:51:07–16:18:03, the restart 19:20:23–19:29:34). It refuses tags it has used before, so a second attempt needs new ones (`bench/ab_engine.sh:170-176`). This screen has not been run.
 ```bash
@@ -227,7 +227,7 @@ The baseline: K1's four runs gave the same answers to the 12 requests that run a
 
 Pass: the summary exits 0 (every run usable), R1's Answers line shows no difference in the prefill or decode phase, and in the Numbers part R1's means for those four rates are marked `within the baseline's spread`. Two runs of the deployed binary with the same configuration on 2026-10-20 (`s2-k1-1` and `s2-k1-2`, `results/s2-k1-*-arm.txt`) meet this rule. These are the screens' own measures. On another CPU (see [Before you start](#before-you-start)) a difference is not by itself a fault: the maintainer decides then.
 
-After a pass, commit the screen's results files (`results/rb-*` and `results/engine-screen.jsonl`, which `ab_engine.sh` writes in this checkout) with the new sha256 of the two binaries in `config/deployed-artifacts.sha256`, and run `check-drift.sh` again: drift on the missing units of step 13 only, or `no drift`. Push the commit to `main`: `scripts/deploy.sh` refuses a checkout that has commits GitHub does not have ([Deploying a commit](deploy.md#when-the-script-refuses)).
+After a pass, commit the screen's results files (`results/rb-*` and `results/engine-screen.jsonl`, which `ab_engine.sh` writes in this checkout) with the new sha256 of the two binaries in `config/deployed-artifacts.sha256`, and run `check-drift.sh` again: `no drift`. Push the commit to `main`: `scripts/deploy.sh` refuses a checkout that has commits GitHub does not have ([Deploying a commit](deploy.md#when-the-script-refuses)).
 
 Rehearsed in part (R11, `results/rebuild-rehearsal-r8-r11-20261030.txt`): `check-drift.sh --full` in the sandbox found the config, the tree, the venv, the checkout and every file of the manifest as production has them, but the two engine binaries. Its other DRIFT lines came from the sandbox (root's files show as uid 65534, and it has no user bus and its own PID namespace); the same check outside, on production, reported no drift. `check-deployment.sh` and the engine screen need the running service and were not rehearsed; `check-deployment.sh`'s output after the start of 2026-10-19 is in `results/deploy-0.1.45-20261019.txt`.
 

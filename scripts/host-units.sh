@@ -1,6 +1,7 @@
 #!/bin/bash -p
 # The systemd units this box does not run (config/host-units.conf).
-#   scripts/host-units.sh [check]   read-only: one line per unit; exits 1 when a state differs (or cannot be read)
+#   scripts/host-units.sh [check]   read-only: one line per unit; exits 1 when a state differs (or cannot be read);
+#                                   a unit that is not installed meets disabled and masked
 #   scripts/host-units.sh apply     sets them (sudo for the system units), then checks
 # A masked unit cannot be started at all, not even by D-Bus or a socket; undo one with `sudo systemctl unmask <unit>`
 # (and `enable` it again if it was enabled: results/host-units-before-20261018.txt has the states before the change).
@@ -56,11 +57,17 @@ while read -r -u 3 state scope unit _ || [ -n "${state:-}" ]; do       # also a 
   fi
   # is-enabled and is-active print the state and exit non-zero for most: read the text, not the code; an empty
   # answer (no systemd, no user instance) is a failure, not a pass.  Not running is inactive or failed only
-  # (activating, reloading and deactivating are running)
+  # (activating, reloading and deactivating are running).  is-enabled prints nothing for a unit that has no unit file
+  # either: systemd's LoadState not-found tells that one apart, and a unit that does not exist cannot start, so it
+  # meets disabled and masked (a new machine without docker or cups; apply's mask makes the link anyway)
   have=$(ctl "$scope" is-enabled "$unit" 2>/dev/null)
   active=$(ctl "$scope" is-active "$unit" 2>/dev/null)
+  load=
+  [ -n "$have" ] || load=$(ctl "$scope" show -p LoadState --value "$unit" 2>/dev/null)
   if [ "$have" = "$state" ] && { [ "$active" = inactive ] || [ "$active" = failed ]; }; then
     echo "ok     $scope $unit $have, $active"
+  elif [ -z "$have" ] && [ "$load" = not-found ] && { [ "$active" = inactive ] || [ "$active" = failed ]; }; then
+    echo "ok     $scope $unit not installed, $active"
   else
     echo "DRIFT  $scope $unit is ${have:-unreadable} / ${active:-unreadable}, want $state and not running"; bad=1
   fi

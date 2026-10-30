@@ -7,8 +7,8 @@ manager would take a change from this user only as polkit allows it: no variable
 system manager's socket.  The user's manager is kept away by the environment: no D-Bus address, and an
 XDG_RUNTIME_DIR of the test's own that is empty (the stand-in systemctl records what it gets of them, and the tests
 check it).  Nor does a bash option or function reach the script from the environment.  The stand-in sudo runs the
-stand-in systemctl and nothing else; the stand-in systemctl logs every call but is-enabled, is-active and
-get-default, and a check must make none of those."""
+stand-in systemctl and nothing else; the stand-in systemctl logs every call but is-enabled, is-active, get-default
+and show, and a check must make none of those."""
 from __future__ import annotations
 
 import itertools
@@ -25,7 +25,8 @@ from unittest import mock
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "host-units.sh"
 STUB = textwrap.dedent("""\
     #!/usr/bin/env bash
-    # systemctl [--user] is-enabled|is-active UNIT, get-default: answers from $STUB_STATES ("scope unit enabled active");
+    # systemctl [--user] is-enabled|is-active UNIT, show -p LoadState --value UNIT, get-default: answers from
+    # $STUB_STATES ("scope unit enabled active [loadstate]"; a - is a column that prints nothing);
     # the user instance answers through XDG_RUNTIME_DIR: the one $STUB_XDG names, when it is set.  Every other call, one
     # that may change a unit, is logged to $STUB_LOG ("scope words...") and fails
     [ -z "${STUB_EAT_STDIN:-}" ] || cat > /dev/null          # a stand-in that reads its standard input to the end
@@ -35,16 +36,17 @@ STUB = textwrap.dedent("""\
                                  echo "XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR-(not set)}"; } >> "$STUB_SEEN"
     scope=system
     [ "$1" = --user ] && { scope=user; shift; }
-    case $1 in is-enabled|is-active|get-default) ;; *) echo "$scope $*" >> "$STUB_LOG" ;; esac
+    case $1 in is-enabled|is-active|get-default|show) ;; *) echo "$scope $*" >> "$STUB_LOG" ;; esac
     [ "$scope" = system ] || { [ -n "${XDG_RUNTIME_DIR-}" ] && [ "$XDG_RUNTIME_DIR" = "${STUB_XDG:-$XDG_RUNTIME_DIR}" ]; } || exit 1
     case $1 in
       get-default) cat "$STUB_DEFAULT"; exit 0 ;;
-      is-enabled) col=3 ;;
-      is-active) col=4 ;;
+      is-enabled) col=3; u=$2 ;;
+      is-active) col=4; u=$2 ;;
+      show) [ "$2 $3 $4" = "-p LoadState --value" ] || exit 1; col=5; u=$5 ;;
       *) exit 1 ;;
     esac
-    v=$(STUB_UNIT=$2 awk -v s="$scope" -v c="$col" '$1 == s && $2 == ENVIRON["STUB_UNIT"] {print $c}' "$STUB_STATES")
-    [ -n "$v" ] && echo "$v"
+    v=$(STUB_UNIT=$u awk -v s="$scope" -v c="$col" '$1 == s && $2 == ENVIRON["STUB_UNIT"] {print $c}' "$STUB_STATES")
+    [ -n "$v" ] && [ "$v" != - ] && echo "$v"
     [ "$v" = enabled ] || [ "$v" = active ]
     """)
 # apply's: mask|disable --now UNIT and set-default UNIT then put the unit in that state (the last line of $STUB_STATES
@@ -190,6 +192,46 @@ class HostUnitsCheck(unittest.TestCase):
     def test_a_failed_unit_is_not_running(self):
         r = self.run_check(self.CONF, self.GOOD.replace("cups.service disabled inactive", "cups.service disabled failed"))
         self.assertEqual(r.returncode, 0, r.stdout)
+
+    def test_a_unit_that_is_not_installed(self):
+        # a new machine without docker or cups: is-enabled prints nothing, LoadState is not-found; a unit that does not
+        # exist cannot start, so it meets disabled and masked
+        conf = self.CONF + "disabled system docker.service\nmasked system colord.service\ndisabled user x.service\n"
+        missing = ("system docker.service - inactive not-found\nsystem colord.service - inactive not-found\n"
+                   "user x.service - inactive not-found\n")
+        r = self.run_check(conf, self.GOOD + missing)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        for unit in ("system docker.service", "system colord.service", "user x.service"):
+            self.assertIn(f"ok     {unit} not installed, inactive\n", r.stdout)
+        r = self.run_check(conf, self.GOOD + missing.replace("docker.service - inactive", "docker.service - failed"))
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_unit_it_cannot_read_is_still_drift(self):
+        # only an empty is-enabled with LoadState not-found, and not running, is a unit that is not installed: an
+        # unreadable LoadState (no manager), any other, an is-enabled that says something, or a unit that runs is drift
+        conf = self.CONF + "disabled system docker.service\n"
+        cases = {"LoadState unreadable": "system docker.service - inactive\n",
+                 "LoadState unreadable, is-active too": "system docker.service - - -\n",
+                 "loaded": "system docker.service - inactive loaded\n",
+                 "masked": "system docker.service - inactive masked\n",
+                 "error": "system docker.service - inactive error\n",
+                 "is-enabled says enabled": "system docker.service enabled inactive not-found\n",
+                 "running": "system docker.service - active not-found\n",
+                 "is-active unreadable": "system docker.service - - not-found\n"}
+        for name, line in cases.items():
+            with self.subTest(name):
+                r = self.run_check(conf, self.GOOD + line)
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertRegex(r.stdout, r"\nDRIFT  system docker\.service is \S+ / \S+, want disabled and not "
+                                           r"running\n")
+                self.assertNotIn("not installed", r.stdout)
+        # the default target is read with get-default, not as a unit: one the machine does not have is drift
+        r = self.run_check("default system multi-user.target\n", "system multi-user.target - inactive not-found\n",
+                           default="")
+        self.assertEqual((r.returncode, r.stdout), (1, "DRIFT  default target is unreadable, not multi-user.target\n"))
+        # and a state the list does not take stays a BAD line, installed or not
+        r = self.run_check("enabled system docker.service\n", "system docker.service - inactive not-found\n")
+        self.assertEqual((r.returncode, r.stdout), (1, "BAD    line: enabled system docker.service\n"))
 
     def test_bad_or_empty_lists_fail_closed(self):
         for conf in ("enabled system cups.service\n", "masked elsewhere cups.service\n", "# nothing\n", ""):
@@ -389,7 +431,8 @@ class HostUnitsCheck(unittest.TestCase):
                 (t / name).write_text(text)
             env = {"PATH": os.environ["PATH"], "STUB_LOG": str(t / "log"), "STUB_STATES": str(t / "states"),
                    "STUB_DEFAULT": str(t / "default"), "XDG_RUNTIME_DIR": str(t)}
-            for args in (["is-enabled", "x.service"], ["is-active", "x.service"], ["get-default"], ["stop", "x.service"],
+            for args in (["is-enabled", "x.service"], ["is-active", "x.service"], ["get-default"],
+                         ["show", "-p", "LoadState", "--value", "x.service"], ["stop", "x.service"],
                          ["--user", "restart", "y.service"], ["mask", "x.service"], ["enable", "--now", "x.service"]):
                 subprocess.run([str(t / "systemctl"), *args], env=env, capture_output=True, stdin=subprocess.DEVNULL,
                                timeout=30)

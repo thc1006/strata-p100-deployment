@@ -2504,6 +2504,18 @@ class TestSh(unittest.TestCase):
                 self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
                 self.assertIn(says + named + "\n", r.stdout)
                 self.assertNotIn("\nRan ", r.stdout + r.stderr)
+        # threads that cannot be counted fail the run too: a test module that makes the runner's os.listdir (the
+        # runner shares the os module) fail for /proc/self/task
+        with self.subTest(named="cannot read"):
+            (d / "tests" / "test_thread.py").write_text(
+                head + "import os\n_listdir = os.listdir\ndef listdir(path='.'):\n"
+                "    if path == '/proc/self/task':\n        raise PermissionError(13, 'Permission denied', path)\n"
+                "    return _listdir(path)\nos.listdir = listdir\n" + body.replace("done.wait(5)", "True"))
+            r = self.run_sh(d)
+            self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+            self.assertIn("FAIL: cannot read /proc/self/task (Permission denied): the threads that would not run in "
+                          "the workers cannot be counted\n", r.stdout)
+            self.assertNotIn("\nRan ", r.stdout + r.stderr)
         for code in ("s = threading.Thread(target=done.set)\ns.start()\ns.join()\n",
                      "import _thread\n_thread.start_new_thread(done.set, ())\ndone.wait()\n"):
             with self.subTest(code=code):

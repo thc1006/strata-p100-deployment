@@ -191,10 +191,12 @@ It sets the units and then checks them. Not rehearsed. The states before the cha
 
 ### 14. Start
 
+Reboot. Steps 5 and 8 read model files through mmap, so their page cache is charged to the account; if the engine then locks those pages, they count against the account's 6 GiB ([Daily operations](operations.md#the-memory-limit-of-the-maintainers-account)). A reboot drops that cache, and at boot systemd starts `strata-q3` and its timer, which step 12 enabled.
 ```bash
-sudo systemctl start strata-q3.service strata-q3-health.timer
+sudo reboot
+systemctl status strata-q3.service      # after the reboot: active (running) once it is ready
 ```
-A restart is ready after about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`). The first start reads the new pack from disk and can take longer: IQ3_S's first start on 2026-10-20 was still loading at 900 s (`results/ab-iq3s-1-switch.txt`); `strata-wait-ready.sh` allows 1800 s (`systemd/strata-q3.service`).
+A restart is ready after about 9 minutes (550–556 s for IQ3_S: `results/ab3-iq3s-*-switch.txt`). The first start reads the new pack from disk and can take longer: IQ3_S's first start on 2026-10-20 was still loading at 900 s (`results/ab-iq3s-1-switch.txt`). `strata-wait-ready.sh` allows 1800 s (`scripts/strata-wait-ready.sh:11`), and so does server.py (`STRATA_ENGINE_READY_S`, `systemd/strata-q3.service:20`).
 
 Not rehearsed (GPUs). The start of 0.1.45 on 2026-10-19 is in `results/deploy-0.1.45-20261019.txt`, and a start with this repository's preflight and wait-ready of `7886a39`, on 2026-10-29, in `results/restart-after-confirm-20261029.txt`.
 

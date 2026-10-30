@@ -2463,6 +2463,24 @@ class TestSh(unittest.TestCase):
         self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
         self.assertRegex(r.stdout, r"\nOK\n(.*\n)*FAIL: cannot read the tests' TMPDIR\n")
 
+    def test_what_the_tests_leave_without_write_permission_is_removed(self):
+        # a directory that a test leaves in its TMPDIR without write permission (0500), or without any (0000), with a
+        # file in it: the run fails for it, and the script's temporary directory goes all the same.  Before, rm could
+        # not remove the file, and the whole of it stayed in TMPDIR
+        d = self.tree()
+        outer = Path(tempfile.mkdtemp())
+        self.addCleanup(lambda: (subprocess.run(["chmod", "-R", "u+rwX", "--", str(outer)]),
+                                 shutil.rmtree(outer, True)))
+        (d / "tests" / "test_tmp.py").write_text(
+            "import os, tempfile, unittest\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        for mode in (0o500, 0o000):\n            d = tempfile.mkdtemp(prefix=f'ro{mode:o}-')\n"
+            "            open(os.path.join(d, 'f'), 'w').close()\n            os.chmod(d, mode)\n")
+        r = self.run_sh(d, env={"TMPDIR": str(outer)})
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertRegex(r.stdout, r"FAIL: the tests left this in their TMPDIR: ro0-\w+ ro500-\w+ \n")
+        self.assertNotIn("Permission denied", r.stderr)
+        self.assertEqual(os.listdir(outer), [], "the script left its temporary directory")
+
     def test_a_thread_that_a_test_module_starts_as_it_loads(self):
         # fork() copies only the thread that calls it, so a thread that a test module starts at its import and that
         # still runs when the workers are forked runs in none of them: the run fails and names it, before the tests

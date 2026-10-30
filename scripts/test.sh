@@ -66,7 +66,8 @@ done
 fail=0
 step() { printf '\n== %s\n' "$1"; }
 tmp=$(mktemp -d) || { echo "cannot create a temporary directory"; exit 1; }
-trap 'rm -rf -- "$tmp"' EXIT
+# (a directory that a test left without write permission is made writable first, so that rm can empty it)
+trap 'chmod -R u+rwX -- "$tmp" 2> /dev/null; rm -rf -- "$tmp"' EXIT
 # its path without symlinks and "..": systemd-analyze names the files in it so, and the step that runs it looks for that
 tmp=$(cd -- "$tmp" && pwd -P) || { echo "cannot enter the temporary directory"; exit 1; }
 

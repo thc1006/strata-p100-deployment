@@ -17,7 +17,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Fixed
 
-- `scripts/host-units.sh` reported a unit of `config/host-units.conf` that the machine does not have as DRIFT (`is unreadable / inactive`), so on a new VM without docker, containerd, cups or kerneloops `scripts/check-drift.sh` never printed `no drift` and `scripts/deploy.sh` refused every commit. A unit that `is-enabled` prints nothing for, whose LoadState is `not-found` and which does not run, now meets a `disabled` or `masked` line, as `ok ... not installed`; every other unreadable state is still DRIFT. A misspelt unit name in the list passes the same way, with `not installed`.
+- `scripts/host-units.sh` reported a unit of `config/host-units.conf` that the machine does not have as DRIFT (`is unreadable / inactive`), so on a new VM without docker, containerd, cups or kerneloops `scripts/check-drift.sh` never printed `no drift` and `scripts/deploy.sh` refused every commit. A unit that `is-enabled` prints nothing for, whose LoadState is `not-found` and which does not run, now meets a `disabled` line, as `ok ... not installed`. A `masked` line still needs its link, which `apply` makes whether the unit exists or not. Every other unreadable state is still DRIFT. A misspelt unit name on a `disabled` line passes the same way, with `not installed`.
 - `docs/reference/system-changes.md` did not list the four desktop files that the CUDA installer wrote into `~/.local/share/applications/` on 2026-10-16 (`results/host-state-20261030.txt`).
 
 ## 2026-10-29

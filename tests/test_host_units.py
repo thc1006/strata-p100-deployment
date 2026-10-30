@@ -195,16 +195,32 @@ class HostUnitsCheck(unittest.TestCase):
 
     def test_a_unit_that_is_not_installed(self):
         # a new machine without docker or cups: is-enabled prints nothing, LoadState is not-found; a unit that does not
-        # exist cannot start, so it meets disabled and masked
-        conf = self.CONF + "disabled system docker.service\nmasked system colord.service\ndisabled user x.service\n"
-        missing = ("system docker.service - inactive not-found\nsystem colord.service - inactive not-found\n"
-                   "user x.service - inactive not-found\n")
+        # exist cannot start, so it meets disabled
+        conf = self.CONF + "disabled system docker.service\ndisabled user x.service\n"
+        missing = "system docker.service - inactive not-found\nuser x.service - inactive not-found\n"
         r = self.run_check(conf, self.GOOD + missing)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        for unit in ("system docker.service", "system colord.service", "user x.service"):
+        for unit in ("system docker.service", "user x.service"):
             self.assertIn(f"ok     {unit} not installed, inactive\n", r.stdout)
         r = self.run_check(conf, self.GOOD + missing.replace("docker.service - inactive", "docker.service - failed"))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_a_masked_unit_without_its_link_is_drift(self):
+        # apply's mask makes the link whether the unit exists or not: a masked line that is not masked is drift, the
+        # unit installed or not (apply did not run, or someone ran unmask)
+        for scope in ("system", "user"):
+            with self.subTest(scope):
+                conf = self.CONF + f"masked {scope} colord.service\n"
+                r = self.run_check(conf, self.GOOD + f"{scope} colord.service - inactive not-found\n")
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn(f"DRIFT  {scope} colord.service is unreadable / inactive, want masked and not running\n",
+                              r.stdout)
+                self.assertNotIn("not installed", r.stdout)
+        # after apply, the same unit is masked, and passes
+        r = self.run_check(self.CONF + "masked system colord.service\n",
+                           self.GOOD + "system colord.service masked inactive masked\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ok     system colord.service masked, inactive\n", r.stdout)
 
     def test_a_unit_it_cannot_read_is_still_drift(self):
         # only an empty is-enabled with LoadState not-found, and not running, is a unit that is not installed: an

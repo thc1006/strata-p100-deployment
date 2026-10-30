@@ -36,6 +36,8 @@ at the next start of the service. Other people use the service.
   and the load tests keep the GPUs busy for up to an hour (a robustness run with a 30-minute soak took 59.8–60.4
   minutes: `results/*-robustness.log`).
 - Run `sudo`, `scripts/install-system-files.sh`, or anything that writes to `/etc`, `/usr/local/sbin` or `~/dev/strata`.
+- Run any step of `docs/runbooks/rebuild.md` on this machine, or write to `~/cuda-12.9` or `~/dev/Strata-data`. The
+  runbook is for a new VM; here its steps would change the files the service runs, and steps 14 and 15 stop it.
 - Run `tools/configure_strata_q3.py` on `~/dev/strata/strata-iq3_xxs.json` without `--dry-run`.
 - Run `scripts/deploy.sh --apply`. It changes what the service runs at its next start.
 - Edit a file in `results/`. These are raw measurements; new results come only from new runs.

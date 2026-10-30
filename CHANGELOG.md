@@ -12,6 +12,7 @@ Notable changes to this machine and this repository, newest first. There are no 
 
 ### Changed
 
+- `AGENTS.md` forbids coding agents to run any step of `docs/runbooks/rebuild.md` on this machine, or to write to `~/cuda-12.9` or `~/dev/Strata-data`, unless the maintainer asks for it in the session.
 - `docs/runbooks/rebuild.md` is the procedure for today's deployment, 0.1.45 with IQ3_S, on a new VM: steps 0–15, each with the rehearsal's record or the record that covers it. It says not to run any of its steps on this machine, and what each would change here. It warns that `setup.py` moves the model files of other Strata folders on the same file system, that `setup.sh`'s scope reached 6.38 GiB in the rehearsal, so the builds come before the account's 6 GiB limit is installed, and that the new engine binaries are committed to `config/deployed-artifacts.sha256` only after an engine screen on the GPUs, whose command and pass criterion step 15 gives.
 
 ### Fixed

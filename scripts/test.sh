@@ -79,8 +79,8 @@ step "unit tests (tests/)"
 mkdir "$tmp/tests" || { echo "cannot create the tests' temporary directory"; exit 1; }
 TMPDIR=$tmp/tests STRATA_TEST_ENGINES_LOCK=$tmp/engines.lock TEST_REPO_ONLY=$REPO_ONLY \
   STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, posix, signal, stat, symtable, sys, \
-    sysconfig, threading, time, traceback, types, unittest, warnings, weakref
+import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, posix, random, signal, stat, \
+    symtable, sys, sysconfig, threading, time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -342,9 +342,29 @@ def at_fork(**kwargs):
 
 
 os.register_at_fork = posix.register_at_fork = at_fork
+seeded = False          # whether the loading gave the random module a seed or a state, which the workers then get back
+real_seed, real_setstate = random.seed, random.setstate
+
+
+@functools.wraps(real_seed)
+def seed(*args, **kwargs):
+    global seeded
+    real_seed(*args, **kwargs)
+    seeded = (args[0] if args else kwargs.get("a")) is not None     # (no seed: one from os.urandom)
+
+
+@functools.wraps(real_setstate)
+def setstate(state):
+    global seeded
+    real_setstate(state)
+    seeded = True
+
+
+random.seed, random.setstate = seed, setstate
 profile.enable()
 suite = Loader().discover("tests", pattern=PATTERN)
 atexit.register, atexit.unregister = real_register, real_unregister
+random.seed, random.setstate = real_seed, real_setstate
 if atexit._ncallbacks() != seen:
     bad.append("atexit has handlers that the runner did not see registered as the tests loaded: a worker would not run "
                "them")
@@ -471,11 +491,13 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
 # that each starts with what the loading ran, but for what fork() does not copy, such as a thread: fork() copies only
 # the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  The
-# random module seeds itself again in a forked process, and a worker gives it back its state.  What still differs in a
-# worker is its pid and parent pid, and its CPU time and other resource use (time.process_time, resource.getrusage),
-# which start again at zero.  A worker takes the next unit from a file that all of them read through one open file
-# description (each read moves its offset on), runs it, and writes down what the checks below need; this process then
-# merges that, prints unittest's report and runs the checks.  A unit is a test,
+# random module seeds itself again in a forked process, so that two workers do not draw the same numbers; when the
+# loading seeded it (random.seed with a seed, random.setstate), a worker gives it back the state it had at the fork.  A
+# random.Random that the loading made draws the same numbers in each worker.  What still differs in a worker is its pid
+# and parent pid, and its CPU time and other resource use (time.process_time, resource.getrusage), which start again
+# at zero.  A worker takes the next unit from a file that all of them read through one open file description (each
+# read moves its offset on), runs it, and writes down what the checks below need; this process then merges that,
+# prints unittest's report and runs the checks.  A unit is a test,
 # or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
 # the loader are cut into their tests, which unittest's fixtures then see in the same order, so a worker sets a class or
 # module up (setUpClass, setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with
@@ -631,8 +653,8 @@ def work(k, saved, mask, gate, report):
     status, interrupted = 1, False
     try:
         try:
-            if RANDOM is not None:
-                RANDOM.setstate(RANDOM_STATE)       # (see the check before the fork)
+            if seeded:
+                random.setstate(RANDOM_STATE)       # (see the check before the fork)
             atexit._clear()                     # what the tests registered as they loaded runs in this process's
             for f in list(weakref.finalize._registry):              # parent, and so do the loading's finalizers;
                 f.atexit = False
@@ -787,8 +809,7 @@ if stop:
         print(f"FAIL: {b}")
     pathlib.Path(sys.argv[1]).write_text("fail\n")
     sys.exit(1)
-RANDOM = sys.modules.get("random")
-RANDOM_STATE = RANDOM.getstate() if RANDOM else None
+RANDOM_STATE = random.getstate()
 sys.stdout.flush()
 sys.stderr.flush()
 start = time.perf_counter()

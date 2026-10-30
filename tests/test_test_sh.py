@@ -2586,11 +2586,11 @@ class TestSh(unittest.TestCase):
                 self.assertRegex(r.stdout, "\nFAIL: " + says)
                 self.assertNotIn("\nRan ", r.stdout + r.stderr)
         # what the loading waited for, closed, cancelled or did not send passes.  The random module seeds itself again
-        # in a forked process, and a worker gives it back its state: a wrong test of a seeded draw fails, a right one
-        # passes
-        draw = ("import random, unittest\nrandom.seed(0)\nclass R(unittest.TestCase):\n    def test_r(self):\n"
+        # in a forked process, and when the loading seeded it (random.seed, random.setstate) a worker gives it back
+        # its state: a wrong test of a seeded draw fails, a right one passes
+        draw = ("import random, unittest\n{}\nclass R(unittest.TestCase):\n    def test_r(self):\n"
                 "        self.assert{}(random.random(), random.Random(0).random())\n")
-        (d / "tests" / "test_load.py").write_text(draw.format("NotEqual"))
+        (d / "tests" / "test_load.py").write_text(draw.format("random.seed(0)", "NotEqual"))
         r = self.run_sh(d)
         self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
         self.assertIn("\nFAILED (failures=1)\n", r.stdout)
@@ -2599,10 +2599,33 @@ class TestSh(unittest.TestCase):
                      "import signal\nsignal.signal(signal.SIGALRM, lambda *a: None)\nsignal.alarm(30)\n"
                      "signal.alarm(0)\n" + GOOD_TEST,
                      "import signal\nsignal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})\n" + GOOD_TEST,
-                     "import logging, concurrent.futures\n" + draw.format("Equal")):
+                     "import logging, concurrent.futures\n" + draw.format("random.seed(0)", "Equal"),
+                     draw.format("from random import seed\nseed(a=0)", "Equal"),
+                     draw.format("random.setstate(random.Random(0).getstate())", "Equal")):
             with self.subTest(code=code):
                 (d / "tests" / "test_load.py").write_text(code)
                 self.passes(d)
+
+    def test_workers_draw_their_own_random_numbers(self):
+        # two tests that bind a port that the random module picks, in two workers at the same time, get two ports, also
+        # when the loading seeded the module from os.urandom (random.seed()).  When each worker gave the module back the
+        # state it had after the loading, both drew the same port, and the second bind failed (Address already in use)
+        d = self.tree()
+        test = ("import pathlib, random, socket, time, unittest\n{0}class T(unittest.TestCase):\n"
+                "    def test_t(self):\n        s = socket.socket()\n        self.addCleanup(s.close)\n"
+                "        try:\n            s.bind(('127.0.0.1', 20000 + random.randrange(10000)))\n"
+                "        finally:\n            pathlib.Path({1!r}).touch()\n"
+                "        deadline = time.monotonic() + 30\n        while not pathlib.Path({2!r}).exists():\n"
+                "            self.assertLess(time.monotonic(), deadline, 'the other test did not run beside it')\n"
+                "            time.sleep(0.01)\n")
+        a, b = str(d.parent / "a"), str(d.parent / "b")
+        for seed in ("", "random.seed()\n"):
+            with self.subTest(seed=seed):
+                for f in (a, b):
+                    Path(f).unlink(missing_ok=True)
+                (d / "tests" / "test_a.py").write_text(test.format(seed, a, b))
+                (d / "tests" / "test_b.py").write_text(test.format(seed, b, a))
+                self.passes(d, "--repo-only", "--jobs", "2")
 
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function

@@ -58,17 +58,19 @@ while read -r -u 3 state scope unit _ || [ -n "${state:-}" ]; do       # also a 
   # is-enabled and is-active print the state and exit non-zero for most: read the text, not the code; an empty
   # answer (no systemd, no user instance) is a failure, not a pass.  Not running is inactive or failed only
   # (activating, reloading and deactivating are running).  is-enabled prints nothing for a unit that has no unit file
-  # either: systemd's LoadState not-found tells that one apart, and a unit that does not exist cannot start, so it
-  # meets disabled (a new machine without docker or cups).  Not masked: apply's mask makes the link whether the unit
-  # exists or not, so a masked line without one is drift (apply did not run, or the unit was unmasked)
+  # either (systemd 249; a newer one prints not-found): systemd's LoadState not-found tells that one apart, and a unit
+  # that does not exist cannot start, so it meets disabled (a new machine without docker or cups).  Not masked:
+  # apply's mask makes the link whether the unit exists or not, so a masked line without one is drift (apply did not
+  # run, or the unit was unmasked).  load is read for a disabled line with such an is-enabled only
   have=$(ctl "$scope" is-enabled "$unit" 2>/dev/null)
   active=$(ctl "$scope" is-active "$unit" 2>/dev/null)
   load=
-  [ "$state" = disabled ] && [ -z "$have" ] && load=$(ctl "$scope" show -p LoadState --value "$unit" 2>/dev/null)
+  if [ "$state" = disabled ] && { [ -z "$have" ] || [ "$have" = not-found ]; }; then
+    load=$(ctl "$scope" show -p LoadState --value "$unit" 2>/dev/null)
+  fi
   if [ "$have" = "$state" ] && { [ "$active" = inactive ] || [ "$active" = failed ]; }; then
     echo "ok     $scope $unit $have, $active"
-  elif [ "$state" = disabled ] && [ -z "$have" ] && [ "$load" = not-found ] &&
-       { [ "$active" = inactive ] || [ "$active" = failed ]; }; then
+  elif [ "$load" = not-found ] && { [ "$active" = inactive ] || [ "$active" = failed ]; }; then
     echo "ok     $scope $unit not installed, $active"
   else
     echo "DRIFT  $scope $unit is ${have:-unreadable} / ${active:-unreadable}, want $state and not running"; bad=1

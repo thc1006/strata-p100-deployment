@@ -205,6 +205,25 @@ class HostUnitsCheck(unittest.TestCase):
         r = self.run_check(conf, self.GOOD + missing.replace("docker.service - inactive", "docker.service - failed"))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
+    def test_a_unit_that_is_not_installed_on_a_newer_systemd(self):
+        # a newer systemd's is-enabled prints not-found for such a unit (systemd 249 prints nothing); LoadState is still
+        # read, and only not-found, with the unit not running, passes
+        conf = self.CONF + "disabled system docker.service\n"
+        r = self.run_check(conf, self.GOOD + "system docker.service not-found inactive not-found\n")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("ok     system docker.service not installed, inactive\n", r.stdout)
+        for name, line in {"loaded": "system docker.service not-found inactive loaded\n",
+                           "LoadState unreadable": "system docker.service not-found inactive\n",
+                           "running": "system docker.service not-found active not-found\n"}.items():
+            with self.subTest(name):
+                r = self.run_check(conf, self.GOOD + line)
+                self.assertEqual(r.returncode, 1, r.stdout)
+                self.assertIn("DRIFT  system docker.service is not-found / ", r.stdout)
+        r = self.run_check(self.CONF + "masked system colord.service\n",
+                           self.GOOD + "system colord.service not-found inactive not-found\n")
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("DRIFT  system colord.service is not-found / inactive, want masked", r.stdout)
+
     def test_a_masked_unit_without_its_link_is_drift(self):
         # apply's mask makes the link whether the unit exists or not: a masked line that is not masked is drift, the
         # unit installed or not (apply did not run, or someone ran unmask)

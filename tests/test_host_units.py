@@ -483,6 +483,23 @@ class HostUnitsCheck(unittest.TestCase):
         lines = [l for l in conf.splitlines() if l.strip() and not l.startswith("#")]
         self.assertEqual(r.stdout.count("DRIFT") + r.stdout.count("ok "), len(lines), r.stdout)
 
+    def test_each_unit_of_the_repository_list_has_its_state_before(self):
+        """Every disabled or masked unit of config/host-units.conf is a unit of a record of the states before the
+        change, results/host-units-before-*.txt (a user unit as user:NAME there).  A disabled unit that a machine does
+        not have passes the check as not installed, so a misspelt name would pass on every machine: this catches it,
+        and a new unit needs a new record."""
+        repo = SCRIPT.parents[1]
+        records = sorted((repo / "results").glob("host-units-before-*.txt"))
+        self.assertIn(repo / "results" / "host-units-before-20261018.txt", records)
+        recorded = {l.split()[0] for r in records for l in r.read_text().splitlines()
+                    if l.strip() and not l.startswith("#")}
+        lines = [l.split() for l in (repo / "config" / "host-units.conf").read_text().splitlines()
+                 if l.strip() and not l.startswith("#")]
+        listed = [("user:" if w[1] == "user" else "") + w[2] for w in lines if w[0] in ("disabled", "masked")]
+        self.assertEqual(len(listed), len([w for w in lines if w[0] != "default"]))   # all but the boot target's
+        self.assertGreater(len(listed), 0)
+        self.assertEqual([u for u in listed if u not in recorded], [], "not in results/host-units-before-*.txt")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -62,6 +62,8 @@ scripts/host-units.sh          # read-only: one ok or DRIFT line per unit, exit 
 scripts/host-units.sh apply    # sets them again with sudo, for example after a release upgrade enabled one
 ```
 
+A `disabled` unit that the machine does not have passes as `not installed`. The unit tests check each name of the list against the records of the states before, `results/host-units-before-*.txt`, so a misspelt name fails `scripts/test.sh`, and a unit added to the list needs such a record.
+
 To bring one back: `sudo systemctl unmask <unit>`, then `sudo systemctl enable --now <unit>` if it was enabled before (the states before the change are in `results/host-units-before-20261018.txt`), and remove its line from `config/host-units.conf` in the same commit. Remote access (ssh, tailscaled, netbird), the network, ZFS, NVIDIA, cron, logging and unattended security updates are not in the list and must stay on.
 
 ## The memory limit of the maintainer's account

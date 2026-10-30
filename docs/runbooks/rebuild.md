@@ -1,14 +1,14 @@
 # Rebuilding the deployment from scratch
 
 - When to use: on a new VM, to build today's deployment where none of it exists.
-- Not covered: this machine, and the loss of only `~/dev/strata`, `~/dev/Strata-data` or `~/cuda-12.9` on it. No procedure for a partial loss has been worked out or run. What each directory holds comes from these steps: `~/cuda-12.9` from step 2, `~/dev/Strata-data` from steps 4, 5 (the IQ3_XXS pack and the MTP files), 7 and 8.
-- Do not run any step of this runbook on this machine. The steps are blocks to paste, without `set -e`, so a line that fails does not stop the lines after it. Here:
+- Not covered: the machine that runs the service now ("this machine" below), and the loss of only `~/dev/strata`, `~/dev/Strata-data` or `~/cuda-12.9` on it. No procedure for a partial loss has been worked out or run. What each directory holds comes from these steps: `~/cuda-12.9` from step 2, `~/dev/strata` from steps 3, 5, 6 and 9, `~/dev/Strata-data` from steps 4, 5 (the IQ3_XXS pack and the MTP files), 7 and 8.
+- Do not run any step of this runbook on this machine (where `systemctl is-enabled strata-q3` already prints `enabled`). The steps are blocks to paste, without `set -e`, so a line that fails does not stop the lines after it. Here:
   - steps 1 and 3 fail, because their directories exist;
   - step 2 installs over the live `~/cuda-12.9`;
   - step 5 compiles again in the live tree and rewrites its config, and setup.py would move into `~/dev/Strata-data` the model files that other `~/dev/strata*` folders hold ([Before you start](#before-you-start));
   - in step 6 only the first line fails: the next lines rebuild `~/dev/strata-0.1.45`, and the last one replaces the live engine's directory;
   - step 7 moves a new download over the live IQ3_S shard 1, step 8 rewrites the live IQ3_S pack, and step 9 rewrites the live config without `--dry-run`;
-  - steps 12–14 change the system with sudo, and step 15's engine screen stops the service while it runs.
+  - steps 12 and 13 install units and change host units with sudo, step 14 reboots the machine, and step 15's engine screen stops the service for about an hour.
 - Scope: today's deployment, Strata 0.1.45 (`477ac13cb`) with GSQ-RCO IQ3_S and `--profile deployed --model iq3_s`. The commands that built 0.1.43.1 with IQ3_XXS on 2026-10-16 are this file at commit `68cb17f`.
 - Last verified: steps 1–3 and 5–11 and the file checks of step 15 were rehearsed on 2026-10-30 on this machine, in a sandbox, while the service ran ([the rehearsal](#the-rehearsal-of-2026-10-30)). Some inputs were not fetched as the steps fetch them (they were copies or links of production's, or an earlier step's download); each step says which, and which record covers it. Step 4 was not downloaded. Steps 0 and 12–14 change the system or need the GPUs, so they were not rehearsed. The whole procedure has not been run on a new VM.
 - Prerequisites:
@@ -100,7 +100,9 @@ cd ~/dev/strata && export STRATA_NVCC=$HOME/cuda-12.9/bin/nvcc PATH=$HOME/cuda-1
   --low-ram resident --kv-streaming off --vram-reserve-mib 1536 --data-dir $HOME/dev/Strata-data --no-browser
 cmp ~/dev/strata/strata-iq3_xxs.json ~/dev/p100-q3-deployment/config/strata-iq3_xxs.setup.json && echo "setup's config as on 2026-10-16"
 ```
-Rehearsed (R6, `results/rebuild-rehearsal-r6-r7-20261030.txt`; output `results/rebuild-rehearsal-setup-20261030.log`): 772 s, of which 6 min 39 s for the engine. The config equals `config/strata-iq3_xxs.setup.json`, which 0.1.43.1's setup wrote on 2026-10-16. The venv's packages, `pyvenv.cfg`, `.strata-pip.json`, `third_party/llama.cpp` and the MTP head equal production's. Setup's downloads were seeded, not run. R4 had downloaded the llama.cpp zip and written setup's `.done` mark for it, and R5 had linked production's IQ3_XXS shards and pack and written `.done` marks for the shards, so setup skipped them without asking the server (`setup.py:1616-1618`) and made no IQ3_XXS pack. R5 had also copied production's MTP tensors, which `tools/mtp_fetch.py` kept because they were whole and had the pinned sha256 (`tools/mtp_fetch.py:221-260`). On 2026-10-16 setup downloaded and made all of these (`results/setup-20261016.log`).
+Rehearsed (R6, `results/rebuild-rehearsal-r6-r7-20261030.txt`; output `results/rebuild-rehearsal-setup-20261030.log`): 772 s, of which 6 min 39 s for the engine. The config equals `config/strata-iq3_xxs.setup.json`, which 0.1.43.1's setup wrote on 2026-10-16. The venv's packages, `pyvenv.cfg`, `.strata-pip.json`, `third_party/llama.cpp` and the MTP head equal production's.
+
+Setup's downloads were seeded, not run. R4 had downloaded the llama.cpp zip and written setup's `.done` mark for it, and R5 had linked production's IQ3_XXS shards and pack and written `.done` marks for the shards, so setup skipped them without asking the server (`setup.py:1616-1618`) and made no IQ3_XXS pack. R5 had also copied production's MTP tensors, which `tools/mtp_fetch.py` kept because they were whole and had the pinned sha256 (`tools/mtp_fetch.py:221-260`). On 2026-10-16 setup downloaded and made all of these (`results/setup-20261016.log`).
 
 ### 6. The deployed build of the engine
 
@@ -192,7 +194,7 @@ Not rehearsed (sudo, `/etc`). The script, without `--enable`, installed `strata-
 ```bash
 scripts/host-units.sh apply
 ```
-It sets the units and then checks them. Not rehearsed. The states before the change are in `results/host-units-before-20261018.txt`; `check-drift.sh` checks them (the same run as in step 12).
+It sets the units and then checks them. The list is this machine's: its states before the change, with GNOME's `gdm` and Docker running, are in `results/host-units-before-20261018.txt`. For a `disabled` unit that the VM does not have, the check prints `DRIFT  system <unit> is unreadable / inactive, want disabled and not running`, and so does `check-drift.sh` in step 15; a `masked` unit that it does not have passes, because `mask` makes its link anyway. Not rehearsed. On this machine `check-drift.sh` checks the units (the same run as in step 12).
 
 ### 14. Start
 
@@ -211,9 +213,9 @@ Not rehearsed (GPUs). The start of 0.1.45 on 2026-10-19 is in `results/deploy-0.
 nice -n 19 ionice -c3 scripts/check-drift.sh --full      # 11 min 24 s on 2026-10-27 (results/check-drift-full-20261027.txt)
 scripts/check-deployment.sh
 ```
-Expected: drift on the two engine binaries only, and `no problems found` from `check-deployment.sh`.
+Expected: drift on the two engine binaries and on the missing units of step 13 only, and `no problems found` from `check-deployment.sh`.
 
-Then screen the rebuilt engine on the GPUs. The arm R1 of `bench/arms-rebuild.json` is the deployed configuration (K1 of `bench/arms-iq3s.json`) run from the rebuilt engine in `~/dev/strata-0.1.45`; the baseline is K1's four runs of 2026-10-29 with the deployed binary (`cf-k1-1` to `cf-k1-4`, [Engine experiments](../engine-experiments.md)). `bench/ab_engine.sh` stops the service before the first run and starts it again after the last; the eight runs of 2026-10-29 took 15:51–19:20 (`results/ab_engine-confirm-20261029.log`). It refuses tags it has used before, so a second attempt needs new ones (`bench/ab_engine.sh:170-176`).
+Then screen the rebuilt engine on the GPUs. The arm R1 of `bench/arms-rebuild.json` is the deployed configuration (K1 of `bench/arms-iq3s.json`) run from the rebuilt engine in `~/dev/strata-0.1.45`; the baseline is K1's four runs of 2026-10-29 with the deployed binary (`cf-k1-1` to `cf-k1-4`, [Engine experiments](../engine-experiments.md)). `bench/ab_engine.sh` stops the service before the first run and starts it again after the last. Each run takes about 26 minutes and the restart after the last about 9 more, so the service is down for about an hour (`results/ab_engine-confirm-20261029.log`: cf-k1-1 15:51:07–16:18:03, the restart 19:20:23–19:29:34). It refuses tags it has used before, so a second attempt needs new ones (`bench/ab_engine.sh:170-176`). This screen has not been run.
 ```bash
 bench/make_engine_configs.py ~/dev/strata-0.1.45 cfg-s-k1
 ENGINE_SCREEN_PHASES=prefill,decode,four,decode4,eval4,admit,admit28,turns bench/ab_engine.sh bench/arms-rebuild.json rb-1:R1 rb-2:R1
@@ -223,9 +225,9 @@ python3 -B bench/ab_engine_summary.py --arms bench/arms-rebuild.json --baseline 
 
 The baseline: K1's four runs gave the same answers to the 12 requests that run alone (9 in the prefill phase, 3 in the decode phase), and their median rates for reading 1.2K, 4K and 16K prompts and for one user's decode varied by 0.30 %, 0.34 %, 0.29 % and 1.80 % (`results/engine-screen.jsonl`).
 
-Pass: in the summary, R1's Answers line shows no difference in the prefill or decode phase, and in the Numbers part R1's means for those four rates are marked `within the baseline's spread`. Two runs of the deployed binary with the same configuration on 2026-10-20 (`s2-k1-1` and `s2-k1-2`, `results/s2-k1-*-arm.txt`) meet this rule. These are the screens' own measures; no rebuilt engine has been screened, and on another CPU (see [Before you start](#before-you-start)) a difference is not by itself a fault: the maintainer decides then.
+Pass: the summary exits 0 (every run usable), R1's Answers line shows no difference in the prefill or decode phase, and in the Numbers part R1's means for those four rates are marked `within the baseline's spread`. Two runs of the deployed binary with the same configuration on 2026-10-20 (`s2-k1-1` and `s2-k1-2`, `results/s2-k1-*-arm.txt`) meet this rule. These are the screens' own measures. On another CPU (see [Before you start](#before-you-start)) a difference is not by itself a fault: the maintainer decides then.
 
-After a pass, commit the screen's results files (`results/rb-*` and `results/engine-screen.jsonl`, which `ab_engine.sh` writes in this checkout) with the new sha256 of the two binaries in `config/deployed-artifacts.sha256`, and run `check-drift.sh` again: `no drift`.
+After a pass, commit the screen's results files (`results/rb-*` and `results/engine-screen.jsonl`, which `ab_engine.sh` writes in this checkout) with the new sha256 of the two binaries in `config/deployed-artifacts.sha256`, and run `check-drift.sh` again: drift on the missing units of step 13 only, or `no drift`. Push the commit to `main`: `scripts/deploy.sh` refuses a checkout that has commits GitHub does not have ([Deploying a commit](deploy.md#when-the-script-refuses)).
 
 Rehearsed in part (R11, `results/rebuild-rehearsal-r8-r11-20261030.txt`): `check-drift.sh --full` in the sandbox found the config, the tree, the venv, the checkout and every file of the manifest as production has them, but the two engine binaries. Its other DRIFT lines came from the sandbox (root's files show as uid 65534, and it has no user bus and its own PID namespace); the same check outside, on production, reported no drift. `check-deployment.sh` and the engine screen need the running service and were not rehearsed; `check-deployment.sh`'s output after the start of 2026-10-19 is in `results/deploy-0.1.45-20261019.txt`.
 

@@ -7,7 +7,10 @@
 # home was readable inside, credentials too (~/.config/gh/hosts.yml, gh's GitHub token, among them), the network was
 # the host's, and a job got the environment of the shell that started it but DBUS_SESSION_BUS_ADDRESS (R0's section 1
 # shows /home/thc1006 read-only from the root file system). The records do not show whether a job read them, nor what
-# that environment held.
+# that environment held.  Every job also saw the host's /run but for the user bus and the system bus, kept the open
+# files of that shell, and reached through the host's network the production server on 127.0.0.1:8080 and the
+# engine's abstract unix socket.  rr also set XDG_RUNTIME_DIR, XDG_CONFIG_HOME, XDG_CACHE_HOME, TMPDIR, PATH and
+# PYTHONNOUSERSITE (its text is in results/rebuild-rehearsal-copies-20261030.txt).
 # R6-R7 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 01:46:54 +0800.
 # The account's limit was lifted by the maintainer to MemoryMax=12G (runtime, 2026-10-30 01:46; MemorySwapMax 0).
 # Each build ran alone through ~/rebuild-rehearsal/bin/rr with -m 8G (its scope's MemoryMax), CPUs 1-7, SCHED_IDLE, nice 19,

@@ -7,6 +7,10 @@
 # (~/.config/gh/hosts.yml, gh's GitHub token, among them), the network was the host's, and a job got the environment
 # of the shell that started it but DBUS_SESSION_BUS_ADDRESS (R0's section 1 shows /home/thc1006 read-only from the
 # root file system). The records do not show whether a job read them, nor what that environment held.
+# Every job also saw the host's /run but for the user bus and the system bus, kept the open files of that shell, and
+# reached through the host's network the production server on 127.0.0.1:8080 and the engine's abstract unix socket.
+# rr also set XDG_RUNTIME_DIR, XDG_CONFIG_HOME, XDG_CACHE_HOME, TMPDIR, PATH and PYTHONNOUSERSITE (its bwrap command
+# line is in section 8 below).
 # R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, 2026-10-30 00:48:13 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr: its own user scope (MemoryMax, MemorySwapMax=0), choom -n 500,
 # nice -n 19, chrt -i 0, ionice -c3, taskset -c 7, then bwrap.  No sudo was run.  Production was read only.

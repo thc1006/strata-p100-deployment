@@ -8,7 +8,11 @@
 # (~/.config/gh/hosts.yml, gh's GitHub token, among them), and the network was the host's (R0's section 1 shows
 # /home/thc1006 read-only from the root file system).  Every job, the four with --home too, got the environment of the
 # shell that started it but DBUS_SESSION_BUS_ADDRESS.  The records do not show whether a job read them, nor what that
-# environment held.
+# environment held.  Every job, the four with --home too, also saw the host's /run but for the user bus and the system
+# bus, kept the open files of that shell, and reached through the host's network the production server on
+# 127.0.0.1:8080 and the engine's abstract unix socket.  rr also set XDG_RUNTIME_DIR, XDG_CONFIG_HOME, XDG_CACHE_HOME,
+# TMPDIR, PATH and PYTHONNOUSERSITE (its text of 00:58:04 is in results/rebuild-rehearsal-copies-20261030.txt; the bwrap
+# command line in section 8 of results/rebuild-rehearsal-r0-20261030.txt shows the same for the first version).
 # R0's self-test checked the first version of rr (sha256 2009c269..., results/rebuild-rehearsal-r0-20261030.txt).
 # R1, R2's download and first install, R3 and R4 (00:50-00:57) ran rr as it was before 00:58:04; no record gives its
 # sha256 then.

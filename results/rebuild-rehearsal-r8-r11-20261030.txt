@@ -7,7 +7,11 @@
 # readable inside, credentials too (~/.config/gh/hosts.yml, gh's GitHub token, among them), the network was the
 # host's, and a job got the environment of the shell that started it but DBUS_SESSION_BUS_ADDRESS (R0's section 1
 # shows /home/thc1006 read-only from the root file system). The records do not show whether a job read them, nor what
-# that environment held.
+# that environment held.  Every job also saw the host's /run but for the user bus and the system bus (rr-r11-drift,
+# with --sysbus, had the system bus), kept the open files of that shell, and reached through the host's network the
+# production server on 127.0.0.1:8080 and the engine's abstract unix socket.  rr also set XDG_RUNTIME_DIR,
+# XDG_CONFIG_HOME, XDG_CACHE_HOME, TMPDIR, PATH and PYTHONNOUSERSITE (its text is in
+# results/rebuild-rehearsal-copies-20261030.txt).
 # The record's own header below dates the limit's return to 6G "02:1x"; its first reading, at 02:09:57, already shows
 # memory.max 6442450944.
 # R8-R11 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 02:09:57 +0800.

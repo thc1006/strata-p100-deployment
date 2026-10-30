@@ -10,8 +10,10 @@
 # shell that started it but DBUS_SESSION_BUS_ADDRESS.  The records do not show whether a job read them, nor what that
 # environment held.
 # R0's self-test checked the first version of rr (sha256 2009c269..., results/rebuild-rehearsal-r0-20261030.txt).
-# --home was added before R2a ("Fix: rr --home" below), and R2a checked only that mode.  The version that R2a-R11 ran
-# has the sha256 728591a9... and has not changed since 00:58:04 (results/rebuild-rehearsal-copies-20261030.txt).
+# R1, R2's download and first install, R3 and R4 (00:50-00:57) ran rr as it was before 00:58:04; no record gives its
+# sha256 then.
+# --home was added before R2a ("Fix: rr --home" below), and R2a checked only that mode.  R2a, R2b and R5 ran the version
+# with the sha256 728591a9..., unchanged since 00:58:04 (results/rebuild-rehearsal-copies-20261030.txt).
 # R1-R5 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 00:49:55 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr (capped user scope, choom -n 500, nice -n 19, chrt -i 0, ionice -c3,
 # taskset, then the bubblewrap sandbox of R0-selftest.txt); rr-guard ran beside it (logs/guard.log).  No sudo was run.

@@ -6,8 +6,9 @@
 # version with rm_sandbox and the refusals to start; the bench/ tools of later commits differ (their headers say how).
 # Every section ran: no probe of section 2 was allowed, and the 33 production paths were unchanged (section 9).
 # Its own lines still name ~/rebuild-rehearsal/bin/rr, as the header text of that version did.  That
-# bench/rehearsal_rr.sh showed jobs the whole real home read-only, credentials too, and the host's network, as the
-# copy in ~/rebuild-rehearsal/bin did (results/rebuild-rehearsal-r0-20261030.txt, section 1).
+# bench/rehearsal_rr.sh showed jobs the whole real home read-only, credentials too, and the host's network, and gave
+# them the environment of the shell that started it but DBUS_SESSION_BUS_ADDRESS, as the copy in
+# ~/rebuild-rehearsal/bin did (results/rebuild-rehearsal-r0-20261030.txt, section 1).
 # R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, 2026-10-30 04:14:06 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr: its own user scope (MemoryMax, MemorySwapMax=0), choom -n 500,
 # nice -n 19, chrt -i 0, ionice -c3, taskset -c 7, then bwrap.  No sudo was run.  Production was read only.

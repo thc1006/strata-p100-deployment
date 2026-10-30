@@ -8,8 +8,12 @@
 # Every job here but rr-r2a-mounts, rr-r2a-probe, rr-r2a-mark and rr-r2-install2 (--home: the sandbox's home in place
 # of the real one) ran in rr's default mode, in which the whole real home was readable inside, credentials too
 # (~/.config/gh/hosts.yml, gh's GitHub token, among them), and the network was the host's (R0's section 1 shows
-# /home/thc1006 read-only from the root file system). The records do not show whether a job read them.
-# bench/rehearsal_rr.sh no longer shows them.
+# /home/thc1006 read-only from the root file system).  Every job, the four with --home too, got the environment of the
+# shell that started it but DBUS_SESSION_BUS_ADDRESS.  The records do not show whether a job read them, nor what that
+# environment held.  bench/rehearsal_rr.sh no longer shows them.
+# R0's self-test checked the first version of rr (sha256 2009c269..., results/rebuild-rehearsal-r0-20261030.txt).
+# --home was added before R2a ("Fix: rr --home" below), and R2a checked only that mode.  The version that R2a-R11 ran
+# has the sha256 728591a9... and has not changed since 00:58:04 (results/rebuild-rehearsal-copies-20261030.txt).
 # R1-R5 of the rebuild rehearsal (PLAN.md section 5.3), on <host>, started 2026-10-30 00:49:55 +0800.
 # Every job ran through ~/rebuild-rehearsal/bin/rr (capped user scope, choom -n 500, nice -n 19, chrt -i 0, ionice -c3,
 # taskset, then the bubblewrap sandbox of R0-selftest.txt); rr-guard ran beside it (logs/guard.log).  No sudo was run.

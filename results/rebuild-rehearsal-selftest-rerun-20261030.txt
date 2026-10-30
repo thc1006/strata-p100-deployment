@@ -11,8 +11,9 @@
 # checks after this record) and in a run at 04:14 of the version of commit 2731c92
 # (results/rebuild-rehearsal-selftest-committed-20261030.txt).  The checks of R0-R11 were recorded before
 # (results/rebuild-rehearsal-*-20261030.txt); the lost parts were not rebuilt (the maintainer's decision).  Since then
-# the self-test refuses a sandbox that has ~/dev/strata or ~/dev/Strata-data, refuses while an rr-* job runs, and
-# removes only through a function that refuses a path that does not resolve under ~/rebuild-rehearsal/root.
+# the self-test refuses a sandbox that has ~/dev/strata or ~/dev/Strata-data and refuses while an rr-* job runs; it
+# removes its markers through a job inside the sandbox (before, through a function that refused a path that did not
+# resolve under ~/rebuild-rehearsal/root).
 # Its jobs ran in rr's default mode, in which the whole real home was readable inside, credentials too, and the network
 # was the host's (results/rebuild-rehearsal-r0-20261030.txt, section 1).
 # Part 2 is not part of the self-test's output; it was added after the run.  Its check-drift.sh line describes the

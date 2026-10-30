@@ -1,0 +1,92 @@
+# The rebuild rehearsal's tool copies in ~/rebuild-rehearsal (bin/ and shim/), the text of its runner bin/rr, the
+# sandbox's apparent size and the guard's scope, read on 2026-10-30 10:01:55 +0800 without changing anything.
+# The R0 record (results/rebuild-rehearsal-r0-20261030.txt) gives bin/rr's sha256 at R0, 00:48; R2a began at 00:58:20
+# (results/rebuild-rehearsal-r1-r5-20261030.txt).  A file's ctime (the last %z column) changes with every write.
+
+$ cd /home/thc1006/rebuild-rehearsal
+[exit 0]
+
+$ sha256sum bin/elfcmp.py bin/prod-stat.sh bin/r0-probe.py bin/r0-selftest.sh bin/r0-settings.py bin/rlog bin/rr bin/rr-guard bin/rr-memwatch shim/nvidia-smi shim/sudo
+4fff4c1cdd2c2e92d1c23b7ad551a073969757787f421fd79ddc9e72475b30b6  bin/elfcmp.py
+b8aee9a6fdd0dc319b5460b980262c37425931c93c942aca452651a26b5fe656  bin/prod-stat.sh
+ca9543a7aafe52c82fe5aa40cea1c0c1dce20da50e9e54d36d8628004ce93482  bin/r0-probe.py
+6f6cbddb7f3f2303cadeff4a3d8df22a71ddda2675282a206276a6f801550247  bin/r0-selftest.sh
+9dd4f79f5c65b4f5623ee47430160048436ad33214b0b3232d6f9520e11bad7a  bin/r0-settings.py
+a53f82db76b06d7cd07205a4fd3134862cb1ce6b9d1e63f91a85dcbac75a1f3b  bin/rlog
+728591a9175e179413420960f8e8686aa634ce3aae3f4979c7dc15a551b01e7b  bin/rr
+ff8bc7fb5289180848f7f30c5755f3f053956361f0e86a94ecc63a861012fcd3  bin/rr-guard
+3aa7faa0f2e666e1f37d0d35f8e996ad31cffc485fd8a8ba70eaf963aa81d6cd  bin/rr-memwatch
+5cd16e8ec34416611d3b937aee5cf8336f29578c7bb3724a275d4d1862d21a68  shim/nvidia-smi
+03da5182ceadbc2f1219b9dd09650a50f3f4a00eda71da8ab8d051b5866bc23c  shim/sudo
+[exit 0]
+
+$ stat -c "%n %s %y %z" bin/* shim/*
+bin/elfcmp.py 812 2026-10-30 00:44:44.585441894 +0800 2026-10-30 00:44:44.589442228 +0800
+bin/prod-stat.sh 1230 2026-10-30 01:11:22.783266105 +0800 2026-10-30 01:11:22.783266105 +0800
+bin/r0-probe.py 3178 2026-10-30 00:45:49.772892300 +0800 2026-10-30 00:45:49.781893053 +0800
+bin/r0-selftest.sh 7833 2026-10-30 00:48:13.771969425 +0800 2026-10-30 00:48:13.771969425 +0800
+bin/r0-settings.py 1344 2026-10-30 00:45:49.777892718 +0800 2026-10-30 00:45:49.781893053 +0800
+bin/rlog 597 2026-10-30 00:54:17.220611161 +0800 2026-10-30 00:54:17.220611161 +0800
+bin/rr 3543 2026-10-30 00:58:04.124813384 +0800 2026-10-30 00:58:04.124813384 +0800
+bin/rr-guard 1407 2026-10-30 00:47:17.014203659 +0800 2026-10-30 00:47:17.014203659 +0800
+bin/rr-memwatch 732 2026-10-30 02:46:20.520011003 +0800 2026-10-30 02:46:20.520011003 +0800
+shim/nvidia-smi 323 2026-10-30 00:44:10.574603069 +0800 2026-10-30 00:44:10.577603319 +0800
+shim/sudo 56 2026-10-30 00:44:10.569602652 +0800 2026-10-30 00:44:10.577603319 +0800
+[exit 0]
+
+$ cat bin/rr
+#!/bin/bash
+# rr [-m MEM] [-c CPUS] [-n NAME] [--sysbus] [--home] -- COMMAND...
+# --home: the sandbox's ~/rebuild-rehearsal/root/home/thc1006 is all of /home/thc1006 inside (production's home is not
+# visible at all, except the two read-only views and ~/rebuild-rehearsal itself), for installers that need to write
+# into /home/thc1006 (the CUDA runfile does).
+# One rehearsal job: its own capped user scope (MemoryMax, no swap, oom_score_adj +500, nice 19, SCHED_IDLE, ionice
+# idle, CPU affinity), inside a bubblewrap namespace in which
+#   - the whole root file system is read-only;
+#   - /home/thc1006/dev, /home/thc1006/cuda-12.9, /home/thc1006/downloads and /tmp are directories of the sandbox
+#     (so hard-coded production paths resolve into ~/rebuild-rehearsal/root/...);
+#   - production's ~/dev and ~/cuda-12.9 are visible only read-only, at ~/rebuild-rehearsal/prod/{dev,cuda-12.9};
+#   - /dev is a minimal one without /dev/nvidia* (no GPU can be reached);
+#   - its own PID namespace and /proc (no /proc/<pid>/root of a host process), an empty /run/user/1003 (no user bus,
+#     so no systemctl --user or systemd-run from inside), and no system bus unless --sysbus is given;
+#   - XDG_CONFIG_HOME and XDG_CACHE_HOME in the sandbox; PATH starts with stand-ins for sudo and nvidia-smi.
+# It refuses to run without the sandbox marker, and the command does not run unless the checks inside hold.
+set -u
+SB=/home/thc1006/rebuild-rehearsal; R=$SB/root/home/thc1006
+MEM=2G; CPUS=7; NAME=rr-$$; SYSBUS=0; HOMEBIND=0
+while [ $# -gt 0 ]; do
+  case $1 in
+    -m) MEM=$2; shift 2 ;; -c) CPUS=$2; shift 2 ;; -n) NAME=$2; shift 2 ;; --sysbus) SYSBUS=1; shift ;; --home) HOMEBIND=1; shift ;;
+    --) shift; break ;; *) break ;;
+  esac
+done
+[ $# -gt 0 ] || { echo "usage: rr [-m MEM] [-c CPUS] [-n NAME] [--sysbus] -- COMMAND..." >&2; exit 2; }
+[ -e "$R/dev/.rehearsal-sandbox" ] || { echo "rr: no sandbox marker in $R/dev" >&2; exit 99; }
+case $NAME in rr-*) ;; *) echo "rr: the scope name must start with rr-" >&2; exit 2 ;; esac
+bus=(--bind "$SB/root/empty-dbus" /run/dbus)
+[ $SYSBUS = 1 ] && bus=()
+binds=(--bind "$SB" "$SB" --ro-bind /home/thc1006/dev "$SB/prod/dev" --ro-bind /home/thc1006/cuda-12.9 "$SB/prod/cuda-12.9"
+       --bind "$R/dev" /home/thc1006/dev --bind "$R/cuda-12.9" /home/thc1006/cuda-12.9 --bind "$R/downloads" /home/thc1006/downloads)
+[ $HOMEBIND = 1 ] && binds=(--bind "$R" /home/thc1006 --bind "$SB" "$SB" --ro-bind /home/thc1006/dev "$SB/prod/dev"
+       --ro-bind /home/thc1006/cuda-12.9 "$SB/prod/cuda-12.9")
+exec systemd-run --user --scope -q --unit="$NAME" --description="rebuild rehearsal job $NAME" -p MemoryMax="$MEM" -p MemorySwapMax=0 -- \
+  choom -n 500 -- nice -n 19 chrt -i 0 ionice -c3 taskset -c "$CPUS" \
+  bwrap --die-with-parent --new-session --unshare-pid \
+    --ro-bind / / --dev /dev --proc /proc \
+    "${binds[@]}" --bind "$SB/root/tmp" /tmp \
+    --bind "$SB/root/empty-run-user" /run/user/1003 "${bus[@]}" \
+    --unsetenv DBUS_SESSION_BUS_ADDRESS --setenv XDG_RUNTIME_DIR /run/user/1003 \
+    --setenv XDG_CONFIG_HOME "$R/.config" --setenv XDG_CACHE_HOME "$R/.cache" --setenv TMPDIR /tmp \
+    --setenv PATH "$SB/shim:/usr/local/bin:/usr/bin:/bin" --setenv PYTHONNOUSERSITE 1 \
+    /bin/sh -c 'if [ -e /home/thc1006/dev/.rehearsal-sandbox ] && [ ! -w /etc ] && [ ! -w "$0" ] && [ ! -w "$0/../cuda-12.9" ] \
+                   && ! ls /dev/nvidia* >/dev/null 2>&1; then shift; exec "$@"; fi
+                echo "rr: namespace check failed: nothing run" >&2; exit 98' "$SB/prod/dev" sh "$@"
+[exit 0]
+
+$ du -s --apparent-size --block-size=1 /home/thc1006/rebuild-rehearsal
+10868772211	/home/thc1006/rebuild-rehearsal
+[exit 0]
+
+$ systemctl --user is-active rrg-guard.scope
+inactive
+[exit 3]

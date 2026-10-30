@@ -44,8 +44,9 @@
 # something in the TMPDIR they get (a directory of this run's), also the file of an object that a global still holds
 # (a NamedTemporaryFile in a module's list or a class's attribute), which a worker does not finalize (the comment on the
 # workers says why), and when the loading left what fork() does not copy to the workers as this process has it (the
-# tests then do not run): a thread that still runs, or a child process (also one that has ended and that no one has
-# waited for).
+# tests then do not run): a thread that still runs, a child process (also one that has ended and that no one has waited
+# for), an open file, pipe or socket, a lock of fcntl.lockf, a timer, a pending signal, or a function that code outside
+# the standard library gave os.register_at_fork.
 # Code review has to see what runs but checks nothing, as a test that returns early from its own body.
 # (The machine's state is checked by check-drift.sh and check-deployment.sh, not here.)
 # Usage: scripts/test.sh [--repo-only] [--harnesses] [--jobs N]
@@ -78,8 +79,8 @@ step "unit tests (tests/)"
 mkdir "$tmp/tests" || { echo "cannot create the tests' temporary directory"; exit 1; }
 TMPDIR=$tmp/tests STRATA_TEST_ENGINES_LOCK=$tmp/engines.lock TEST_REPO_ONLY=$REPO_ONLY \
   STRATA_TEST_HARNESSES=$HARNESSES TEST_JOBS=$JOBS python3 -B - "$tmp/verdict" <<'EOF' || fail=1
-import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, signal, stat, symtable, sys, \
-    threading, time, traceback, types, unittest, warnings, weakref
+import ast, atexit, cProfile, ctypes, functools, gc, inspect, json, os, pathlib, posix, signal, stat, symtable, sys, \
+    sysconfig, threading, time, traceback, types, unittest, warnings, weakref
 for stream in (sys.stdout, sys.stderr):
     stream.reconfigure(errors="backslashreplace")        # a lone surrogate in a name prints, as \udcxx
 repo_only = os.environ["TEST_REPO_ONLY"] == "1"
@@ -310,6 +311,37 @@ def unregister(func):
 
 atexit.register, atexit.unregister = register, unregister
 
+
+def descriptors():
+    """This process's open file descriptors, each with the file it refers to (device, inode)."""
+    found = {}
+    for n in os.listdir("/proc/self/fd"):
+        try:
+            st = os.fstat(int(n))
+        except OSError:                 # (that of the listing, closed by now)
+            continue
+        found[int(n)] = (st.st_dev, st.st_ino)
+    return found
+
+
+OWN_FDS = descriptors()                 # this process's own, before the tests load
+STDLIB = tuple(os.path.realpath(sysconfig.get_path(k)) + os.sep for k in ("stdlib", "platstdlib"))
+SITE = tuple(os.path.realpath(sysconfig.get_path(k)) + os.sep for k in ("purelib", "platlib"))
+forkers = []            # where code outside the standard library called os.register_at_fork before the workers
+real_at_fork = os.register_at_fork
+
+
+@functools.wraps(real_at_fork)
+def at_fork(**kwargs):
+    real_at_fork(**kwargs)
+    caller = sys._getframe(1)
+    name = caller.f_code.co_filename
+    path = STDLIB[0] if name.startswith("<frozen ") else os.path.realpath(name)
+    if not path.startswith(STDLIB) or path.startswith(SITE):
+        forkers.append(f"{name}:{caller.f_lineno}")
+
+
+os.register_at_fork = posix.register_at_fork = at_fork
 profile.enable()
 suite = Loader().discover("tests", pattern=PATTERN)
 atexit.register, atexit.unregister = real_register, real_unregister
@@ -438,8 +470,10 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 
 # The tests run in JOBS workers (--jobs; one by default), processes forked from this one once the tests are loaded, so
 # that each starts with what the loading ran, but for what fork() does not copy, such as a thread: fork() copies only
-# the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  A
-# worker takes the next unit from a file that all of them read through one open file
+# the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  The
+# random module seeds itself again in a forked process, and a worker gives it back its state.  What still differs in a
+# worker is its pid and parent pid, and its CPU time and other resource use (time.process_time, resource.getrusage),
+# which start again at zero.  A worker takes the next unit from a file that all of them read through one open file
 # description (each read moves its offset on), runs it, and writes down what the checks below need; this process then
 # merges that, prints unittest's report and runs the checks.  A unit is a test,
 # or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
@@ -597,6 +631,8 @@ def work(k, saved, mask, gate, report):
     status, interrupted = 1, False
     try:
         try:
+            if RANDOM is not None:
+                RANDOM.setstate(RANDOM_STATE)       # (see the check before the fork)
             atexit._clear()                     # what the tests registered as they loaded runs in this process's
             for f in list(weakref.finalize._registry):              # parent, and so do the loading's finalizers;
                 f.atexit = False
@@ -698,9 +734,17 @@ def child(pid):
     return f"{stat[stat.find('(') + 1:end]!r} (pid {pid}{', ended' if stat[end + 2:end + 3] == 'Z' else ''})"
 
 
-# fork() does not copy a child process either: the workers cannot wait for it (Popen.wait() then returns 0), also
-# when it has ended and no one has waited for it yet, so the run ends here for it too.  subprocess.run() waits for its
-# own.
+# fork() does not copy these either as this process has them, and the run ends here for each, as for a thread:
+# - a child process: the workers cannot wait for it (Popen.wait() then returns 0), also when it has ended and no one
+#   has waited for it yet.  subprocess.run() waits for its own.
+# - a file, pipe or socket: this process keeps it open when a test closes it, so that closing it does not release a
+#   lock on it, give a pipe's reader the end of the data or close a connection.  (The units' queues are this
+#   process's own.)
+# - a lock of fcntl.lockf (a POSIX record lock): it stays this process's.
+# - a timer (signal.alarm, signal.setitimer), and a pending signal, but SIGINT, SIGTERM and SIGHUP, which go on to the
+#   workers (see above).
+# - a function that code outside the standard library gave os.register_at_fork: it would run as the workers are
+#   forked.
 stop = [thread] if thread else []
 try:
     kids = [p for t in os.listdir("/proc/self/task")
@@ -712,11 +756,39 @@ else:
     if kids:
         stop.append("a process that started as the tests loaded is a child of the runner, which the workers cannot "
                     "wait for (start it in setUpModule or setUpClass): " + ", ".join(map(child, kids)))
+try:
+    opened = sorted(n for n, f in descriptors().items() if OWN_FDS.get(n) != f and n not in queues)
+    names = [f"{n} ({os.readlink(f'/proc/self/fd/{n}')})" for n in opened]
+    locks = [line.split() for line in pathlib.Path("/proc/locks").read_text().splitlines()]
+except OSError as e:
+    stop.append(f"cannot read {e.filename} ({e.strerror}): the files that the tests opened as they loaded, and their "
+                "locks, cannot be listed")
+else:
+    if opened:
+        stop.append("a file, pipe or socket that the tests opened as they loaded is open in the runner too, which "
+                    "keeps it open when a test closes it (open it in setUpModule or setUpClass): " + ", ".join(names))
+    if any(lock[1:2] == ["POSIX"] and lock[4:5] == [str(parent)] for lock in locks):
+        stop.append("a lock of fcntl.lockf that the tests took as they loaded stays the runner's, not the workers' "
+                    "(take it in setUpModule or setUpClass)")
+timers = [n for n in ("ITIMER_REAL", "ITIMER_VIRTUAL", "ITIMER_PROF") if signal.getitimer(getattr(signal, n))[0]]
+if timers:
+    stop.append("a timer that the tests set as they loaded (signal.alarm, signal.setitimer) goes off in the runner, "
+                "not in the workers (set it in setUpModule or setUpClass): " + ", ".join(timers))
+held = sorted(signal.sigpending() - set(SIGNALS))
+if held:
+    stop.append("a signal that the tests sent to themselves as they loaded is still pending, and the workers do not "
+                "get it (send it in setUpModule or setUpClass): " + ", ".join(getattr(s, "name", str(s)) for s in held))
+os.register_at_fork = posix.register_at_fork = real_at_fork
+if forkers:
+    stop.append("a function that the tests registered with os.register_at_fork as they loaded would run as the "
+                "workers are forked (register it in setUpModule or setUpClass): " + ", ".join(forkers))
 if stop:
     for b in bad + stop:
         print(f"FAIL: {b}")
     pathlib.Path(sys.argv[1]).write_text("fail\n")
     sys.exit(1)
+RANDOM = sys.modules.get("random")
+RANDOM_STATE = RANDOM.getstate() if RANDOM else None
 sys.stdout.flush()
 sys.stderr.flush()
 start = time.perf_counter()

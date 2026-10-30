@@ -2529,22 +2529,55 @@ class TestSh(unittest.TestCase):
         # what a test module makes at its import and fork() does not copy to the workers as the runner had it ends the
         # run before the tests, as a thread does.  Each test below is wrong and failed in the runner before the
         # workers; in a worker it passed: Popen.wait() returned 0 for a child of the runner (also for one that had
-        # ended)
+        # ended), the runner kept a file open when the test closed it, so that its flock stayed, a lock of
+        # fcntl.lockf (on the runner's stderr) stayed the runner's, a timer and a pending signal went off in the
+        # runner only, and a function given to os.register_at_fork ran as the worker was forked
         d = self.tree()
         child = ("import subprocess, time, unittest\nP = subprocess.Popen(['sh', '-c', '{0}exit 3'])\n{1}"
                  "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertEqual(P.wait(), 0)\n")
+        lock = ("import fcntl, os, tempfile, unittest\n{0}fcntl.{1}(fd, fcntl.LOCK_EX)\n"
+                "class T(unittest.TestCase):\n    def test_t(self):\n{2}        g = os.open(path, os.O_WRONLY)\n"
+                "        with self.assertRaises(BlockingIOError):\n"
+                "            fcntl.{1}(g, fcntl.LOCK_EX | fcntl.LOCK_NB)\n        os.close(g)\n{3}")
         fails = "a process that started as the tests loaded is a child of the runner, which the workers cannot wait for"
         cases = {
             child.format("sleep 1; ", ""):
                 fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+\)\n",
             child.format("", "time.sleep(0.3)\n"):
                 fails + r" \(start it in setUpModule or setUpClass\): 'sh' \(pid \d+, ended\)\n",
+            lock.format("fd, path = tempfile.mkstemp()\n", "flock", "        os.close(fd)\n",
+                        "        os.unlink(path)\n"):
+                r"a file, pipe or socket that the tests opened as they loaded is open in the runner too, which keeps "
+                r"it open when a test closes it \(open it in setUpModule or setUpClass\): 3 \(/\S+/tmp\w+\)\n",
+            lock.format("fd, path = 2, '/proc/self/fd/2'\n", "lockf", "", ""):     # (stderr, a pipe)
+                r"a lock of fcntl.lockf that the tests took as they loaded stays the runner's, not the workers' "
+                r"\(take it in setUpModule or setUpClass\)\n",
+            "import signal, time, unittest\nlate = []\nsignal.signal(signal.SIGALRM, lambda *a: late.append(1))\n"
+            "signal.setitimer(signal.ITIMER_REAL, 0.5)\nclass T(unittest.TestCase):\n    def test_t(self):\n"
+            "        time.sleep(1)\n        self.assertEqual(late, [])\n":
+                r"a timer that the tests set as they loaded \(signal.alarm, signal.setitimer\) goes off in the "
+                r"runner, not in the workers \(set it in setUpModule or setUpClass\): ITIMER_REAL\n",
+            "import os, signal, unittest\ngot = []\nsignal.signal(signal.SIGUSR1, lambda *a: got.append(1))\n"
+            "signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})\nos.kill(os.getpid(), signal.SIGUSR1)\n"
+            "class T(unittest.TestCase):\n    def test_t(self):\n"
+            "        signal.pthread_sigmask(signal.SIG_UNBLOCK, {signal.SIGUSR1})\n        self.assertEqual(got, [])\n":
+                r"a signal that the tests sent to themselves as they loaded is still pending, and the workers do not "
+                r"get it \(send it in setUpModule or setUpClass\): SIGUSR1\n",
+            "import os, unittest\nforked = []\nos.register_at_fork(after_in_child=lambda: forked.append(1))\n"
+            "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertTrue(forked)\n":
+                r"a function that the tests registered with os.register_at_fork as they loaded would run as the "
+                r"workers are forked \(register it in setUpModule or setUpClass\): \S+/tests/test_load.py:3\n",
             # what cannot be read fails the run too: a test module that makes the runner's reads fail
             "import pathlib, unittest\n_read = pathlib.Path.read_text\ndef read_text(self, *a, **k):\n"
             "    if self.name == 'children':\n        raise PermissionError(13, 'Permission denied', str(self))\n"
             "    return _read(self, *a, **k)\npathlib.Path.read_text = read_text\n" + GOOD_TEST:
                 r"cannot read /proc/self/task/\*/children \(Permission denied\): the processes that the workers could "
-                r"not wait for cannot be listed\n"}
+                r"not wait for cannot be listed\n",
+            "import pathlib, unittest\n_read = pathlib.Path.read_text\ndef read_text(self, *a, **k):\n"
+            "    if str(self) == '/proc/locks':\n        raise PermissionError(13, 'Permission denied', str(self))\n"
+            "    return _read(self, *a, **k)\npathlib.Path.read_text = read_text\n" + GOOD_TEST:
+                r"cannot read /proc/locks \(Permission denied\): the files that the tests opened as they loaded, and "
+                r"their locks, cannot be listed\n"}
         for code, says in cases.items():
             with self.subTest(says=says):
                 (d / "tests" / "test_load.py").write_text(code)
@@ -2552,10 +2585,24 @@ class TestSh(unittest.TestCase):
                 self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
                 self.assertRegex(r.stdout, "\nFAIL: " + says)
                 self.assertNotIn("\nRan ", r.stdout + r.stderr)
-        # a child that the loading waited for passes
-        (d / "tests" / "test_load.py").write_text(
-            "import subprocess\nR = subprocess.run(['sh', '-c', 'exit 3'])\nassert R.returncode == 3\n" + GOOD_TEST)
-        self.passes(d)
+        # what the loading waited for, closed, cancelled or did not send passes.  The random module seeds itself again
+        # in a forked process, and a worker gives it back its state: a wrong test of a seeded draw fails, a right one
+        # passes
+        draw = ("import random, unittest\nrandom.seed(0)\nclass R(unittest.TestCase):\n    def test_r(self):\n"
+                "        self.assert{}(random.random(), random.Random(0).random())\n")
+        (d / "tests" / "test_load.py").write_text(draw.format("NotEqual"))
+        r = self.run_sh(d)
+        self.assertEqual((r.returncode, r.stdout.splitlines()[-1:]), (1, ["FAILED"]), r.stdout + r.stderr)
+        self.assertIn("\nFAILED (failures=1)\n", r.stdout)
+        for code in ("import subprocess\nR = subprocess.run(['sh', '-c', 'exit 3'])\nassert R.returncode == 3\n"
+                     + GOOD_TEST, "open(__file__).close()\n" + GOOD_TEST,
+                     "import signal\nsignal.signal(signal.SIGALRM, lambda *a: None)\nsignal.alarm(30)\n"
+                     "signal.alarm(0)\n" + GOOD_TEST,
+                     "import signal\nsignal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGUSR1})\n" + GOOD_TEST,
+                     "import logging, concurrent.futures\n" + draw.format("Equal")):
+            with self.subTest(code=code):
+                (d / "tests" / "test_load.py").write_text(code)
+                self.passes(d)
 
     def test_what_a_test_holds_once_the_tests_have_run(self):
         # a test that makes another one hold a function as it runs (as the default of an argument) makes that function

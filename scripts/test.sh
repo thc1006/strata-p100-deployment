@@ -493,11 +493,12 @@ unittest.TestCase._callTestMethod = call       # (IsolatedAsyncioTestCase has it
 # the thread that calls it.  The run fails when the loading left such a thing (see the checks before the fork).  The
 # random module seeds itself again in a forked process, so that two workers do not draw the same numbers; when the
 # loading seeded it (random.seed with a seed, random.setstate), a worker gives it back the state it had at the fork.  A
-# random.Random that the loading made draws the same numbers in each worker.  What still differs in a worker is its pid
-# and parent pid, and its CPU time and other resource use (time.process_time, resource.getrusage), which start again
-# at zero.  A worker takes the next unit from a file that all of them read through one open file description (each
-# read moves its offset on), runs it, and writes down what the checks below need; this process then merges that,
-# prints unittest's report and runs the checks.  A unit is a test,
+# random.Random that the loading made draws the same numbers in each worker.  What still differs in a worker, among
+# other things, is its pid and parent pid, its CPU time and other resource use (time.process_time, resource.getrusage),
+# which start again at zero, and a mapping that the loading marked mmap.MADV_DONTFORK, which a worker does not have: a
+# test that reads it ends its worker with SIGSEGV, and the run fails.  A worker takes the next unit from a file that all
+# of them read through one open file description (each read moves its offset on), runs it, and writes down what the
+# checks below need; this process then merges that, prints unittest's report and runs the checks.  A unit is a test,
 # or a suite other than a plain unittest.TestSuite (its own run() may do what a plain one does not); the plain suites of
 # the loader are cut into their tests, which unittest's fixtures then see in the same order, so a worker sets a class or
 # module up (setUpClass, setUpModule) and tears it down again for each run of its tests that it takes.  (Test hook: with
@@ -654,7 +655,7 @@ def work(k, saved, mask, gate, report):
     try:
         try:
             if seeded:
-                random.setstate(RANDOM_STATE)       # (see the check before the fork)
+                random.setstate(RANDOM_STATE)       # (see the comment on the workers)
             atexit._clear()                     # what the tests registered as they loaded runs in this process's
             for f in list(weakref.finalize._registry):              # parent, and so do the loading's finalizers;
                 f.atexit = False

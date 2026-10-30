@@ -7,11 +7,16 @@
 # folder (IQ3_S's shard 1, 54.8 GB; the IQ3_S pack, 51.8 GB; the MTP files; the links into production's read-only
 # view).  A further run a few minutes later, after they were gone, found nothing to remove; its output was not kept.
 # Only the sandbox was touched: rm named only paths under ~/rebuild-rehearsal/root, and the 33 production paths that the
-# self-test compares (inode, link count, size, mtime, ctime) are unchanged in both runs (section 9 below, and the
-# checks after this record).  The checks of R0-R11 were recorded before (results/rebuild-rehearsal-*-20261030.txt);
-# the lost parts were not rebuilt (the maintainer's decision).  Since then the self-test refuses a sandbox that has
-# ~/dev/strata or ~/dev/Strata-data, refuses while an rr-* job runs, and removes only through a function that refuses
-# a path that does not resolve under ~/rebuild-rehearsal/root.
+# self-test compares (inode, link count, size, mtime, ctime) are unchanged in the 03:38 run (section 9 below, and the
+# checks after this record) and in a run at 04:14 of the version of commit 2731c92
+# (results/rebuild-rehearsal-selftest-committed-20261030.txt).  The checks of R0-R11 were recorded before
+# (results/rebuild-rehearsal-*-20261030.txt); the lost parts were not rebuilt (the maintainer's decision).  Since then
+# the self-test refuses a sandbox that has ~/dev/strata or ~/dev/Strata-data, refuses while an rr-* job runs, and
+# removes only through a function that refuses a path that does not resolve under ~/rebuild-rehearsal/root.
+# Its jobs ran in rr's default mode, in which the whole real home was readable inside, credentials too, and the network
+# was the host's (results/rebuild-rehearsal-r0-20261030.txt, section 1).
+# Part 2 is not part of the self-test's output; it was added after the run.  Its check-drift.sh line describes the
+# command instead of giving it, and only the last two sections of that run's output are here.
 #
 # 1. The record of the 03:38 run, as it ran (host name written <host>).
 # R0 of the rebuild rehearsal (PLAN.md section 5): the bubblewrap sandbox's self-test, on <host>, 2026-10-30 03:38:06 +0800.

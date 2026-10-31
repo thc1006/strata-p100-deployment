@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 600" width="960" height="600" role="img" aria-labelledby="t d" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif">
+<title id="t">Where the service ran: run ab3-iq3s-1, 2026-10-20</title>
+<desc id="d">Where the service ran in run ab3-iq3s-1 on 2026-10-20. Clients send requests to server.py, which runs 4 requests at a time on one Strata 0.1.45 engine. The engine splits the model's 48 layers over four Tesla P100 cards, and a token passes them in turn: GPU 0 runs layers 0 to 12 with 11.6 GiB of expert cache and had 14.6 GiB in use at most; GPU 1 runs layers 13 to 24 with 11.5 GiB of expert cache and had 14.2 GiB in use at most; GPU 2 runs layers 25 to 37 with 12.2 GiB of expert cache and had 14.9 GiB in use at most; GPU 3 runs layers 38 to 47 with 10.7 GiB of expert cache and had 14.7 GiB in use at most. Each card has 16 GiB; the memory in use is the most seen in the 27 minutes of the run. 98% of the experts are on the cards. Host RAM, 62.8 GiB, holds the per-layer embedding table, 26.8 GiB locked; 5.5 GiB of experts, page-locked: the 2% no card holds, and copies of the experts in the card slots that reading a prompt borrows; and the parked conversations, 8.0 GiB at most. Each card reads RAM over PCIe at 11.0–11.5 GB/s. This repository checks the config before every start, waits for the load, checks the service every 2 minutes, and compares the machine with the repository when asked.</desc>
+<rect x="0" y="0" width="960" height="600" rx="0" fill="#ffffff" stroke="none"/>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#59636e"/></marker></defs>
+<rect x="20" y="20" width="250" height="60" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="145" y="45" font-size="15" fill="#1f2328" text-anchor="middle" font-weight="600">Lab members' clients</text>
+<text x="145" y="66" font-size="13" fill="#59636e" text-anchor="middle">OpenAI or Anthropic API</text>
+<line x1="270" y1="50" x2="355" y2="50" stroke="#59636e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="312" y="41" font-size="13" fill="#59636e" text-anchor="middle">HTTP</text>
+<rect x="355" y="20" width="290" height="60" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="500" y="45" font-size="15" fill="#1f2328" text-anchor="middle" font-weight="600">server.py</text>
+<text x="500" y="66" font-size="13" fill="#59636e" text-anchor="middle">4 requests at a time</text>
+<line x1="500" y1="80" x2="500" y2="110" stroke="#59636e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="924" y="45" font-size="13" fill="#59636e" text-anchor="end">run ab3-iq3s-1 on 2026-10-20</text>
+<rect x="20" y="110" width="920" height="236" rx="8" fill="none" stroke="#59636e"/>
+<text x="36" y="136" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">Strata 0.1.45 engine, one process</text>
+<text x="924" y="136" font-size="13" fill="#59636e" text-anchor="end">98% of the experts on the cards</text>
+<rect x="36" y="150" width="206" height="158" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="48" y="174" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">GPU 0</text>
+<text x="230" y="174" font-size="13" fill="#59636e" text-anchor="end">Tesla P100</text>
+<text x="48" y="202" font-size="15" fill="#1f2328" text-anchor="start">layers 0–12</text>
+<text x="48" y="230" font-size="13" fill="#1f2328" text-anchor="start">expert cache 11.6 GiB</text>
+<rect x="48" y="242" width="182" height="16" rx="3" fill="#ffffff" stroke="#59636e"/>
+<rect x="48" y="242" width="166.226" height="16" rx="3" fill="#cfe3f1" stroke="none"/>
+<rect x="48" y="242" width="132.291" height="16" rx="3" fill="#0072B2" stroke="none"/>
+<line x1="214.226" y1="242" x2="214.226" y2="258" stroke="#59636e" stroke-width="1.5"/>
+<text x="48" y="278" font-size="13" fill="#59636e" text-anchor="start">peak in use 14.6 GiB</text>
+<text x="48" y="295" font-size="13" fill="#59636e" text-anchor="start">of 16 GiB</text>
+<line x1="242" y1="198" x2="262" y2="198" stroke="#59636e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="262" y="150" width="206" height="158" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="274" y="174" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">GPU 1</text>
+<text x="456" y="174" font-size="13" fill="#59636e" text-anchor="end">Tesla P100</text>
+<text x="274" y="202" font-size="15" fill="#1f2328" text-anchor="start">layers 13–24</text>
+<text x="274" y="230" font-size="13" fill="#1f2328" text-anchor="start">expert cache 11.5 GiB</text>
+<rect x="274" y="242" width="182" height="16" rx="3" fill="#ffffff" stroke="#59636e"/>
+<rect x="274" y="242" width="160.983" height="16" rx="3" fill="#cfe3f1" stroke="none"/>
+<rect x="274" y="242" width="130.244" height="16" rx="3" fill="#0072B2" stroke="none"/>
+<line x1="434.983" y1="242" x2="434.983" y2="258" stroke="#59636e" stroke-width="1.5"/>
+<text x="274" y="278" font-size="13" fill="#59636e" text-anchor="start">peak in use 14.2 GiB</text>
+<text x="274" y="295" font-size="13" fill="#59636e" text-anchor="start">of 16 GiB</text>
+<line x1="468" y1="198" x2="488" y2="198" stroke="#59636e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="488" y="150" width="206" height="158" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="500" y="174" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">GPU 2</text>
+<text x="682" y="174" font-size="13" fill="#59636e" text-anchor="end">Tesla P100</text>
+<text x="500" y="202" font-size="15" fill="#1f2328" text-anchor="start">layers 25–37</text>
+<text x="500" y="230" font-size="13" fill="#1f2328" text-anchor="start">expert cache 12.2 GiB</text>
+<rect x="500" y="242" width="182" height="16" rx="3" fill="#ffffff" stroke="#59636e"/>
+<rect x="500" y="242" width="169.847" height="16" rx="3" fill="#cfe3f1" stroke="none"/>
+<rect x="500" y="242" width="138.32" height="16" rx="3" fill="#0072B2" stroke="none"/>
+<line x1="669.847" y1="242" x2="669.847" y2="258" stroke="#59636e" stroke-width="1.5"/>
+<text x="500" y="278" font-size="13" fill="#59636e" text-anchor="start">peak in use 14.9 GiB</text>
+<text x="500" y="295" font-size="13" fill="#59636e" text-anchor="start">of 16 GiB</text>
+<line x1="694" y1="198" x2="714" y2="198" stroke="#59636e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="714" y="150" width="206" height="158" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="726" y="174" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">GPU 3</text>
+<text x="908" y="174" font-size="13" fill="#59636e" text-anchor="end">Tesla P100</text>
+<text x="726" y="202" font-size="15" fill="#1f2328" text-anchor="start">layers 38–47</text>
+<text x="726" y="230" font-size="13" fill="#1f2328" text-anchor="start">expert cache 10.7 GiB</text>
+<rect x="726" y="242" width="182" height="16" rx="3" fill="#ffffff" stroke="#59636e"/>
+<rect x="726" y="242" width="167.648" height="16" rx="3" fill="#cfe3f1" stroke="none"/>
+<rect x="726" y="242" width="122.054" height="16" rx="3" fill="#0072B2" stroke="none"/>
+<line x1="893.648" y1="242" x2="893.648" y2="258" stroke="#59636e" stroke-width="1.5"/>
+<text x="726" y="278" font-size="13" fill="#59636e" text-anchor="start">peak in use 14.7 GiB</text>
+<text x="726" y="295" font-size="13" fill="#59636e" text-anchor="start">of 16 GiB</text>
+<rect x="36" y="322" width="14" height="12" rx="2" fill="#0072B2" stroke="none"/>
+<text x="56" y="333" font-size="13" fill="#59636e" text-anchor="start">expert cache</text>
+<rect x="176.72" y="322" width="14" height="12" rx="2" fill="#cfe3f1" stroke="#59636e"/>
+<text x="196.72" y="333" font-size="13" fill="#59636e" text-anchor="start">other memory in use, peak of the run (27 min)</text>
+<rect x="583.42" y="322" width="14" height="12" rx="2" fill="#ffffff" stroke="#59636e"/>
+<text x="603.42" y="333" font-size="13" fill="#59636e" text-anchor="start">free at that peak</text>
+<line x1="139" y1="346" x2="139" y2="374" stroke="#59636e" stroke-width="1.2" stroke-dasharray="4 3"/>
+<line x1="365" y1="346" x2="365" y2="374" stroke="#59636e" stroke-width="1.2" stroke-dasharray="4 3"/>
+<line x1="591" y1="346" x2="591" y2="374" stroke="#59636e" stroke-width="1.2" stroke-dasharray="4 3"/>
+<line x1="817" y1="346" x2="817" y2="374" stroke="#59636e" stroke-width="1.2" stroke-dasharray="4 3"/>
+<rect x="20" y="374" width="920" height="120" rx="6" fill="#f6f8fa" stroke="#d1d9e0"/>
+<text x="36" y="400" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">Host RAM, 62.8 GiB</text>
+<text x="924" y="400" font-size="13" fill="#59636e" text-anchor="end">PCIe to each card 11.0–11.5 GB/s</text>
+<rect x="36" y="414" width="180" height="16" rx="3" fill="#ffffff" stroke="#d1d9e0"/>
+<rect x="36" y="414" width="76.8783" height="16" rx="3" fill="#f3e3d9" stroke="#B34700"/>
+<text x="228" y="427" font-size="13" fill="#1f2328" text-anchor="start">26.8 GiB per-layer embedding table, locked</text>
+<rect x="36" y="438" width="180" height="16" rx="3" fill="#ffffff" stroke="#d1d9e0"/>
+<rect x="36" y="438" width="15.6497" height="16" rx="3" fill="#f3e3d9" stroke="#B34700"/>
+<text x="228" y="451" font-size="13" fill="#1f2328" text-anchor="start">5.5 GiB experts, page-locked: the 2% off the cards, and those of slots lent to prompts</text>
+<rect x="36" y="462" width="180" height="16" rx="3" fill="#ffffff" stroke="#d1d9e0"/>
+<rect x="36" y="462" width="22.9299" height="16" rx="3" fill="none" stroke="#B34700" stroke-dasharray="4 3"/>
+<text x="228" y="475" font-size="13" fill="#1f2328" text-anchor="start">8.0 GiB parked conversations, at most</text>
+<rect x="20" y="512" width="920" height="70" rx="6" fill="none" stroke="#59636e" stroke-dasharray="6 4"/>
+<text x="36" y="534" font-size="14" fill="#1f2328" text-anchor="start" font-weight="600">This repository</text>
+<text x="36" y="554" font-size="13" fill="#59636e" text-anchor="start">checks the config before every start · waits for the load · checks the service every 2 minutes</text>
+<text x="36" y="572" font-size="13" fill="#59636e" text-anchor="start">compares the machine with the repository when asked</text>
+</svg>

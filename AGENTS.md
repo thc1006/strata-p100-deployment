@@ -24,6 +24,9 @@ at the next start of the service. Other people use the service.
   `scripts/deploy.sh` does).
 - `python3 tools/configure_strata_q3.py ~/dev/strata/strata-iq3_xxs.json $(sed -e 's/#.*//' config/profile.conf) --dry-run`: shows what
   the tool would change in the live config without writing it.
+- `python3 docs/images/readme_figures.py`: draws the README's figures from the records of the runs named in its
+  `RUNS`, and the watchdog interval from `systemd/strata-q3-health.timer`. `tests/test_readme_figures.py` fails when
+  the committed figures differ from what it draws, or the README's text from its numbers.
 - `scripts/deploy.sh`: whether `origin/main` can be deployed to this checkout. To find out, it runs that commit's
   `scripts/test.sh` and `scripts/check-drift.sh` here; the checkout stays as it was. `--apply` then deploys it: a
   fast-forward, with no sudo and no restart.

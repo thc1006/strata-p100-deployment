@@ -1,12 +1,30 @@
 # Strata on 4× Tesla P100: Qwen3.8-Flash-Next deployment and benchmarks
 
-Last updated: 2026-10-29.
+Last updated: 2026-10-31.
 
 This repository holds the configuration, operations scripts and measurements of a production deployment of [Strata](https://github.com/Niko1221/Strata), an LLM inference engine. The service runs ISTA-DASLab's GSQ-RCO IQ3_S quantization of Qwen3.8-Flash-Next, a mixture-of-experts (MoE) model, on four NVIDIA Tesla P100 16 GB GPUs (Pascal, sm_60), in a VMware VM with a ZFS root file system. It offers OpenAI-compatible and Anthropic-compatible APIs on `127.0.0.1:8080` to the members of one lab.
+
+The engine splits the model's 48 layers over the four cards, and each token passes them in turn. 98% of the experts fit in the cards' memory. The other experts, the per-layer embedding table and the parked conversations are in RAM.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/deployment-dark.svg">
+  <img src="docs/images/deployment.svg" width="960" alt="Diagram of the service: clients, server.py, one Strata engine on four Tesla P100 cards with their layers and memory, and host RAM.">
+</picture>
+
+<sub>As the engine ran in decision 0004's run `ab3-iq3s-1` on 2026-10-20: its arguments and its lines at the load (`results/ab3-iq3s-1-arm.txt`), and the most memory in use on each card and the most RAM locked during the run (`results/ab3-iq3s-1-monitor.csv`). The watchdog interval comes from `systemd/strata-q3-health.timer`.</sub>
 
 ## What the measurements show
 
 All numbers but the QUANTS.md figures come from this machine. The [deployment record](docs/deployment-record.md) gives the method, the raw files and the limits of each one.
+
+IQ3_S on Strata 0.1.45 (config SHA-256 `e3e5a7b4…`), in decision 0004's runs `ab3-iq3s-1` and `ab3-iq3s-2` of 2026-10-20: with one request at a time, the first token came 2.3–2.8 s after a short prompt was sent, 11.0–11.8 s after 4.4K tokens and 41.0–41.8 s after 32K. Four clients at once received 94.6–95.0 tokens per second together in a run's median round, and a run's median request 26.9–27.0 tokens per second after its first token.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/speed-dark.svg">
+  <img src="docs/images/speed.svg" width="960" alt="Two charts: time to the first token by prompt length, and tokens per second with 1, 2 and 4 clients at once.">
+</picture>
+
+<sub>From the runs' records ([decision 0004](docs/decisions/0004-iq3-s.md)). Left: every request of their `replicate` test, three per prompt and run, with reasoning off, at most 256 tokens per answer and nothing served from the prompt cache (`results/stress.jsonl`). The test is modelled on a [community benchmark on four Tesla P100 cards](https://github.com/Niko1221/Strata/blob/477ac13cbe8e582c20484871ce459d20d82df09d/bench/results/2026-10-06-community-4x-tesla-p100/README.md) in Strata's repository. Right: Strata's `tools/serve_load.py`, at most 512 tokens per answer, three rounds per run (`results/ab3-iq3s-*-serve_load.json`). Blue: the tokens all clients received in a round, over the round's time; each dot is a run's median round. Orange: each request's tokens over its time after its first token; each dot is the median over a run's requests.</sub>
 
 On Strata 0.1.43.1 with IQ3_XXS (the engine until 2026-10-19, the model until 2026-10-20):
 
@@ -43,7 +61,7 @@ On Strata 0.1.45, deployed on 2026-10-19:
 | `bench/` | Load, latency and robustness tests, A/B tests of engine versions, switches and models, tracing, and the engine build script |
 | `results/` | Raw test results ([index](results/README.md)) |
 | `examples/requests/` | Example API requests |
-| `docs/` | Documentation, listed below |
+| `docs/` | Documentation, listed below. `docs/images/`: this page's figures and `readme_figures.py`, which draws them from measured runs |
 | `.github/workflows/` | CI: `test.yml` runs `scripts/test.sh --repo-only --harnesses --jobs 6` |
 
 ## Install and use

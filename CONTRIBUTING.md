@@ -17,7 +17,8 @@ measurement. For a security problem, follow the [security policy](SECURITY.md) i
   script also checks programs that exist only on the production machine.
 - A change to `tools/configure_strata_q3.py` needs a unit test in `tests/`.
 - A change to the deployed configuration needs measurements from this hardware. Put the raw output in `results/` and
-  explain the change in [docs/deployment-record.md](docs/deployment-record.md).
+  explain the change in [docs/deployment-record.md](docs/deployment-record.md). When the README's figures should show
+  the new runs, set `RUNS` in `docs/images/readme_figures.py`, run it, and update the README's text around the figures.
 - Do not edit existing files in `results/`. They are raw measurements.
 - Write documentation in plain English, and add an entry to [CHANGELOG.md](CHANGELOG.md) for a notable change.
 

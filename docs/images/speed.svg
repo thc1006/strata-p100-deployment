@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" width="960" height="420" role="img" aria-labelledby="t d" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans',Helvetica,Arial,sans-serif">
+<title id="t">Measured speed of IQ3_S on Strata 0.1.45, 2026-10-20 (runs ab3-iq3s-1, ab3-iq3s-2)</title>
+<desc id="d">Measured speed of IQ3_S on Strata 0.1.45, 2026-10-20 (runs ab3-iq3s-1, ab3-iq3s-2). Left: time to the first token of one request at a time: 217–287 tokens, 2.3–2.8 s; 4.4K, 11.0–11.8 s; 32K, 41.0–41.8 s. Right: tokens per second with 1, 2 and 4 clients at once: all clients together in a run's median round, and a run's median request after its first token: 1 client: 32.1 together, 34.5 per request; 2 clients: 55.6–55.8 together, 30.7–30.8 per request; 4 clients: 94.6–95.0 together, 26.9–27.0 per request.</desc>
+<rect x="0" y="0" width="960" height="420" rx="0" fill="#ffffff" stroke="none"/>
+<text x="20" y="406" font-size="13" fill="#59636e" text-anchor="start">IQ3_S on Strata 0.1.45, runs ab3-iq3s-1 and ab3-iq3s-2 on 2026-10-20</text>
+<text x="20" y="28" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">Time to the first token, one request at a time</text>
+<line x1="70" y1="330" x2="450" y2="330" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="334" font-size="13" fill="#59636e" text-anchor="end">0 s</text>
+<line x1="70" y1="276" x2="450" y2="276" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="280" font-size="13" fill="#59636e" text-anchor="end">10 s</text>
+<line x1="70" y1="222" x2="450" y2="222" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="226" font-size="13" fill="#59636e" text-anchor="end">20 s</text>
+<line x1="70" y1="168" x2="450" y2="168" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="172" font-size="13" fill="#59636e" text-anchor="end">30 s</text>
+<line x1="70" y1="114" x2="450" y2="114" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="118" font-size="13" fill="#59636e" text-anchor="end">40 s</text>
+<line x1="70" y1="60" x2="450" y2="60" stroke="#d1d9e0" stroke-width="1"/>
+<text x="62" y="64" font-size="13" fill="#59636e" text-anchor="end">50 s</text>
+<text x="70" y="350" font-size="13" fill="#59636e" text-anchor="middle">0</text>
+<text x="160.423" y="350" font-size="13" fill="#59636e" text-anchor="middle">8K</text>
+<text x="250.845" y="350" font-size="13" fill="#59636e" text-anchor="middle">16K</text>
+<text x="341.268" y="350" font-size="13" fill="#59636e" text-anchor="middle">24K</text>
+<text x="431.69" y="350" font-size="13" fill="#59636e" text-anchor="middle">32K</text>
+<text x="260" y="372" font-size="13" fill="#59636e" text-anchor="middle">prompt tokens</text>
+<circle cx="72.5" cy="317.9" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="72.5" cy="317.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="72.5" cy="317.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="72.5" cy="317.7" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="72.5" cy="317.7" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="72.5" cy="317.7" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="315.7" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="315.6" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="314.9" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="314.9" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="315.6" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="73.2" cy="315.6" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.1" cy="269.5" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.1" cy="269.5" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.5" cy="270.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.5" cy="270.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.7" cy="268.2" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="119.7" cy="266.2" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.4" cy="108.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.4" cy="108.2" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.7" cy="104.1" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.7" cy="104.8" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.9" cy="106.0" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="431.9" cy="105.5" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<text x="87.2439" y="304.88" font-size="13" fill="#1f2328" text-anchor="start">217–287 tokens: 2.3–2.8 s</text>
+<text x="133.698" y="256.172" font-size="13" fill="#1f2328" text-anchor="start">4.4K: 11.0–11.8 s</text>
+<text x="421.905" y="94.118" font-size="13" fill="#1f2328" text-anchor="end">32K: 41.0–41.8 s</text>
+<text x="500" y="28" font-size="15" fill="#1f2328" text-anchor="start" font-weight="600">Tokens per second, clients at once</text>
+<line x1="560" y1="330" x2="920" y2="330" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="334" font-size="13" fill="#59636e" text-anchor="end">0</text>
+<line x1="560" y1="276" x2="920" y2="276" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="280" font-size="13" fill="#59636e" text-anchor="end">20</text>
+<line x1="560" y1="222" x2="920" y2="222" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="226" font-size="13" fill="#59636e" text-anchor="end">40</text>
+<line x1="560" y1="168" x2="920" y2="168" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="172" font-size="13" fill="#59636e" text-anchor="end">60</text>
+<line x1="560" y1="114" x2="920" y2="114" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="118" font-size="13" fill="#59636e" text-anchor="end">80</text>
+<line x1="560" y1="60" x2="920" y2="60" stroke="#d1d9e0" stroke-width="1"/>
+<text x="552" y="64" font-size="13" fill="#59636e" text-anchor="end">100</text>
+<text x="620" y="350" font-size="13" fill="#59636e" text-anchor="middle">1</text>
+<circle cx="613.0" cy="243.2" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="613.0" cy="243.4" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="627.0" cy="236.7" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<circle cx="627.0" cy="236.9" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<text x="604" y="247.248" font-size="13" fill="#0072B2" text-anchor="end">32.1</text>
+<text x="636" y="240.741" font-size="13" fill="#B34700" text-anchor="start">34.5</text>
+<text x="740" y="350" font-size="13" fill="#59636e" text-anchor="middle">2</text>
+<circle cx="733.0" cy="179.9" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="733.0" cy="179.2" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="747.0" cy="246.9" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<circle cx="747.0" cy="247.0" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<text x="724" y="183.233" font-size="13" fill="#0072B2" text-anchor="end">55.6–55.8</text>
+<text x="756" y="250.94" font-size="13" fill="#B34700" text-anchor="start">30.7–30.8</text>
+<text x="860" y="350" font-size="13" fill="#59636e" text-anchor="middle">4</text>
+<circle cx="853.0" cy="74.5" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="853.0" cy="73.4" r="4.5" fill="#cfe3f1" stroke="#0072B2" stroke-width="1.5"/>
+<circle cx="867.0" cy="257.5" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<circle cx="867.0" cy="257.2" r="4.5" fill="none" stroke="#B34700" stroke-width="1.5"/>
+<text x="844" y="77.3936" font-size="13" fill="#0072B2" text-anchor="end">94.6–95.0</text>
+<text x="876" y="261.201" font-size="13" fill="#B34700" text-anchor="start">26.9–27.0</text>
+<text x="740" y="372" font-size="13" fill="#59636e" text-anchor="middle">clients sending at the same time</text>
+<text x="844" y="59.3936" font-size="13" fill="#0072B2" text-anchor="end">all clients together</text>
+<text x="636" y="204.741" font-size="13" fill="#B34700" text-anchor="start">a request (median),</text>
+<text x="636" y="221.741" font-size="13" fill="#B34700" text-anchor="start">after its first token</text>
+</svg>

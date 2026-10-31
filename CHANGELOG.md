@@ -2,6 +2,12 @@
 
 Notable changes to this machine and this repository, newest first. There are no version numbers; sections are by date. The categories follow [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.1.0/).
 
+## 2026-10-31
+
+### Added
+
+- The README has two figures from decision 0004's IQ3_S runs `ab3-iq3s-1` and `ab3-iq3s-2` of 2026-10-20: where the service's parts ran, and what a client got (the time to the first token by prompt length, and tokens per second with 1, 2 and 4 clients). `docs/images/readme_figures.py` draws them, in a light and a dark version, from the runs' records and the watchdog interval in `systemd/strata-q3-health.timer`, so a later change of the config does not change them; to show other runs, set its `RUNS`. It stops, and writes nothing, when a number cannot be read, the runs differ, or a line of text would not fit. `tests/test_readme_figures.py` fails when a committed figure is not what the script draws, or when the README's text gives other numbers.
+
 ## 2026-10-30
 
 ### Added
